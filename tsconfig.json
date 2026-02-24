@@ -1,0 +1,29 @@
+{
+  "include": [
+    "src/env.d.ts",
+    "src/**/*",
+    "src/**/*.vue"
+  ],
+  "compilerOptions": {
+    "composite": true,
+    "esModuleInterop": true,
+    "moduleResolution": "bundler",
+    "maxNodeModuleJsDepth": 2,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@emi": ["native/emi-stub.ts"],
+      "@opencc": ["native/ferrous-opencc-wasm/pkg"]
+    },
+    "types": ["node", "./auto-imports.d.ts", "./components.d.ts"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "target": "ES2022",
+    "module": "ESNext",
+    "strict": true,
+    "jsx": "preserve",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  }
+}
