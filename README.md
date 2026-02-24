@@ -72,4 +72,3 @@ npx cap open android
 - Pinia (状态管理)
 - Naive UI (UI 组件)
 - Axios (HTTP 请求)
-- PWA (离线支持)
