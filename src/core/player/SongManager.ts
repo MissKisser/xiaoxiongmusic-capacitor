@@ -407,26 +407,30 @@ class SongManager {
       // 是否可解锁（移除 isElectron 限制，允许 Web 端也使用解锁功能）
       const canUnlock = nextSong.type !== "radio" && settingStore.useSongUnlock;
 
-      // 优先尝试解锁（获取完整音频，避免30秒试听限制）
-      if (canUnlock) {
-        console.log(`🔓 [${songId}] 预加载：优先尝试解锁获取完整音频...`);
-        const unlockUrl = await this.getUnlockSongUrl(nextSong);
-        if (unlockUrl.url) {
-          console.log(`✅ [${songId}] 预加载：解锁成功，使用解锁链接`);
-          this.nextPrefetch = { id: songId, url: unlockUrl.url, isUnlocked: true, quality: unlockUrl.quality };
-          return this.nextPrefetch;
-        }
-        console.log(`⚠️ [${songId}] 预加载：解锁失败，尝试使用官方链接...`);
-      }
-
-      // 解锁失败或未启用解锁，尝试获取官方链接作为备选
+      // 优先尝试获取官方链接（对齐 SPlayer 逻辑，避免免费歌曲被第三方翻唱替换）
       const { url: officialUrl, isTrial, quality } = await this.getOnlineUrl(songId, false);
       if (officialUrl && !isTrial) {
         // 官方可播放且非试听
         this.nextPrefetch = { id: songId, url: officialUrl, isUnlocked: false, quality };
         return this.nextPrefetch;
+      } else if (canUnlock) {
+        // 官方失败或为试听时尝试解锁兜底
+        console.log(`🔓 [${songId}] 预加载：官方链接无效或仅可试听，尝试解锁兜底...`);
+        const unlockUrl = await this.getUnlockSongUrl(nextSong);
+        if (unlockUrl.url) {
+          console.log(`✅ [${songId}] 预加载：解锁成功，使用解锁链接`);
+          this.nextPrefetch = { id: songId, url: unlockUrl.url, isUnlocked: true, quality: unlockUrl.quality };
+          return this.nextPrefetch;
+        } else if (officialUrl && isTrial && settingStore.playSongDemo) {
+          // 解锁失败，若官方为试听且允许试听，保留官方试听地址
+          this.nextPrefetch = { id: songId, url: officialUrl, isUnlocked: false, quality };
+          return this.nextPrefetch;
+        } else {
+          // 无可用源
+          return;
+        }
       } else if (officialUrl && isTrial && settingStore.playSongDemo) {
-        // 官方为试听且允许试听
+        // 官方为试听且允许试听，但未启用解锁
         this.nextPrefetch = { id: songId, url: officialUrl, isUnlocked: false, quality };
         return this.nextPrefetch;
       } else {
@@ -528,7 +532,6 @@ class SongManager {
         console.log(`[UNLOCK] [${songId}] 灰色歌曲解锁结果:`, {
           hasUrl: !!unlockResult.url,
           urlLength: unlockResult.url?.length || 0,
-          urlPreview: unlockResult.url ? unlockResult.url.substring(0, 80) + '...' : 'null',
           isUnlocked: unlockResult.isUnlocked,
           unlockSource: unlockResult.unlockSource
         });
@@ -539,33 +542,26 @@ class SongManager {
         console.warn(`[UNLOCK] [${songId}] 灰色歌曲解锁失败，尝试官方链接作为兜底...`);
       }
 
-      // 优先尝试解锁（获取完整音频，避免30秒试听限制）
+      // 优先尝试获取官方链接（对齐 SPlayer 逻辑，避免免费歌曲被第三方翻唱替换）
+      const { url: officialUrl, isTrial, quality } = await this.getOnlineUrl(songId, !!song.pc);
+      console.log(`[SONG] [${songId}] 官方链接获取结果:`, { url: officialUrl, isTrial, quality });
+
+      // 如果官方链接有效且非试听（或者用户接受试听），直接使用官方链接
+      if (officialUrl && officialUrl.trim() !== "" && (!isTrial || (isTrial && settingStore.playSongDemo))) {
+        if (isTrial) {
+          window.$message.warning("当前歌曲仅可试听");
+        }
+        return { id: songId, url: officialUrl, quality, isUnlocked: false, unlockSource: "official" };
+      }
+
+      // 官方链接无效或仅可试听，且允许解锁时，尝试解锁兜底
       if (canUnlock && !isGraySong) {
-        console.log(`[UNLOCK] [${songId}] 优先尝试解锁获取完整音频...`);
+        console.log(`[UNLOCK] [${songId}] 官方链接无效或仅可试听，尝试解锁兜底...`);
         const unlockResult = await this.getUnlockSongUrl(song);
         if (unlockResult.url && unlockResult.url.trim() !== "") {
           console.log(`[UNLOCK] [${songId}] 解锁成功，使用解锁链接播放`);
           return unlockResult;
         }
-        console.log(`[UNLOCK] [${songId}] 解锁失败，尝试使用官方链接...`);
-      }
-
-      // 解锁失败或未启用解锁，尝试获取官方链接
-      const { url: officialUrl, isTrial, quality } = await this.getOnlineUrl(songId, !!song.pc);
-      console.log(`[SONG] [${songId}] 官方链接获取结果:`, { url: officialUrl, isTrial, quality });
-
-      // 验证官方链接是否有效（不能是空字符串）
-      if (officialUrl && officialUrl.trim() !== "" && (!isTrial || (isTrial && settingStore.playSongDemo))) {
-        if (isTrial) {
-          window.$message.warning("当前歌曲仅可试听");
-          // 如果是试听且启用了解锁但解锁失败，提示用户
-          if (canUnlock) {
-            console.warn(`⚠️ [${songId}] 解锁失败，使用官方试听链接（30秒限制）`);
-          }
-        } else {
-          console.log(`✅ [${songId}] 使用官方链接播放`);
-        }
-        return { id: songId, url: officialUrl, quality, isUnlocked: false, unlockSource: "official" };
       }
 
       // 如果官方链接无效，且是灰色歌曲，再次尝试解锁作为兜底
