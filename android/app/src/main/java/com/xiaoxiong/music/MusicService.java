@@ -10,7 +10,9 @@ import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
@@ -46,6 +48,8 @@ public class MusicService extends Service {
     public static final String ACTION_UPDATE_STATE = "com.xiaoxiong.music.UPDATE_STATE";
     public static final String ACTION_UPDATE_POSITION = "com.xiaoxiong.music.UPDATE_POSITION";
     public static final String ACTION_DESTROY = "com.xiaoxiong.music.DESTROY";
+    public static final String ACTION_SET_SLEEP_TIMER = "com.xiaoxiong.music.SET_SLEEP_TIMER";
+    public static final String ACTION_CLEAR_SLEEP_TIMER = "com.xiaoxiong.music.CLEAR_SLEEP_TIMER";
 
     private MediaSessionCompat mediaSession;
     private AudioProxyServer audioProxyServer;
@@ -58,11 +62,17 @@ public class MusicService extends Service {
     private boolean isPlaying = false;
     private long currentDuration = -1; // 新增时长字段
 
+    // ====== [SleepTimer] 睡眠定时器相关 ======
+    private Handler sleepTimerHandler;
+    private Runnable sleepTimerRunnable;
+    private boolean sleepTimerWaitSongEnd = false;
+
     @Override
     public void onCreate() {
         super.onCreate();
         instance = this;
         Log.d(TAG, "onCreate: Service created");
+        sleepTimerHandler = new Handler(Looper.getMainLooper());
         createNotificationChannel();
         createMediaSession();
         startAudioProxyServer();
@@ -105,6 +115,12 @@ public class MusicService extends Service {
                 case ACTION_DESTROY:
                     stopForeground(true);
                     stopSelf();
+                    break;
+                case ACTION_SET_SLEEP_TIMER:
+                    handleSetSleepTimer(intent);
+                    break;
+                case ACTION_CLEAR_SLEEP_TIMER:
+                    handleClearSleepTimer();
                     break;
             }
         }
@@ -377,12 +393,78 @@ public class MusicService extends Service {
     @Override
     public void onDestroy() {
         instance = null;
+        handleClearSleepTimer(); // 清理睡眠定时器
         stopAudioProxyServer();
         if (mediaSession != null) {
             mediaSession.setActive(false);
             mediaSession.release();
         }
         super.onDestroy();
+    }
+
+    // ====== [SleepTimer] 睡眠定时器处理 ======
+
+    /**
+     * 设置睡眠定时器
+     * @param intent 携带 timeMs(long) 和 waitSongEnd(boolean) 参数
+     */
+    private void handleSetSleepTimer(Intent intent) {
+        long timeMs = intent.getLongExtra("timeMs", 0);
+        boolean waitSongEnd = intent.getBooleanExtra("waitSongEnd", false);
+
+        if (timeMs <= 0) {
+            Log.w(TAG, "[SleepTimer] 无效的定时时长: " + timeMs);
+            return;
+        }
+
+        // 先清除已有的定时任务
+        handleClearSleepTimer();
+
+        this.sleepTimerWaitSongEnd = waitSongEnd;
+
+        sleepTimerRunnable = () -> {
+            Log.d(TAG, "[SleepTimer] ⏰ 定时时间到！waitSongEnd=" + sleepTimerWaitSongEnd);
+
+            if (sleepTimerWaitSongEnd) {
+                // 等待当前歌曲播放完：通知前端标记
+                Log.d(TAG, "[SleepTimer] 通知前端等待当前歌曲播放完再暂停");
+                MusicNotificationPlugin pluginInstance = MusicNotificationPlugin.getInstance();
+                if (pluginInstance != null) {
+                    pluginInstance.notifySleepTimerFinished();
+                } else {
+                    // 兜底：如果插件实例不可用，直接暂停
+                    Log.w(TAG, "[SleepTimer] 插件实例不可用，直接执行暂停");
+                    sendBroadcastCompat(MusicControlReceiver.ACTION_PAUSE);
+                }
+            } else {
+                // 立即暂停
+                Log.d(TAG, "[SleepTimer] 立即执行暂停播放");
+                sendBroadcastCompat(MusicControlReceiver.ACTION_PAUSE);
+                // 通知前端定时器已结束（用于清理 UI 状态）
+                MusicNotificationPlugin pluginInstance = MusicNotificationPlugin.getInstance();
+                if (pluginInstance != null) {
+                    pluginInstance.notifySleepTimerFinished();
+                }
+            }
+
+            // 清理自身引用
+            sleepTimerRunnable = null;
+        };
+
+        sleepTimerHandler.postDelayed(sleepTimerRunnable, timeMs);
+        Log.d(TAG, "[SleepTimer] ✅ 定时器已设置: " + (timeMs / 1000) + "秒后触发, waitSongEnd=" + waitSongEnd);
+    }
+
+    /**
+     * 清除睡眠定时器
+     */
+    private void handleClearSleepTimer() {
+        if (sleepTimerRunnable != null) {
+            sleepTimerHandler.removeCallbacks(sleepTimerRunnable);
+            sleepTimerRunnable = null;
+            Log.d(TAG, "[SleepTimer] 🗑️ 定时器已清除");
+        }
+        sleepTimerWaitSongEnd = false;
     }
 
     /**

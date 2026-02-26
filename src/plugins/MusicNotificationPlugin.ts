@@ -40,13 +40,26 @@ export interface MusicNotificationPlugin {
      */
     destroy(): Promise<void>;
 
+    /**
+     * [睡眠定时器] 设置睡眠定时器
+     */
+    setSleepTimer(options: {
+        timeMs: number;
+        waitSongEnd: boolean;
+    }): Promise<void>;
+
+    /**
+     * [睡眠定时器] 清除睡眠定时器
+     */
+    clearSleepTimer(): Promise<void>;
+
 
 
     /**
      * 添加事件监听器
      */
     addListener(
-        eventName: 'play' | 'pause' | 'next' | 'previous' | 'seek',
+        eventName: 'play' | 'pause' | 'next' | 'previous' | 'seek' | 'sleepTimerFinished',
         listenerFunc: (data: any) => void
     ): Promise<{ remove: () => void }>;
 }

@@ -98,13 +98,14 @@
                 : '只有完整播放完的歌曲才会被缓存，中途切歌不会缓存' }}
             </n-text>
 
-            <div class="setting-row">
+            <!-- 缓存上限与滑块分离 -->
+            <div class="setting-row-column">
               <n-text>缓存上限</n-text>
-              <div class="slider-wrap">
+              <div class="slider-wrap-full">
                 <n-slider 
                   :value="settingStore.audioCacheMaxSize" 
                   :min="100" 
-                  :max="2000" 
+                  :max="5000" 
                   :step="100"
                   :disabled="!settingStore.audioCacheEnabled"
                   :format-tooltip="(v: number) => v + ' MB'"
@@ -117,6 +118,11 @@
             <div class="setting-row">
               <n-text>已用空间</n-text>
               <n-text :depth="2">{{ cacheSize }} MB</n-text>
+            </div>
+
+            <div class="setting-row">
+              <n-text>缓存歌曲数</n-text>
+              <n-text :depth="2">{{ cacheCount }} 首</n-text>
             </div>
 
             <n-button 
@@ -168,6 +174,7 @@ import { registerPlugin } from "@capacitor/core";
 const settingStore = useSettingStore();
 const fileInput = ref<HTMLInputElement | null>(null);
 const cacheSize = ref("0");
+const cacheCount = ref(0);
 
 // === 主题模式 ===
 const themeModes = [
@@ -237,7 +244,7 @@ const handleBlurToggle = (enabled: boolean) => {
 
 // === 缓存设置 ===
 interface AudioCachePlugin {
-  getCacheSize(): Promise<{ size: number }>;
+  getCacheSize(): Promise<{ size: number; count: number }>;
   clearCache(): Promise<{ success: boolean }>;
   setCacheConfig(options: { enabled: boolean; maxSize: number; strategy: string }): Promise<{ success: boolean }>;
   getCacheStatus(): Promise<{ enabled: boolean; maxSize: number; currentSize: number; strategy: string }>;
@@ -271,6 +278,7 @@ const refreshCacheSize = async () => {
   try {
     const result = await audioCachePlugin.getCacheSize();
     cacheSize.value = String(result.size);
+    cacheCount.value = result.count || 0;
   } catch (e) {
     console.warn("Failed to get cache size", e);
   }
@@ -296,6 +304,7 @@ const handleClearCache = async () => {
   try {
     await audioCachePlugin.clearCache();
     cacheSize.value = "0";
+    cacheCount.value = 0;
     window.$message.success("缓存已清除");
   } catch (e) {
     window.$message.error("清除缓存失败");
@@ -366,6 +375,33 @@ onMounted(async () => {
     gap: 12px;
     flex: 1;
     max-width: 250px;
+
+    .n-slider {
+      flex: 1;
+    }
+
+    .size-label {
+      white-space: nowrap;
+      min-width: 60px;
+      text-align: right;
+      font-size: 13px;
+    }
+  }
+}
+
+.setting-row-column {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 4px 0;
+  gap: 12px;
+
+  .slider-wrap-full {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
 
     .n-slider {
       flex: 1;

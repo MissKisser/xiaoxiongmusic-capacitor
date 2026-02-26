@@ -31,15 +31,19 @@ public class AudioCachePlugin extends Plugin {
         if (server == null) {
             JSObject ret = new JSObject();
             ret.put("size", 0);
+            ret.put("count", 0);
             call.resolve(ret);
             return;
         }
 
-        long sizeBytes = server.getCacheSize();
+        long[] stat = server.getCacheSize();
+        long sizeBytes = stat[0];
+        long count = stat[1];
         double sizeMB = sizeBytes / (1024.0 * 1024.0);
 
         JSObject ret = new JSObject();
         ret.put("size", Math.round(sizeMB * 100.0) / 100.0); // 保留两位小数
+        ret.put("count", count);
         call.resolve(ret);
     }
 
@@ -83,7 +87,8 @@ public class AudioCachePlugin extends Plugin {
         if (server != null) {
             ret.put("enabled", server.isCacheEnabled());
             ret.put("maxSize", server.getMaxCacheSize() / (1024 * 1024));
-            long sizeBytes = server.getCacheSize();
+            long[] stat = server.getCacheSize();
+            long sizeBytes = stat[0];
             ret.put("currentSize", Math.round(sizeBytes / (1024.0 * 1024.0) * 100.0) / 100.0);
             ret.put("strategy", server.getCacheStrategy());
         } else {

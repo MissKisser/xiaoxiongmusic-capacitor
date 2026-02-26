@@ -24,4 +24,12 @@ export class MusicNotificationWeb extends WebPlugin implements MusicNotification
     async destroy(): Promise<void> {
         // Web 平台不需要实现
     }
+
+    async setSleepTimer(): Promise<void> {
+        // Web 平台不需要实现
+    }
+
+    async clearSleepTimer(): Promise<void> {
+        // Web 平台不需要实现
+    }
 }

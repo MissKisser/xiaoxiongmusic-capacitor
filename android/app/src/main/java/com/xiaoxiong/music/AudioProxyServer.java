@@ -82,21 +82,24 @@ public class AudioProxyServer extends NanoHTTPD {
     }
 
     /**
-     * 获取当前缓存大小（字节），不含临时文件
+     * 获取当前缓存大小（字节）和文件数量，不含临时文件
+     * 返回 long 数组：[大小, 数量]
      */
-    public long getCacheSize() {
+    public long[] getCacheSize() {
         long totalSize = 0;
+        long totalCount = 0;
         if (cacheDir.exists()) {
             File[] files = cacheDir.listFiles();
             if (files != null) {
                 for (File file : files) {
                     if (!file.getName().endsWith(".tmp")) {
                         totalSize += file.length();
+                        totalCount++;
                     }
                 }
             }
         }
-        return totalSize;
+        return new long[]{totalSize, totalCount};
     }
 
     /**
@@ -447,7 +450,7 @@ public class AudioProxyServer extends NanoHTTPD {
         if (!cacheEnabled || maxCacheSize <= 0)
             return;
 
-        long currentSize = getCacheSize();
+        long currentSize = getCacheSize()[0];
         if (currentSize <= maxCacheSize)
             return;
 

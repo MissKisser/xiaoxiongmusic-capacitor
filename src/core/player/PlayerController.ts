@@ -5,7 +5,7 @@ import { type SongType } from "@/types/main";
 import { RepeatModeType, ShuffleModeType } from "@/types/shared";
 import { calculateLyricIndex } from "@/utils/calc";
 import { getCoverColor } from "@/utils/color";
-import { isElectron } from "@/utils/env";
+import { isElectron, isCapacitor } from "@/utils/env";
 import { getPlayerInfoObj, getPlaySongData } from "@/utils/format";
 import { handleSongQuality, shuffleArray, sleep } from "@/utils/helper";
 import { DJ_MODE_KEYWORDS } from "@/utils/meta";
@@ -43,6 +43,8 @@ class PlayerController {
   private lastErrorTime = 0;
   /** 上次更新通知栏进度的时间 */
   private lastProgressUpdateTime = 0;
+  /** [SleepTimer] 原生定时器已触发，等待当前歌曲播放完毕 */
+  private sleepTimerWaitingForSongEnd = false;
 
   constructor() {
     // 初始化 AudioManager（会根据设置自动选择引擎）
@@ -55,6 +57,39 @@ class PlayerController {
     }
 
     this.bindAudioEvents();
+
+    // [SleepTimer] 监听原生层定时器完成事件
+    if (isCapacitor) {
+      this.listenNativeSleepTimer();
+    }
+  }
+
+  /**
+   * [SleepTimer] 监听原生层睡眠定时器完成事件
+   */
+  private async listenNativeSleepTimer() {
+    try {
+      const { MusicNotification } = await import('@/plugins/MusicNotificationPlugin');
+      MusicNotification.addListener('sleepTimerFinished', () => {
+        const statusStore = useStatusStore();
+        console.log('[SleepTimer] 收到原生层定时器完成事件');
+
+        if (statusStore.autoClose.waitSongEnd) {
+          // 等待当前歌曲播完再执行暂停
+          console.log('[SleepTimer] 等待当前歌曲播放完毕后暂停');
+          this.sleepTimerWaitingForSongEnd = true;
+          // 将 remainTime 设为 0 以便 UI 显示“定时已到，等待播完”
+          statusStore.autoClose.remainTime = 0;
+        } else {
+          // 直接暂停（原生层已执行 pause 广播，这里清理 UI 状态）
+          console.log('[SleepTimer] 原生层已执行暂停，清理前端状态');
+          this.resetAutoCloseState();
+        }
+      });
+      console.log('[SleepTimer] 原生睡眠定时器事件监听已注册');
+    } catch (err) {
+      console.warn('[SleepTimer] 注册原生事件监听失败:', err);
+    }
   }
 
   /**
@@ -1112,25 +1147,40 @@ class PlayerController {
     if (this.autoCloseInterval) {
       clearInterval(this.autoCloseInterval);
     }
+    // 重置等待标志
+    this.sleepTimerWaitingForSongEnd = false;
     // 计算目标结束时间戳
     const endTime = Date.now() + remainTime * 1000;
     statusStore.autoClose.enable = true;
     statusStore.autoClose.time = time;
     statusStore.autoClose.endTime = endTime;
     statusStore.autoClose.remainTime = remainTime;
-    // 定时器仅用于 UI 更新，实际计时基于系统时间
+
+    // [SleepTimer] 在 Capacitor 环境下，同时向原生层设置定时器
+    if (isCapacitor) {
+      import('@/plugins/MusicNotificationPlugin').then(({ MusicNotification }) => {
+        MusicNotification.setSleepTimer({
+          timeMs: remainTime * 1000,
+          waitSongEnd: statusStore.autoClose.waitSongEnd,
+        });
+        console.log(`[SleepTimer] 已向原生层发送定时器请求: ${remainTime}秒, waitSongEnd=${statusStore.autoClose.waitSongEnd}`);
+      }).catch(err => {
+        console.warn('[SleepTimer] 发送原生定时器失败:', err);
+      });
+    }
+
+    // 前端定时器仅用于 UI 更新，实际计时基于系统时间
     this.autoCloseInterval = setInterval(() => {
       const now = Date.now();
       const remaining = Math.max(0, Math.ceil((statusStore.autoClose.endTime - now) / 1000));
       statusStore.autoClose.remainTime = remaining;
-      // 到达时间
+      // 到达时间（前端倒计时仅停止 UI 刷新，实际暂停由原生层执行）
       if (remaining <= 0) {
         clearInterval(this.autoCloseInterval);
-        if (!statusStore.autoClose.waitSongEnd) {
+        // 在非 Capacitor 环境下保留原有逻辑
+        if (!isCapacitor && !statusStore.autoClose.waitSongEnd) {
           this.pause();
-          statusStore.autoClose.enable = false;
-          statusStore.autoClose.remainTime = statusStore.autoClose.time * 60;
-          statusStore.autoClose.endTime = 0;
+          this.resetAutoCloseState();
         }
       }
     }, 1000);
@@ -1141,16 +1191,56 @@ class PlayerController {
     const statusStore = useStatusStore();
     const { enable, waitSongEnd, remainTime } = statusStore.autoClose;
 
+    // [SleepTimer] 原生层定时器已触发，且等待当前歌曲播完
+    if (this.sleepTimerWaitingForSongEnd) {
+      console.log('[SleepTimer] 当前歌曲已播完，执行自动关闭');
+      this.sleepTimerWaitingForSongEnd = false;
+      this.pause();
+      this.resetAutoCloseState();
+      return true;
+    }
+
+    // 原有的前端倒计时逻辑（非 Capacitor 环境兼容）
     if (enable && waitSongEnd && remainTime <= 0) {
       console.log("🔄 执行自动关闭");
       this.pause();
-      statusStore.autoClose.enable = false;
-      // 重置时间
-      statusStore.autoClose.remainTime = statusStore.autoClose.time * 60;
-      statusStore.autoClose.endTime = 0;
+      this.resetAutoCloseState();
       return true;
     }
     return false;
+  }
+
+  /**
+   * 重置自动关闭状态
+   */
+  private resetAutoCloseState() {
+    const statusStore = useStatusStore();
+    statusStore.autoClose.enable = false;
+    statusStore.autoClose.remainTime = statusStore.autoClose.time * 60;
+    statusStore.autoClose.endTime = 0;
+    this.sleepTimerWaitingForSongEnd = false;
+  }
+
+  /**
+   * 停止自动关闭定时器
+   */
+  public stopAutoCloseTimer() {
+    const statusStore = useStatusStore();
+    // 清除前端 setInterval
+    if (this.autoCloseInterval) {
+      clearInterval(this.autoCloseInterval);
+      this.autoCloseInterval = undefined;
+    }
+    // [SleepTimer] 清除原生层定时器
+    if (isCapacitor) {
+      import('@/plugins/MusicNotificationPlugin').then(({ MusicNotification }) => {
+        MusicNotification.clearSleepTimer();
+        console.log('[SleepTimer] 已通知原生层清除定时器');
+      }).catch(err => {
+        console.warn('[SleepTimer] 清除原生定时器失败:', err);
+      });
+    }
+    this.resetAutoCloseState();
   }
 
   /**

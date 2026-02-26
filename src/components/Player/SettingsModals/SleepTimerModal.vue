@@ -144,6 +144,10 @@ const onToggleTimer = (value: boolean) => {
 // 等待歌曲结束选项变化
 const onWaitSongEndChange = (value: boolean) => {
   statusStore.autoClose.waitSongEnd = value;
+  // [SleepTimer] 如果定时器正在运行，重新同步到原生层
+  if (enabled.value && statusStore.autoClose.remainTime > 0) {
+    player.startAutoCloseTimer(statusStore.autoClose.time, statusStore.autoClose.remainTime);
+  }
 };
 
 // 启动定时器
@@ -161,19 +165,17 @@ const startTimer = (minutes: number) => {
   
   enabled.value = true;
   
-  // 启动倒计时
+  // [SleepTimer] 通过 PlayerController 启动定时器（会同时通知原生层）
+  player.startAutoCloseTimer(minutes, seconds);
+  
+  // 启动前端倒计时（仅用于 UI 展示）
   startCountdown();
 };
 
 // 停止定时器
 const stopTimer = () => {
-  statusStore.autoClose = {
-    enable: false,
-    time: statusStore.autoClose.time,
-    remainTime: 0,
-    endTime: 0,
-    waitSongEnd: waitSongEnd.value,
-  };
+  // [SleepTimer] 通过 PlayerController 清除定时器（会同时清除原生层）
+  player.stopAutoCloseTimer();
   
   enabled.value = false;
   

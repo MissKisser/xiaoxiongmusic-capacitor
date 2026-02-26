@@ -2,15 +2,29 @@
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { isCapacitor } from "@/utils/env";
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import { syncNativeCookies } from "@/utils/cookie";
-import { useStatusStore, useAuthStore, useVersionStore } from "@/stores";
+import { useStatusStore, useAuthStore, useVersionStore, useSettingStore } from "@/stores";
 import GlobalUpdateModal from "@/components/Modal/GlobalUpdateModal.vue";
 import GlobalAuthModal from "@/components/Modal/GlobalAuthModal.vue";
 
 const router = useRouter();
 const authStore = useAuthStore();
 const versionStore = useVersionStore();
+const settingStore = useSettingStore();
+
+// 定义音频缓存插件接口供全局同步使用
+interface AudioCachePlugin {
+  setCacheConfig(options: { enabled: boolean; maxSize: number; strategy: string }): Promise<{ success: boolean }>;
+}
+let globalAudioCachePlugin: AudioCachePlugin | null = null;
+if (isCapacitor) {
+  try {
+    globalAudioCachePlugin = registerPlugin<AudioCachePlugin>("AudioCache");
+  } catch (e) {
+    console.warn("AudioCache plugin not available for auto-sync", e);
+  }
+}
 
 // 记录上次按返回键的时间，用于双击退出
 const lastBackPressTime = ref(0);
@@ -110,6 +124,20 @@ onMounted(async () => {
       console.log("✅ 启动时 Cookie 同步完成");
     } catch (error) {
       console.error("❌ 启动时 Cookie 同步失败:", error);
+    }
+
+    // [新增] 启动时同步系统缓存配置到原生层
+    if (globalAudioCachePlugin) {
+      try {
+        await globalAudioCachePlugin.setCacheConfig({
+          enabled: settingStore.audioCacheEnabled,
+          maxSize: settingStore.audioCacheMaxSize,
+          strategy: settingStore.audioCacheStrategy,
+        });
+        console.log("✅ 启动时音频缓存配置同步完成: ", settingStore.audioCacheMaxSize + "MB");
+      } catch (e) {
+        console.warn("❌ 启动时音频缓存配置同步失败:", e);
+      }
     }
     
     // 调试：列出 localStorage 中的 cookie

@@ -16,9 +16,17 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 public class MusicNotificationPlugin extends Plugin {
     private static final String TAG = "MusicService"; // 统一 TAG
 
+    // 静态实例引用（供 MusicService 回调访问）
+    private static MusicNotificationPlugin instance;
+
+    public static MusicNotificationPlugin getInstance() {
+        return instance;
+    }
+
     @Override
     public void load() {
         super.load();
+        instance = this;
         MusicControlReceiver.setPluginInstance(this); // 保持 Receiver 以便接收回调
         Log.e(TAG, "Plugin: loaded");
     }
@@ -87,6 +95,49 @@ public class MusicNotificationPlugin extends Plugin {
         Intent intent = new Intent(getContext(), MusicService.class);
         intent.setAction(action);
         getContext().startService(intent);
+    }
+
+    // ====== [SleepTimer] 睡眠定时器接口 ======
+
+    @PluginMethod
+    public void setSleepTimer(PluginCall call) {
+        // Capacitor 的 getLong 可能因 JS 传递的数字类型为 int 而返回 0，需兜底
+        long timeMs = call.getLong("timeMs", 0L);
+        if (timeMs == 0L) {
+            int timeMsInt = call.getInt("timeMs", 0);
+            if (timeMsInt > 0) timeMs = timeMsInt;
+        }
+        boolean waitSongEnd = call.getBoolean("waitSongEnd", false);
+
+        Log.d(TAG, "[SleepTimer] Plugin: setSleepTimer, timeMs=" + timeMs + ", waitSongEnd=" + waitSongEnd);
+
+        Intent intent = new Intent(getContext(), MusicService.class);
+        intent.setAction(MusicService.ACTION_SET_SLEEP_TIMER);
+        intent.putExtra("timeMs", timeMs);
+        intent.putExtra("waitSongEnd", waitSongEnd);
+        getContext().startService(intent);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void clearSleepTimer(PluginCall call) {
+        Log.d(TAG, "[SleepTimer] Plugin: clearSleepTimer");
+
+        Intent intent = new Intent(getContext(), MusicService.class);
+        intent.setAction(MusicService.ACTION_CLEAR_SLEEP_TIMER);
+        getContext().startService(intent);
+        call.resolve();
+    }
+
+    /**
+     * 通知前端睡眠定时器已触发
+     * 由 MusicService 在定时器到期时调用
+     */
+    public void notifySleepTimerFinished() {
+        Log.d(TAG, "[SleepTimer] Plugin: notifySleepTimerFinished -> 发送事件到前端");
+        JSObject ret = new JSObject();
+        ret.put("action", "sleepTimerFinished");
+        notifyListeners("sleepTimerFinished", ret);
     }
 
     // 保持原来的事件通知方法不变 (notifyPlayEvent 等)，因为 Receiver 还会调用它们
