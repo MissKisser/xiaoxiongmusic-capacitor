@@ -39,6 +39,7 @@ declare module 'vue' {
     GlobalAuthModal: typeof import('./src/components/Modal/GlobalAuthModal.vue')['default']
     GlobalUpdateModal: typeof import('./src/components/Modal/GlobalUpdateModal.vue')['default']
     HomePageSectionManager: typeof import('./src/components/Modal/Setting/HomePageSectionManager.vue')['default']
+    ImageCropModal: typeof import('./src/components/Modal/Setting/ImageCropModal.vue')['default']
     JumpArtist: typeof import('./src/components/Modal/JumpArtist.vue')['default']
     KeyboardSetting: typeof import('./src/components/Setting/KeyboardSetting.vue')['default']
     ListComment: typeof import('./src/components/List/ListComment.vue')['default']

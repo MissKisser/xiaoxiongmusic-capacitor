@@ -16,7 +16,7 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-
+2
     // 读取签名配置（可选，如果 keystore.properties 不存在则跳过）
     def keystorePropertiesFile = rootProject.file("keystore.properties")
     def keystoreProperties = new Properties()

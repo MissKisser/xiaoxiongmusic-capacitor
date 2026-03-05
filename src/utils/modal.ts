@@ -160,8 +160,10 @@ export const openBatchList = (data: SongType[], isLocal: boolean, playListId?: n
     transformOrigin: "center",
     autoFocus: false,
     style: {
-      maxWidth: "70vw",
+      width: "600px",
+      maxWidth: "calc(100vw - 32px)",
     },
+    zIndex: 3000,
     title: "批量操作",
     content: () => h(BatchList, { data, isLocal, playListId }),
   });

@@ -6,6 +6,7 @@
       :data="tableData"
       :row-key="(row) => row.key"
       max-height="60vh"
+      :scroll-x="320"
       virtual-scroll
       @update:checked-row-keys="tableCheck"
     />
@@ -153,11 +154,12 @@ const columnsData = computed<DataTableColumns<DataType>>(() => [
   {
     title: "#",
     key: "key",
-    width: 80,
+    width: 50,
   },
   {
     title: "标题",
     key: "name",
+    minWidth: 120,
     ellipsis: {
       tooltip: true,
     },
@@ -165,13 +167,7 @@ const columnsData = computed<DataTableColumns<DataType>>(() => [
   {
     title: "歌手",
     key: "artists",
-    ellipsis: {
-      tooltip: true,
-    },
-  },
-  {
-    title: "专辑",
-    key: "album",
+    minWidth: 100,
     ellipsis: {
       tooltip: true,
     },
@@ -188,7 +184,6 @@ const tableData = computed<DataType[]>(() =>
       ? // 拼接歌手
         song?.artists.map((ar: { name: string }) => ar.name).join(" / ")
       : song?.artists || "未知歌手",
-    album: isObject(song?.album) ? song?.album.name : song?.album || "未知专辑",
     // 原始数据
     origin: song,
   })),

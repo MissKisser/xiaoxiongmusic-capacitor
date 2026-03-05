@@ -23,7 +23,7 @@
               <n-space vertical>
                 <n-text depth="3">设置自定义全局背景图片</n-text>
                 
-                <n-space align="center">
+                <n-space align="center" :wrap="false">
                   <n-button @click="triggerUpload">
                     <template #icon>
                       <component :is="renderIcon('Image')" />
@@ -48,11 +48,9 @@
 
                 <!-- 预览区域 -->
                 <div v-if="settingStore.globalBackgroundImage" class="preview-container">
-                  <n-image 
+                  <img 
                     :src="settingStore.globalBackgroundImage" 
-                    object-fit="contain" 
                     class="preview-img"
-                    preview-disabled
                   />
                 </div>
               </n-space>
@@ -166,10 +164,12 @@
 </template>
 
 <script setup lang="ts">
+import { h } from "vue";
 import { useSettingStore } from "@/stores";
 import { renderIcon } from "@/utils/helper";
 import { isCapacitor } from "@/utils/env";
 import { registerPlugin } from "@capacitor/core";
+import ImageCropModal from "@/components/Modal/Setting/ImageCropModal.vue";
 
 const settingStore = useSettingStore();
 const fileInput = ref<HTMLInputElement | null>(null);
@@ -192,39 +192,40 @@ const triggerUpload = () => {
   fileInput.value?.click();
 };
 
+// 打开裁剪弹窗
+const openCropModal = (imageSrc: string) => {
+  const modal = window.$modal.create({
+    preset: "card",
+    transformOrigin: "center",
+    autoFocus: false,
+    maskClosable: false,
+    closeOnEsc: false,
+    closable: false,
+    style: {
+      width: "min(90vw, 600px)",
+      maxWidth: "calc(100vw - 32px)",
+      marginTop: "calc(env(safe-area-inset-top, 0px) + 70px)",
+    },
+    zIndex: 4000,
+    title: "裁剪背景图片",
+    content: () => {
+      return h(ImageCropModal, {
+        imageSrc,
+        onCancel: () => modal.destroy(),
+        onConfirm: () => modal.destroy(),
+      });
+    },
+  });
+};
+
 const handleFileChange = (e: Event) => {
   const input = e.target as HTMLInputElement;
   if (!input.files?.length) return;
   const file = input.files[0];
-  
   const reader = new FileReader();
-  reader.onload = (e) => {
-    const result = e.target?.result as string;
-    if (result) {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const maxSize = 1920;
-        let width = img.width;
-        let height = img.height;
-        if (width > maxSize || height > maxSize) {
-          if (width > height) {
-            height = (height / width) * maxSize;
-            width = maxSize;
-          } else {
-            width = (width / height) * maxSize;
-            height = maxSize;
-          }
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        ctx?.drawImage(img, 0, 0, width, height);
-        const compressed = canvas.toDataURL("image/jpeg", 0.85);
-        settingStore.globalBackgroundImage = compressed;
-        window.$message.success("背景设置成功");
-      };
-      img.src = result;
+  reader.onload = (ev) => {
+    if (ev.target?.result) {
+      openCropModal(ev.target.result as string);
     }
   };
   reader.readAsDataURL(file);
@@ -356,10 +357,11 @@ onMounted(async () => {
   background: var(--n-color);
 
   .preview-img {
-    max-width: 100%;
-    max-height: 100%;
+    max-width: 60%;
+    max-height: 280px;
     display: block;
     object-fit: contain;
+    border-radius: 4px;
   }
 }
 
