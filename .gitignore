@@ -4,3 +4,23 @@ node_modules/
 *.log
 .DS_Store
 .env
+
+# IDE 配置
+.idea/
+*.iml
+
+# Claude Code 配置
+.claude/
+
+# Android 构建产物
+android/app/build/
+android/build/
+android/.gradle/
+android/capacitor-cordova-android-plugins/build/
+
+# TypeScript 构建信息
+tsconfig.tsbuildinfo
+
+# 签名配置（敏感信息）
+android/keystore.properties
+keystore.properties

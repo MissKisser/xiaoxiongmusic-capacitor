@@ -3,12 +3,18 @@ apply plugin: 'com.android.application'
 android {
     namespace = "com.xiaoxiong.music"
     compileSdk = rootProject.ext.compileSdkVersion
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+
     defaultConfig {
         applicationId "com.xiaoxiong.music"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 4
-        versionName "4.5.3"
+        versionCode 5
+        versionName "4.6.4"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,9 +22,8 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-2
-    // 读取签名配置（可选，如果 keystore.properties 不存在则跳过）
-    def keystorePropertiesFile = rootProject.file("keystore.properties")
+
+    def keystorePropertiesFile = file("D:/document/Projects/xiaoxiongmusic/keystore.properties")
     def keystoreProperties = new Properties()
     if (keystorePropertiesFile.exists()) {
         keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
@@ -39,7 +44,6 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            // 如果配置了签名，则使用签名配置
             if (keystorePropertiesFile.exists()) {
                 signingConfig signingConfigs.release
             }
@@ -62,7 +66,7 @@ dependencies {
     // AndroidX Media 库 - 用于 MediaSession 和通知
     implementation "androidx.media:media:1.6.0"
 
-    // NanoHTTPD - 本地音频代理服务器（添加 CORS 头，使 Web Audio API 均衡器生效）
+    // NanoHTTPD - 本地音频代理服务器
     implementation 'org.nanohttpd:nanohttpd:2.3.1'
 
     implementation project(':capacitor-android')

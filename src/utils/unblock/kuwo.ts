@@ -8,8 +8,10 @@ import type { SongUrlResult } from "./types";
 
 /**
  * 获取酷我音乐歌曲 ID
+ * @param keyword 搜索关键词
+ * @param songName 原始歌曲名（用于匹配验证）
  */
-const getKuwoSongId = async (keyword: string): Promise<string | null> => {
+const getKuwoSongId = async (keyword: string, songName?: string): Promise<string | null> => {
     try {
         const url =
             "http://search.kuwo.cn/r.s?&correct=1&stype=comprehensive&encoding=utf8&rformat=json&mobi=1&show_copyright_off=1&searchapi=6&all=" +
@@ -53,10 +55,10 @@ const getKuwoSongId = async (keyword: string): Promise<string | null> => {
         const songName = firstSong.SONGNAME;
         unblockLog.log("🔍 Kuwo: 找到歌曲 songId:", songId, "songName:", songName);
 
-        // 是否与原曲吻合
-        const originalName = keyword?.split("-") ?? [keyword];
-        if (songName && !songName.includes(originalName[0])) {
-            unblockLog.warn("⚠️ Kuwo: 歌曲名不匹配, 期望:", originalName[0], "实际:", songName);
+        // 是否与原曲吻合（使用传入的 songName 进行验证，避免 split("-") 解析错误）
+        const originalName = songName || (keyword?.split("-")?.[0] ?? keyword);
+        if (foundSongName && !foundSongName.includes(originalName)) {
+            unblockLog.warn("⚠️ Kuwo: 歌曲名不匹配, 期望:", originalName, "实际:", foundSongName);
             return null;
         }
         return songId.slice("MUSIC_".length);
@@ -68,11 +70,13 @@ const getKuwoSongId = async (keyword: string): Promise<string | null> => {
 
 /**
  * 获取酷我音乐歌曲 URL
+ * @param keyword 搜索关键词
+ * @param songName 原始歌曲名（用于匹配验证）
  */
-const getKuwoSongUrl = async (keyword: string): Promise<SongUrlResult> => {
+const getKuwoSongUrl = async (keyword: string, songName?: string): Promise<SongUrlResult> => {
     try {
         if (!keyword) return { code: 404, url: null };
-        const songId = await getKuwoSongId(keyword);
+        const songId = await getKuwoSongId(keyword, songName);
         if (!songId) return { code: 404, url: null };
 
         // 请求地址

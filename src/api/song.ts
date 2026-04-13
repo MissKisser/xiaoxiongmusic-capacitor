@@ -50,15 +50,17 @@ export const songUrl = (
 };
 
 // 获取解锁歌曲 URL
-export const unlockSongUrl = (id: number, keyword: string, server: SongUnlockServer) => {
+export const unlockSongUrl = (id: number, songName: string, artist: string, server: SongUnlockServer) => {
   // Capacitor 环境：使用本地解锁（避免服务器 IP 被封禁）
   if (isCapacitor) {
     console.log(`🔓 [Capacitor] 使用本地解锁: server=${server}`);
-    return localUnlockSongUrl(id, keyword, server);
+    return localUnlockSongUrl(id, songName, artist, server);
   }
 
   // Web/Electron 环境：继续使用服务器 API
-  const params = server === SongUnlockServer.NETEASE ? { id } : { keyword };
+  // 构建 keyword 用于搜索
+  const keyword = `${songName}-${artist}`;
+  const params = server === SongUnlockServer.NETEASE ? { id } : { keyword, songName };
   // 使用 /api/unblock 作为 baseURL
   // Electron 端：直接访问 localhost:25884 的服务器
   // Web 端（开发环境）：通过 Vite 代理转发到 http://127.0.0.1:25884
@@ -168,6 +170,52 @@ export const songDynamicCover = (id: number) => {
 export const songChorus = (id: number) => {
   return request({
     url: "/song/chorus",
+    params: { id },
+  });
+};
+
+// ========== SongWiki 音乐百科 API ==========
+
+/**
+ * 获取歌曲百科摘要
+ * @param id 歌曲 ID
+ */
+export const songWikiSummary = (id: number) => {
+  return request({
+    url: "/song/wiki/summary",
+    params: { id },
+  });
+};
+
+/**
+ * 获取歌曲首次收听信息
+ * @param id 歌曲 ID
+ */
+export const songFirstListenInfo = (id: number) => {
+  return request({
+    url: "/song/first/listen/info",
+    params: { id },
+  });
+};
+
+/**
+ * 获取歌曲乐谱列表
+ * @param id 歌曲 ID
+ */
+export const songSheetList = (id: number) => {
+  return request({
+    url: "/sheet/list",
+    params: { id },
+  });
+};
+
+/**
+ * 获取乐谱预览图片
+ * @param id 乐谱 ID
+ */
+export const songSheetPreview = (id: number) => {
+  return request({
+    url: "/sheet/preview",
     params: { id },
   });
 };

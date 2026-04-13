@@ -119,15 +119,6 @@ const props = defineProps({
     default: 0.5,
   },
   /**
-   * 设置所有歌词行在横坐标上的弹簧属性，包括重量、弹力和阻力。
-   *
-   * @param params 需要设置的弹簧属性，提供的属性将会覆盖原来的属性，未提供的属性将会保持原样
-   */
-  linePosXSpringParams: {
-    type: Object as PropType<Partial<spring.SpringParams>>,
-    required: false,
-  },
-  /**
    * 设置所有歌词行在​纵坐标上的弹簧属性，包括重量、弹力和阻力。
    *
    * @param params 需要设置的弹簧属性，提供的属性将会覆盖原来的属性，未提供的属性将会保持原样
@@ -291,12 +282,6 @@ watchEffect(() => {
 // 渐变宽度
 watchEffect(() => {
   if (props.wordFadeWidth !== undefined) playerRef.value?.setWordFadeWidth(props.wordFadeWidth);
-});
-
-// X 轴弹簧参数
-watchEffect(() => {
-  if (props.linePosXSpringParams !== undefined)
-    playerRef.value?.setLinePosXSpringParams(props.linePosXSpringParams);
 });
 
 // Y 轴弹簧参数

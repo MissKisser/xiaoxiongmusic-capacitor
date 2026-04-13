@@ -197,6 +197,15 @@ export const useSongMenu = () => {
         icon: renderIcon("Video", { size: 18 }),
       },
       {
+        key: "wiki",
+        label: "歌曲百科",
+        show: type === "song" && !isLocal && settingStore.useOnlineService,
+        props: {
+          onClick: () => router.push({ name: "song-wiki", query: { id: song.id } }),
+        },
+        icon: renderIcon("Info", { size: 18 }),
+      },
+      {
         key: "line-1",
         type: "divider",
       },

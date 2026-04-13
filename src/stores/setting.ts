@@ -187,6 +187,8 @@ export interface SettingState {
   playSongDemo: boolean;
   /** 显示搜索历史 */
   showSearchHistory: boolean;
+  /** 显示热搜榜 */
+  showHotSearch: boolean;
   /** 是否使用 AMLL 歌词 */
   useAMLyrics: boolean;
   /** 是否使用 AMLL 歌词弹簧效果 */
@@ -203,6 +205,8 @@ export interface SettingState {
   preferQQMusicLyric: boolean;
   /** 本地歌曲使用 QQ 音乐歌词匹配 */
   localLyricQQMusicMatch: boolean;
+  /** 歌词源优先级 */
+  lyricPriority: "auto" | "qm" | "ttml" | "official";
   /** AMLL DB 服务地址 */
   amllDbServer: string;
   /** 菜单显示封面 */
@@ -367,6 +371,7 @@ export const useSettingStore = defineStore("setting", {
     koreanLyricFont: "follow",
     hideVipTag: false,
     showSearchHistory: true,
+    showHotSearch: true,
     menuShowCover: true,
     menuExpandedKeys: [],
     routeAnimation: "slide",
@@ -424,6 +429,7 @@ export const useSettingStore = defineStore("setting", {
     enableOnlineTTMLLyric: false,
     preferQQMusicLyric: false,
     localLyricQQMusicMatch: false,
+    lyricPriority: "auto",
     amllDbServer: defaultAMLLDbServer,
     showYrc: true,
     showTran: true,

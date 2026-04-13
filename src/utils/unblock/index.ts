@@ -13,16 +13,20 @@ import { unblockLog } from "./http";
 /**
  * 本地解锁歌曲 URL
  * @param id 歌曲 ID（网易云使用）
- * @param keyword 搜索关键词（其他源使用）
+ * @param songName 歌曲名（用于匹配验证）
+ * @param artist 歌手名（用于匹配验证）
  * @param server 解锁服务器类型
  * @returns 解锁结果
  */
 export async function localUnlockSongUrl(
     id: number,
-    keyword: string,
+    songName: string,
+    artist: string,
     server: SongUnlockServer
 ): Promise<SongUrlResult> {
-    unblockLog.log(`🔓 本地解锁开始: server=${server}, id=${id}, keyword=${keyword}`);
+    // 构建 keyword 用于搜索
+    const keyword = `${songName}-${artist}`;
+    unblockLog.log(`🔓 本地解锁开始: server=${server}, id=${id}, songName=${songName}, artist=${artist}, keyword=${keyword}`);
 
     try {
         let result: SongUrlResult;
@@ -32,7 +36,7 @@ export async function localUnlockSongUrl(
                 result = await getNeteaseSongUrl(id);
                 break;
             case SongUnlockServer.KUWO:
-                result = await getKuwoSongUrl(keyword);
+                result = await getKuwoSongUrl(keyword, songName);
                 break;
             case SongUnlockServer.BODIAN:
                 result = await getBodianSongUrl(keyword);

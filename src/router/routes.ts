@@ -332,6 +332,16 @@ const appRoutes: Array<RouteRecordRaw> = [
     component: () => import("@/views/Comment.vue"),
     props: true,
   },
+  // 歌曲百科
+  {
+    path: "/song/wiki",
+    name: "song-wiki",
+    beforeEnter: (to, _, next) => {
+      if (!to.query.id) next({ path: "/403" });
+      else next();
+    },
+    component: () => import("@/views/Song/wiki.vue"),
+  },
   // 状态
   {
     path: "/403",

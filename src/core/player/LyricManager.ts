@@ -95,10 +95,14 @@ class LyricManager {
     otherLyrics: LyricLine[],
     key: "translatedLyric" | "romanLyric",
   ): LyricLine[] {
-    const lyricsData = lyrics;
+    // 深拷贝避免修改入参
+    const lyricsData = cloneDeep(lyrics);
     if (lyricsData.length && otherLyrics.length) {
       lyricsData.forEach((v: LyricLine) => {
+        // 校验时间有效性
+        if (!Number.isFinite(v.startTime)) return;
         otherLyrics.forEach((x: LyricLine) => {
+          if (!Number.isFinite(x.startTime)) return;
           if (v.startTime === x.startTime || Math.abs(v.startTime - x.startTime) < 300) {
             v[key] = x.words.map((word) => word.word).join("");
           }
@@ -498,10 +502,27 @@ class LyricManager {
       lyricData = await this.applyChineseVariant(lyricData);
       this.setFinalLyric(lyricData, req);
     };
-    // 优先获取 QQ 音乐歌词
-    if (settingStore.preferQQMusicLyric) {
+    // 根据歌词源优先级决定获取顺序
+    const lyricPriority = settingStore.lyricPriority || "auto";
+
+    // 优先获取策略
+    if (lyricPriority === "qm" || (lyricPriority === "auto" && settingStore.preferQQMusicLyric)) {
       await adoptQQMusic();
     }
+    // 强制优先 TTML
+    if (lyricPriority === "ttml") {
+      await adoptTTML();
+      if (ttmlAdopted) {
+        statusStore.usingTTMLLyric = true;
+        return await this.applyChineseVariant(this.handleLyricExclude(result));
+      }
+    }
+    // 强制优先网易云官方歌词
+    if (lyricPriority === "official") {
+      await adoptLRC();
+      return await this.applyChineseVariant(this.handleLyricExclude(result));
+    }
+    // 自动模式：并行获取所有源
     await Promise.allSettled([adoptTTML(), adoptLRC()]);
     // 优先使用 TTML
     statusStore.usingTTMLLyric = ttmlAdopted;

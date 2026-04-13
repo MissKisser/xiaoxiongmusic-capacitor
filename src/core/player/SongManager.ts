@@ -250,9 +250,10 @@ class SongManager {
     if (cachedUrl) {
       return { id: songId, url: cachedUrl };
     }
+    // 提取歌手名
     const artist = Array.isArray(song.artists) ? song.artists[0].name : song.artists;
-    const keyWord = song.name + "-" + artist;
-    if (!songId || !keyWord) {
+    const songName = song.name;
+    if (!songId || !songName) {
       return { id: songId, url: undefined };
     }
 
@@ -292,7 +293,7 @@ class SongManager {
       const sourceName = this.getUnlockSourceName(server);
       try {
         console.log(`[UNLOCK] [${songId}] 正在尝试解锁服务: ${sourceName} (${server})...`);
-        const result = await unlockSongUrl(songId, keyWord, server);
+        const result = await unlockSongUrl(songId, songName, artist, server);
         console.log(`[UNLOCK] [${songId}] ${sourceName} 返回结果:`, result);
 
         // 检查是否成功
