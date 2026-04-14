@@ -63,7 +63,7 @@
       <n-tab-pane v-if="isCapacitor" name="cache" tab="缓存设置">
         <n-scrollbar class="tab-scrollbar">
           <n-space vertical size="large">
-            <n-text depth="3">开启后播放过的歌曲会缓存到本地，再次播放时直接读取，不消耗流量</n-text>
+            <n-text depth="3">开启后播放过的歌曲会缓存到本地，再次播放时直接读取，不消耗流量哦</n-text>
 
             <div class="setting-row">
               <n-text>启用音频缓存</n-text>

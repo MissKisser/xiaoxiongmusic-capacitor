@@ -1,6 +1,6 @@
 {
     "name": "splayer-mobile",
-    "version": "4.6.4",
+    "version": "4.6.5",
     "description": "SPlayer Mobile - 前端独立版本",
     "type": "module",
     "scripts": {
@@ -98,7 +98,6 @@
         "unplugin-vue-components": "^29.2.0",
         "vite": "^7.3.0",
         "vite-plugin-compression": "^0.5.1",
-        "vite-plugin-pwa": "^1.2.0",
         "vite-plugin-wasm": "^3.5.0",
         "vue-tsc": "2.2.12"
     }

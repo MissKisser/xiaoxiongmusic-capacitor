@@ -5,64 +5,12 @@ import AutoImport from "unplugin-auto-import/vite";
 import { NaiveUiResolver } from "unplugin-vue-components/resolvers";
 import Components from "unplugin-vue-components/vite";
 import viteCompression from "vite-plugin-compression";
-import { VitePWA } from "vite-plugin-pwa";
 import wasm from "vite-plugin-wasm";
 
 export default defineConfig({
     base: './', // 使用相对路径,确保 Capacitor 能正确加载资源
     plugins: [
         vue(),
-        VitePWA({
-            injectRegister: "auto",
-            registerType: "autoUpdate",
-            includeAssets: [
-                "icons/favicon.ico",
-                "icons/favicon-16x16.png",
-                "icons/favicon-32x32.png",
-                "icons/apple-touch-icon.png",
-                "icons/favicon.png",
-            ],
-            manifest: {
-                lang: "zh-CN",
-                id: "/",
-                name: "小熊音乐",
-                short_name: "小熊音乐",
-                description: "A minimalist music player",
-                display: "standalone",
-                start_url: "/",
-                scope: "/",
-                theme_color: "#ff5a5f",
-                background_color: "#ffffff",
-                icons: [
-                    {
-                        src: "/icons/favicon-192x192.png",
-                        sizes: "192x192",
-                        type: "image/png",
-                        purpose: "any",
-                    },
-                    {
-                        src: "/icons/favicon-512x512.png",
-                        sizes: "512x512",
-                        type: "image/png",
-                        purpose: "any",
-                    },
-                    {
-                        src: "/icons/favicon-512x512.png",
-                        sizes: "512x512",
-                        type: "image/png",
-                        purpose: "maskable",
-                    },
-                ],
-            },
-            workbox: {
-                globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2,wasm,json}"],
-                maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-            },
-            devOptions: {
-                enabled: false,
-                type: "module",
-            },
-        }),
         AutoImport({
             imports: [
                 "vue",

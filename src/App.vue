@@ -7,6 +7,7 @@ import { syncNativeCookies } from "@/utils/cookie";
 import { useStatusStore, useAuthStore, useVersionStore, useSettingStore } from "@/stores";
 import GlobalUpdateModal from "@/components/Modal/GlobalUpdateModal.vue";
 import GlobalAuthModal from "@/components/Modal/GlobalAuthModal.vue";
+import { WebViewCache } from "@/plugins/WebViewCache";
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -116,14 +117,27 @@ onMounted(async () => {
   
   if (isCapacitor) {
     console.log("📱 Capacitor 环境检测成功，平台:", Capacitor.getPlatform());
-    
-    // 应用启动时同步 Cookie 到原生层
+
+    // 应用启动时同步 Cookie 到原生层（先同步，避免缓存清除影响）
     // 这确保了之前登录保存的 Cookie 能在新会话中使用
     try {
       await syncNativeCookies();
       console.log("✅ 启动时 Cookie 同步完成");
     } catch (error) {
       console.error("❌ 启动时 Cookie 同步失败:", error);
+    }
+
+    // 检查版本并清除 WebView 缓存（确保加载最新资源）
+    // 注意：原生层已保留 Local Storage/Cookies 等用户数据目录
+    try {
+      const cacheResult = await WebViewCache.checkVersionAndClear();
+      if (cacheResult.cleared) {
+        console.log("✅ 版本更新，WebView 缓存已清除，旧版本:", cacheResult.previousVersion);
+      } else {
+        console.log("ℹ️ 版本未变化，无需清除缓存");
+      }
+    } catch (error) {
+      console.warn("⚠️ WebView 缓存检查失败:", error);
     }
 
     // [新增] 启动时同步系统缓存配置到原生层
