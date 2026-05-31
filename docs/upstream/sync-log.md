@@ -184,3 +184,41 @@
 
 - Claude Code (claude.ai/code)
 - 同步日期: 2026-04-13
+
+---
+
+## 同步记录 #2
+
+- **同步日期**: 2026-05-31
+- **同步目标**: SPlayer 上游 2026-04-13 至 2026-05-15 期间更新
+- **当前版本**: 4.6.5 (versionCode: 6)
+- **上游参考**: https://github.com/imsyy/SPlayer
+
+### 上游提交清单
+
+| 提交 | 日期 | 说明 | 同步状态 |
+|------|------|------|---------|
+| `e9e2ffce` | 2026-05-15 | AMLL 依赖升级 (core 0.5.0 / lyric 1.0.0) | 暂缓 |
+| `0383cb21` | 2026-05-01 | 移动端页面指示器触摸区域扩大 | 已同步 |
+| `80a5ee05` | 2026-05-01 | 移动端页面指示器点击修复 | 已同步 |
+| `566bc036` | 2026-04-17 | 任务栏歌词鼠标命中区域修复 | 跳过（桌面端） |
+| `6c8967d8` | 2026-04-17 | 快捷键设置体验优化 | 跳过（桌面端） |
+| `f903f4d9` | 2026-05-05 | 文档更新 | 跳过（文档） |
+| `3380dcd3` | 2026-05-15 | 删除 nightly CI | 跳过（CI） |
+
+### 已同步内容
+
+#### 页面指示器点击修复
+
+- **提交**: `80a5ee05` + `0383cb21`
+- **文件**: `src/components/Player/FullPlayerMobile.vue`
+- **改动**: 给 `.dot` 添加 `pointer-events: auto`、`cursor: pointer`、`position: relative` 及 `::after` 伪元素扩大触摸区域
+- **效果**: 全屏播放器底部页面指示器小圆点可正常点击切换页面，Android 触屏体验改善
+
+### 暂缓同步项
+
+#### AMLL 依赖升级
+
+- **变更**: `@applemusic-like-lyrics/core` 0.3.2 → 0.5.0，`@applemusic-like-lyrics/lyric` 0.4.1 → 1.0.0
+- **暂缓原因**: `lyric` 1.0.0 为破坏性主版本升级，`LyricLine` 类型结构可能变更；移动端 `AMLyric.vue` 和 `LyricPlayer.vue` 已做大量本地化改造，需专项测试验证 API 兼容性
+- **前置工作**: 需确认新版 `LyricLine` 类型与 `lyricParser.ts`/`lyricStripper.ts` 的兼容性
