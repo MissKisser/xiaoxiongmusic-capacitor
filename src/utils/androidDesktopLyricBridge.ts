@@ -8,10 +8,14 @@ import { useStatusStore } from "@/stores/status";
 import type { LyricData } from "@/types/desktop-lyric";
 import { isCapacitor } from "@/utils/env";
 import { getPlayerInfoObj } from "@/utils/format";
-import { buildAndroidDesktopLyricPayload } from "./androidDesktopLyric";
+import {
+  buildAndroidDesktopLyricPayload,
+  getAndroidDesktopLyricPayloadKey,
+} from "./androidDesktopLyric";
 
 let initialized = false;
 let pendingShowAfterPermission = false;
+let lastLyricPayloadKey = "";
 let appStateListener: { remove: () => Promise<void> | void } | null = null;
 let closeListener: { remove: () => Promise<void> | void } | null = null;
 let configChangeListener: { remove: () => Promise<void> | void } | null = null;
@@ -44,13 +48,16 @@ const pushConfig = async () => {
   await DesktopLyric.updateConfig(cloneDeep(settingStore.desktopLyricConfig));
 };
 
-const pushLyric = async () => {
+const pushLyric = async (options: { force?: boolean } = {}) => {
   if (!isCapacitor) return;
   const settingStore = useSettingStore();
   const payload = buildAndroidDesktopLyricPayload(
     getLyricData(),
     settingStore.desktopLyricConfig,
   );
+  const payloadKey = getAndroidDesktopLyricPayloadKey(payload);
+  if (!options.force && payloadKey === lastLyricPayloadKey) return;
+  lastLyricPayloadKey = payloadKey;
   await DesktopLyric.updateLyric(payload);
 };
 
@@ -78,6 +85,7 @@ export const setAndroidDesktopLyricShow = async (show: boolean): Promise<boolean
 
   if (!show) {
     pendingShowAfterPermission = false;
+    lastLyricPayloadKey = "";
     await DesktopLyric.hide();
     return false;
   }
@@ -86,7 +94,7 @@ export const setAndroidDesktopLyricShow = async (show: boolean): Promise<boolean
   if (!hasPermission) return false;
 
   await pushConfig();
-  await pushLyric();
+  await pushLyric({ force: true });
   await DesktopLyric.show();
   return true;
 };
@@ -95,7 +103,7 @@ export const syncAndroidDesktopLyricNow = async () => {
   const statusStore = useStatusStore();
   if (!isCapacitor || !statusStore.showDesktopLyric) return;
   await pushConfig();
-  await pushLyric();
+  await pushLyric({ force: true });
 };
 
 export const initAndroidDesktopLyricBridge = () => {
@@ -198,5 +206,6 @@ export const disposeAndroidDesktopLyricBridge = () => {
   closeListener = null;
   configChangeListener = null;
   controlListener = null;
+  lastLyricPayloadKey = "";
   initialized = false;
 };

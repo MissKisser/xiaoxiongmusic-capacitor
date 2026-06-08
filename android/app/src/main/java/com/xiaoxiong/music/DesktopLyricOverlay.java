@@ -123,9 +123,9 @@ class DesktopLyricOverlay {
             titleText = title.isEmpty() ? artist : title + " - " + artist;
         }
 
-        titleView.setText(titleText);
-        primaryView.setText(primary);
-        secondaryView.setText(secondary);
+        setTextIfChanged(titleView, titleText);
+        setTextIfChanged(primaryView, primary);
+        setTextIfChanged(secondaryView, secondary);
         secondaryView.setVisibility(secondary.isEmpty() ? View.GONE : View.VISIBLE);
         updateInfoVisibility();
         updateControlBarVisibility();
@@ -208,12 +208,28 @@ class DesktopLyricOverlay {
     private TextView createLyricTextView() {
         TextView textView = new TextView(context);
         textView.setSingleLine(true);
+        textView.setHorizontallyScrolling(true);
         textView.setEllipsize(TextUtils.TruncateAt.MARQUEE);
         textView.setMarqueeRepeatLimit(-1);
         textView.setSelected(true);
         textView.setIncludeFontPadding(false);
         textView.setPadding(0, dp(3), 0, dp(3));
         return textView;
+    }
+
+    private void setTextIfChanged(TextView textView, String nextText) {
+        String safeText = nextText == null ? "" : nextText;
+        if (TextUtils.equals(textView.getText(), safeText)) return;
+
+        textView.setText(safeText);
+        if (textView.getEllipsize() == TextUtils.TruncateAt.MARQUEE) {
+            restartMarquee(textView);
+        }
+    }
+
+    private void restartMarquee(TextView textView) {
+        textView.setSelected(false);
+        textView.post(() -> textView.setSelected(true));
     }
 
     private LinearLayout createControlBar() {

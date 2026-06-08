@@ -20,6 +20,7 @@ const DEFAULT_CONFIG: AndroidDesktopLyricConfig = {
   isDoubleLine: true,
 };
 
+const PAYLOAD_KEY_SEPARATOR = "\u001f";
 const PLACEHOLDER_TEXT = "小熊音乐桌面歌词";
 const LOADING_TEXT = "歌词加载中...";
 const PURE_MUSIC_TEXT = "纯音乐，请欣赏";
@@ -121,3 +122,19 @@ export const buildAndroidDesktopLyricPayload = (
     lyricLoading: false,
   };
 };
+
+/**
+ * 生成用于原生浮窗去重的稳定 key。
+ *
+ * 桌面歌词不需要逐毫秒同步；同一句歌词重复推送会重置 Android TextView marquee，
+ * 导致播放时长歌词在左右边界来回抖动，无法连续滚完整句。
+ */
+export const getAndroidDesktopLyricPayloadKey = (payload: AndroidDesktopLyricPayload): string =>
+  [
+    payload.title,
+    payload.artist,
+    payload.primaryText,
+    payload.secondaryText,
+    payload.isPlaying ? "1" : "0",
+    payload.lyricLoading ? "1" : "0",
+  ].join(PAYLOAD_KEY_SEPARATOR);
