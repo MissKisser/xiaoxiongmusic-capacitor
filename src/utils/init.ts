@@ -37,6 +37,7 @@ const init = async () => {
     onMusicControlEvent('pause', () => playerCtrl.pause());
     onMusicControlEvent('next', () => playerCtrl.nextOrPrev('next'));
     onMusicControlEvent('previous', () => playerCtrl.nextOrPrev('prev'));
+    onMusicControlEvent('desktopLyric', () => playerCtrl.toggleDesktopLyric());
     onMusicControlEvent('seek', (data) => {
       // data.position 是毫秒
       console.log('[MusicService] [Init] Seek event received, position:', data?.position);
@@ -91,6 +92,9 @@ const init = async () => {
     const { useBackgroundPlayback } = await import('@/composables/useBackgroundPlayback');
     const backgroundPlayback = useBackgroundPlayback();
     backgroundPlayback.init();
+
+    const { initAndroidDesktopLyricBridge } = await import("@/utils/androidDesktopLyricBridge");
+    initAndroidDesktopLyricBridge();
   }
 
   // 初始化播放器

@@ -173,6 +173,12 @@ public class MusicNotificationPlugin extends Plugin {
         notifyListeners("seek", ret);
     }
 
+    public void notifyDesktopLyricEvent() {
+        JSObject ret = new JSObject();
+        ret.put("action", "desktopLyric");
+        notifyListeners("desktopLyric", ret);
+    }
+
     @Override
     protected void handleOnDestroy() {
         startServiceCommand(MusicService.ACTION_DESTROY, null);

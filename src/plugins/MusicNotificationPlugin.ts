@@ -59,7 +59,7 @@ export interface MusicNotificationPlugin {
      * 添加事件监听器
      */
     addListener(
-        eventName: 'play' | 'pause' | 'next' | 'previous' | 'seek' | 'sleepTimerFinished',
+        eventName: 'play' | 'pause' | 'next' | 'previous' | 'seek' | 'sleepTimerFinished' | 'desktopLyric',
         listenerFunc: (data: any) => void
     ): Promise<{ remove: () => void }>;
 }

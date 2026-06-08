@@ -28,6 +28,7 @@ declare module 'vue' {
     CreatePlaylist: typeof import('./src/components/Modal/CreatePlaylist.vue')['default']
     CustomCode: typeof import('./src/components/Modal/Setting/CustomCode.vue')['default']
     DefaultLyric: typeof import('./src/components/Player/PlayerLyric/DefaultLyric.vue')['default']
+    DesktopLyricSettingsModal: typeof import('./src/components/Player/SettingsModals/DesktopLyricSettingsModal.vue')['default']
     DownloadModal: typeof import('./src/components/Modal/DownloadModal.vue')['default']
     Equalizer: typeof import('./src/components/Modal/Equalizer.vue')['default']
     EqualizerModal: typeof import('./src/components/Player/SettingsModals/EqualizerModal.vue')['default']

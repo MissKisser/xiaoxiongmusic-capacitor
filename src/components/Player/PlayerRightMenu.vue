@@ -1,8 +1,11 @@
 <template>
   <n-flex :size="8" align="center" class="right-menu">
-    <n-badge v-if="isElectron" value="ON" :show="statusStore.showDesktopLyric">
-      <div class="menu-icon hidden" @click.stop="player.toggleDesktopLyric()">
-        <SvgIcon name="DesktopLyric2" :depth="statusStore.showDesktopLyric ? 1 : 3" />
+    <n-badge v-if="desktopLyricAvailable" value="ON" :show="statusStore.showDesktopLyric">
+      <div
+        :class="['menu-icon', 'lyric-toggle', { open: statusStore.showDesktopLyric }]"
+        @click.stop="player.toggleDesktopLyric()"
+      >
+        <span>词</span>
       </div>
     </n-badge>
     <!-- 其他控制 -->
@@ -60,7 +63,7 @@
 <script setup lang="ts">
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useDataStore, useSettingStore, useStatusStore } from "@/stores";
-import { isElectron } from "@/utils/env";
+import { isCapacitor, isElectron } from "@/utils/env";
 import { renderIcon } from "@/utils/helper";
 import { openAutoClose, openChangeRate, openEqualizer } from "@/utils/modal";
 import type { DropdownOption } from "naive-ui";
@@ -69,6 +72,7 @@ const dataStore = useDataStore();
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
 const player = usePlayerController();
+const desktopLyricAvailable = isElectron || isCapacitor;
 
 // 更多功能
 const controlsOptions = computed<DropdownOption[]>(() => [
@@ -126,6 +130,20 @@ const handleControls = (key: string) => {
     .n-icon {
       font-size: 22px;
       color: var(--primary-hex);
+    }
+    &.lyric-toggle {
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      span {
+        color: var(--primary-hex);
+        font-size: 18px;
+        font-weight: 800;
+        line-height: 1;
+      }
+      &.open {
+        background-color: rgba(var(--primary), 0.18);
+      }
     }
     &:hover {
       transform: scale(1.1);

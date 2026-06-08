@@ -1,5 +1,7 @@
 import { TimeFormat } from "@/composables/useTimeFormat";
 import { SongUnlockServer } from "@/core/player/SongManager";
+import defaultDesktopLyricConfig from "@/assets/data/lyricConfig";
+import type { LyricConfig } from "@/types/desktop-lyric";
 import type { SongLevelType } from "@/types/main";
 import { defaultAMLLDbServer } from "@/utils/meta";
 import { defineStore } from "pinia";
@@ -352,6 +354,8 @@ export interface SettingState {
   audioCacheStrategy: "all" | "complete";
   /** 启用毛玻璃特效（低性能设备建议关闭） */
   enableBlurEffect: boolean;
+  /** Android 桌面歌词配置 */
+  desktopLyricConfig: LyricConfig;
 }
 
 export const useSettingStore = defineStore("setting", {
@@ -535,6 +539,7 @@ export const useSettingStore = defineStore("setting", {
     audioCacheMaxSize: 500,
     audioCacheStrategy: "all",
     enableBlurEffect: false,
+    desktopLyricConfig: { ...defaultDesktopLyricConfig },
   }),
   getters: {
     /**

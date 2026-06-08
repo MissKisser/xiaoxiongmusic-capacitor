@@ -159,7 +159,7 @@ export const destroyMusicControls = async () => {
  * 监听音乐控制事件
  */
 export const onMusicControlEvent = (
-    event: 'play' | 'pause' | 'next' | 'previous' | 'seek',
+    event: 'play' | 'pause' | 'next' | 'previous' | 'seek' | 'desktopLyric',
     callback: (details?: any) => void
 ) => {
     if (!isNative) {

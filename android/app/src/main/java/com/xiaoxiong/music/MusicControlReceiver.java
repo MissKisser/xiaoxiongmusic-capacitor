@@ -17,6 +17,7 @@ public class MusicControlReceiver extends BroadcastReceiver {
     public static final String ACTION_NEXT = "com.xiaoxiong.music.ACTION_NEXT";
     public static final String ACTION_PREVIOUS = "com.xiaoxiong.music.ACTION_PREVIOUS";
     public static final String ACTION_SEEK = "com.xiaoxiong.music.ACTION_SEEK";
+    public static final String ACTION_TOGGLE_DESKTOP_LYRIC = "com.xiaoxiong.music.ACTION_TOGGLE_DESKTOP_LYRIC";
 
 
     private static MusicNotificationPlugin pluginInstance;
@@ -58,6 +59,9 @@ public class MusicControlReceiver extends BroadcastReceiver {
                 long position = intent.getLongExtra("position", 0);
                 Log.d(TAG, "Seek to position: " + position + "ms");
                 pluginInstance.notifySeekEvent(position);
+                break;
+            case ACTION_TOGGLE_DESKTOP_LYRIC:
+                pluginInstance.notifyDesktopLyricEvent();
                 break;
             default:
                 Log.w(TAG, "Unknown action: " + action);

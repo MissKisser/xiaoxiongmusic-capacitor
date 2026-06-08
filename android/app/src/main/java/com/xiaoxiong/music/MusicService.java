@@ -338,6 +338,8 @@ public class MusicService extends Service {
         NotificationCompat.Action playPauseAction = isPlaying
                 ? createAction(R.drawable.ic_pause, "暂停", MusicControlReceiver.ACTION_PAUSE)
                 : createAction(R.drawable.ic_play, "播放", MusicControlReceiver.ACTION_PLAY);
+        NotificationCompat.Action desktopLyricAction =
+                createAction(R.drawable.ic_lyrics, "词", MusicControlReceiver.ACTION_TOGGLE_DESKTOP_LYRIC);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
@@ -351,9 +353,10 @@ public class MusicService extends Service {
                 .addAction(createAction(R.drawable.ic_skip_previous, "上一首", MusicControlReceiver.ACTION_PREVIOUS))
                 .addAction(playPauseAction)
                 .addAction(createAction(R.drawable.ic_skip_next, "下一首", MusicControlReceiver.ACTION_NEXT))
+                .addAction(desktopLyricAction)
                 .setStyle(new MediaStyle()
                         .setMediaSession(mediaSession.getSessionToken())
-                        .setShowActionsInCompactView(0, 1, 2));
+                        .setShowActionsInCompactView(0, 1, 3));
 
         if (coverBitmap != null) {
             builder.setLargeIcon(coverBitmap);

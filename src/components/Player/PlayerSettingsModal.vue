@@ -51,6 +51,21 @@
           </div>
           <SvgIcon name="Right" :size="20" />
         </div>
+
+        <!-- 桌面歌词 -->
+        <div v-if="desktopLyricAvailable" class="setting-item" @click="showDesktopLyricModal = true">
+          <div class="setting-icon">
+            <span class="lyric-word">词</span>
+          </div>
+          <div class="setting-info">
+            <div class="setting-title">桌面歌词</div>
+            <div class="setting-desc">
+              {{ statusStore.showDesktopLyric ? "已开启" : "未开启" }}
+              <span v-if="settingStore.desktopLyricConfig.isLock"> · 已锁定</span>
+            </div>
+          </div>
+          <SvgIcon name="Right" :size="20" />
+        </div>
       </n-flex>
     </n-scrollbar>
   </n-modal>
@@ -59,13 +74,16 @@
   <SleepTimerModal v-model:show="showSleepTimerModal" />
   <EqualizerModal v-model:show="showEqualizerModal" />
   <PlayRateModal v-model:show="showPlayRateModal" />
+  <DesktopLyricSettingsModal v-model:show="showDesktopLyricModal" />
 </template>
 
 <script setup lang="ts">
-import { useStatusStore } from "@/stores";
+import { useSettingStore, useStatusStore } from "@/stores";
+import { isCapacitor, isElectron } from "@/utils/env";
 import SleepTimerModal from "./SettingsModals/SleepTimerModal.vue";
 import EqualizerModal from "./SettingsModals/EqualizerModal.vue";
 import PlayRateModal from "./SettingsModals/PlayRateModal.vue";
+import DesktopLyricSettingsModal from "./SettingsModals/DesktopLyricSettingsModal.vue";
 
 interface Props {
   show: boolean;
@@ -78,6 +96,8 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 const statusStore = useStatusStore();
+const settingStore = useSettingStore();
+const desktopLyricAvailable = isElectron || isCapacitor;
 
 const showModal = computed({
   get: () => props.show,
@@ -87,6 +107,7 @@ const showModal = computed({
 const showSleepTimerModal = ref(false);
 const showEqualizerModal = ref(false);
 const showPlayRateModal = ref(false);
+const showDesktopLyricModal = ref(false);
 
 // 均衡器预设
 const presetList = {
@@ -160,6 +181,12 @@ const formatRemainTime = computed(() => {
 
       .n-icon {
         color: var(--primary-color);
+      }
+
+      .lyric-word {
+        color: var(--primary-color);
+        font-size: 17px;
+        font-weight: 700;
       }
     }
 

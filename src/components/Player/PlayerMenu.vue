@@ -13,6 +13,9 @@
         </n-flex>
         <div class="drag-dom" />
         <n-flex class="right" justify="end">
+          <div class="menu-icon" @click="showSettingsModal = true">
+            <SvgIcon name="Settings" />
+          </div>
           <div class="menu-icon" @click="toggleFullscreen">
             <SvgIcon :name="isFullscreen ? 'FullscreenExit' : 'Fullscreen'" />
           </div>
@@ -22,14 +25,17 @@
         </n-flex>
       </div>
     </Transition>
+    <PlayerSettingsModal v-model:show="showSettingsModal" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { useStatusStore, useMusicStore } from "@/stores";
+import PlayerSettingsModal from "./PlayerSettingsModal.vue";
 
 const musicStore = useMusicStore();
 const statusStore = useStatusStore();
+const showSettingsModal = ref(false);
 
 // Fullscreen
 const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();

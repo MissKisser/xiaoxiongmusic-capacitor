@@ -1348,9 +1348,26 @@ class PlayerController {
    * 桌面歌词控制
    * @param show 是否显示
    */
-  public setDesktopLyricShow(show: boolean) {
+  public async setDesktopLyricShow(show: boolean) {
     const statusStore = useStatusStore();
-    if (statusStore.showDesktopLyric === show) return;
+    if (statusStore.showDesktopLyric === show && !isCapacitor) return;
+
+    if (isCapacitor) {
+      try {
+        const { setAndroidDesktopLyricShow } = await import("@/utils/androidDesktopLyricBridge");
+        const shown = await setAndroidDesktopLyricShow(show);
+        statusStore.showDesktopLyric = shown;
+        if (shown === show) {
+          window.$message.success(`${shown ? "已开启" : "已关闭"}桌面歌词`);
+        }
+      } catch (error) {
+        console.warn("[DesktopLyric] Android 桌面歌词切换失败:", error);
+        statusStore.showDesktopLyric = false;
+        window.$message.error("桌面歌词切换失败");
+      }
+      return;
+    }
+
     statusStore.showDesktopLyric = show;
     playerIpc.toggleDesktopLyric(show);
     window.$message.success(`${show ? "已开启" : "已关闭"}桌面歌词`);

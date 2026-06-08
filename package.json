@@ -1,6 +1,6 @@
 {
     "name": "splayer-mobile",
-    "version": "4.6.5",
+    "version": "4.6.6",
     "description": "SPlayer Mobile - 前端独立版本",
     "type": "module",
     "scripts": {
