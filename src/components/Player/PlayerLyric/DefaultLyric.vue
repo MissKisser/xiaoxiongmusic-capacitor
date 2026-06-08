@@ -603,12 +603,21 @@ onBeforeUnmount(() => {
     --lrc-left-padding: 16px !important;
   }
   .lyric-scroll-container {
+    --lrc-right-padding: 80px;
+    --lrc-current-line-extra-start: max(
+      0px,
+      calc(var(--lrc-left-padding, 10px) - var(--lrc-right-padding))
+    );
+    --lrc-current-line-extra-end: max(
+      0px,
+      calc(var(--lrc-right-padding) - var(--lrc-left-padding, 10px))
+    );
     width: 100%;
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
     padding-left: var(--lrc-left-padding, 10px);
-    padding-right: 80px;
+    padding-right: var(--lrc-right-padding);
     box-sizing: border-box;
     /* 隐藏滚动条 */
     scrollbar-width: none;
@@ -617,7 +626,7 @@ onBeforeUnmount(() => {
       display: none;
     }
     @media (max-width: 990px) {
-      padding-right: 60px;
+      --lrc-right-padding: 60px;
     }
   }
   .placeholder {
@@ -672,7 +681,10 @@ onBeforeUnmount(() => {
     transition:
       filter 0.35s,
       opacity 0.35s,
-      transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+      transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1),
+      width 0.35s ease,
+      margin-left 0.35s ease,
+      margin-right 0.35s ease;
     cursor: pointer;
     width: 100%;
     .content {
@@ -779,6 +791,11 @@ onBeforeUnmount(() => {
     }
     &.on {
       opacity: 1 !important;
+      width: calc(
+        100% + var(--lrc-current-line-extra-start) + var(--lrc-current-line-extra-end)
+      );
+      margin-left: calc(var(--lrc-current-line-extra-start) * -1);
+      margin-right: calc(var(--lrc-current-line-extra-end) * -1);
       transform: scale(1);
       .tran,
       .roma {
