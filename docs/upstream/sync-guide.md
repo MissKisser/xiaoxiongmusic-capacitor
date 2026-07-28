@@ -155,6 +155,8 @@ export async function unlockSongUrl(id: number, songName: string, artist: string
 | `server/routes/version.ts` | 版本管理 API | 版本检查失效 |
 | `server/routes/admin.ts` | 管理员面板 | 管理功能失效 |
 | `server/db.ts` | 数据库连接 | 数据库断连 |
+
+> **注意(2026-07-28 更新)**:`server/` 已抽取为独立仓库 [xiaoxiongmusic-server](https://github.com/MissKisser/xiaoxiongmusic-server),作为 git submodule 引用。上列 server 相关受保护文件**已不在本仓库**,后续 server 改动请在 server 仓库进行。SPlayer 上游同步不再涉及 server/。
 | `src/stores/auth.ts` | 授权状态管理 | 授权状态丢失 |
 | `src/stores/version.ts` | 版本检查逻辑 | 更新提示失效 |
 | `src/components/Modal/GlobalAuthModal.vue` | 授权弹窗 | 无法授权 |

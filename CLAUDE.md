@@ -143,6 +143,8 @@ isDev        // 开发环境
 
 数据库初始化脚本位于 `scripts/init_database.sql`。
 
+> ⚠️ **`server/` 是 git submodule**,指向独立仓库 [xiaoxiongmusic-server](https://github.com/MissKisser/xiaoxiongmusic-server)。**不要直接在 `server/` 目录里改代码**——submodule 内容应视为只读引用。后端改动请到 xiaoxiongmusic-server 仓库进行,然后执行 `git submodule update --remote server` 同步。server 与桌面端(xiaoxiongmusic)共享同一份代码。首次克隆本仓库后需执行 `git submodule update --init --recursive` 初始化 server。
+
 ## 依赖管理
 
 **必须使用 pnpm**，使用其他包管理器可能导致依赖异常。
