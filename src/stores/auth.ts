@@ -45,7 +45,7 @@ export const useAuthStore = defineStore('auth', {
             try {
                 // api 实例会自动处理 baseURL (Capacitor 下为 https://music.viaxv.top)
                 const response = await api.get('/auth/check', {
-                    params: { deviceId: this.deviceId },
+                    params: { deviceId: this.deviceId, platform: 'android' },
                 });
 
                 if (response.data.success && response.data.authorized) {
