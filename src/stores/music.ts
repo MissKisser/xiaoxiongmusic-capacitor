@@ -97,11 +97,13 @@ export const useMusicStore = defineStore("music", {
         this.songLyric = {
           lrcData: updates.lrcData ?? [],
           yrcData: updates.yrcData ?? [],
+          lyricAuthors: updates.lyricAuthors ?? [],
         };
       } else {
         this.songLyric = {
           lrcData: updates.lrcData ?? this.songLyric.lrcData,
           yrcData: updates.yrcData ?? this.songLyric.yrcData,
+          lyricAuthors: updates.lyricAuthors ?? this.songLyric.lyricAuthors,
         };
       }
       // 更新歌词窗口数据
@@ -124,6 +126,13 @@ export const useMusicStore = defineStore("music", {
         : size === "cover"
           ? this.playSong.cover
           : this.playSong.coverSize?.[size] || this.playSong.cover;
+    },
+    /**
+     * 设置歌词作者/来源信息
+     * @param authors 作者列表
+     */
+    setLyricAuthors(authors: string[]) {
+      this.songLyric.lyricAuthors = authors;
     },
   },
   // 持久化
