@@ -30,6 +30,13 @@
       </n-flex>
       <n-flex align="center">
         <n-button @click="selectAll">全选</n-button>
+        <n-button
+          :loading="exporting"
+          :disabled="selectedLines.length === 0"
+          @click="handleExportImage"
+        >
+          导出图片
+        </n-button>
         <n-button type="primary" :disabled="selectedLines.length === 0" @click="handleCopy">
           复制 ({{ selectedLines.length }})
         </n-button>
@@ -39,12 +46,15 @@
 </template>
 
 <script setup lang="ts">
-import { useMusicStore } from "@/stores";
+import { useMusicStore, useStatusStore } from "@/stores";
 import { copyData } from "@/utils/helper";
+import { getPlayerInfoObj } from "@/utils/format";
+import { exportLyricPoster } from "@/utils/lyric/posterExport";
 
 const props = defineProps<{ onClose: () => void }>();
 
 const musicStore = useMusicStore();
+const statusStore = useStatusStore();
 
 const selectedFilters = ref<string[]>(["translation", "romaji"]);
 const selectedLines = ref<number[]>([]);
@@ -55,18 +65,22 @@ const rawLyrics = computed(() => {
 });
 
 const displayLyrics = computed(() => {
-  return rawLyrics.value.map((line, index) => {
-    const text =
-      line.words?.map((w) => w.word).join("") || "";
-    const translation = line.translatedLyric || "";
-    const romaji = line.romanLyric || line.words?.map((w) => w.romanWord).join("") || "";
-    return {
-      index,
-      text,
-      translation,
-      romaji,
-    };
-  });
+  return rawLyrics.value
+    // 过滤背景人声行，避免海报重复
+    .filter((line) => !line.isBG)
+    .map((line, index) => {
+      const text =
+        line.words?.map((w) => w.word).join("") || "";
+      const translation = line.translatedLyric || "";
+      const romaji = line.romanLyric || line.words?.map((w) => w.romanWord).join("") || "";
+      return {
+        index,
+        text,
+        translation,
+        romaji,
+        duet: !!line.isDuet,
+      };
+    });
 });
 
 const showTranslation = computed(() => selectedFilters.value.includes("translation"));
@@ -101,6 +115,59 @@ const handleCopy = async () => {
     props.onClose();
   } else {
     window.$message.warning("没有可复制的内容");
+  }
+};
+
+/** 导出中，防重复点击 */
+const exporting = ref(false);
+
+/**
+ * 导出歌词图片（海报）
+ * 借鉴 SPlayer-Next 的 Canvas 海报方案，移动端落盘后调起分享 / 预览
+ */
+const handleExportImage = async () => {
+  if (exporting.value || selectedLines.value.length === 0) return;
+  const lines = displayLyrics.value
+    .filter((l) => selectedLines.value.includes(l.index))
+    .map((l) => ({
+      text: l.text,
+      translation: showTranslation.value && l.translation ? l.translation : undefined,
+      romaji: showRomaji.value && l.romaji ? l.romaji : undefined,
+      duet: l.duet,
+    }))
+    .filter((l) => l.text || l.translation || l.romaji);
+  if (!lines.length) {
+    window.$message.warning("没有可导出的歌词");
+    return;
+  }
+  exporting.value = true;
+  const loading = window.$message.loading("正在生成歌词图片...", { duration: 0 });
+  try {
+    const info = getPlayerInfoObj(musicStore.playSong);
+    const result = await exportLyricPoster({
+      title: info?.name || musicStore.playSong.name || "未知歌曲",
+      artist: info?.artist || "未知歌手",
+      cover: musicStore.getSongCover("l"),
+      lines,
+      fallbackColor: statusStore.mainColor,
+    });
+    if (!result.success) {
+      window.$message.error(result.message || "导出图片失败");
+      return;
+    }
+    if (result.action === "shared") {
+      window.$message.success("已调起分享");
+    } else if (result.action === "downloaded") {
+      window.$message.success("歌词图片已下载");
+    } else {
+      window.$message.success(`已保存：${result.fileName}`);
+    }
+  } catch (error) {
+    console.error("导出歌词图片失败", error);
+    window.$message.error("导出图片失败");
+  } finally {
+    loading.destroy();
+    exporting.value = false;
   }
 };
 </script>
