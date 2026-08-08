@@ -6,6 +6,12 @@
       <DefaultLyric v-else :currentTime="playSeek" />
     </div>
 
+    <!-- 歌词作者/来源信息 -->
+    <div v-if="lyricAuthors.length" class="lyric-credit-line">
+      <span class="lyric-credit-prefix">歌词制作</span>
+      <span class="lyric-credit-text">{{ lyricCreditText }}</span>
+    </div>
+
     <!-- 侧边快捷操作按钮 (移动端专用) -->
     <div class="lyric-quick-actions" v-if="isMobile">
       <div class="action-item" @click="adjustFontSize(2)">
@@ -81,6 +87,10 @@ const settingStore = useSettingStore();
 const statusStore = useStatusStore();
 const player = usePlayerController();
 const { isMobile } = useMobile();
+
+// 歌词作者/来源信息（LRC [by:]/[au:] 或 TTML amll:meta author）
+const lyricAuthors = computed(() => musicStore.songLyric.lyricAuthors ?? []);
+const lyricCreditText = computed(() => lyricAuthors.value.map((author) => `@${author}`).join(", "));
 
 /**
  * 当前歌曲 id
@@ -197,17 +207,18 @@ onBeforeUnmount(() => {
     height: 100%;
     min-height: 0;
     touch-action: none;
+    // 歌词边缘淡出（仅作用于歌词内容，避免遮挡底部作者信息）
+    mask: linear-gradient(
+      180deg,
+      hsla(0, 0%, 100%, 0) 0,
+      hsla(0, 0%, 100%, 0.6) 5%,
+      #fff 10%,
+      #fff 75%,
+      hsla(0, 0%, 100%, 0.6) 85%,
+      hsla(0, 0%, 100%, 0)
+    );
   }
   filter: drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.2));
-  mask: linear-gradient(
-    180deg,
-    hsla(0, 0%, 100%, 0) 0,
-    hsla(0, 0%, 100%, 0.6) 5%,
-    #fff 10%,
-    #fff 75%,
-    hsla(0, 0%, 100%, 0.6) 85%,
-    hsla(0, 0%, 100%, 0)
-  );
   @media (hover: hover) and (pointer: fine) {
     &:hover {
       .lyric-menu {
@@ -257,6 +268,32 @@ onBeforeUnmount(() => {
       transform: scale(0.9);
       background-color: rgba(var(--main-cover-color), 0.2);
     }
+  }
+}
+.lyric-credit-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 2px 16px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgb(var(--main-cover-color));
+  opacity: 0.45;
+  pointer-events: none;
+  .lyric-credit-prefix {
+    flex-shrink: 0;
+    opacity: 0.85;
+  }
+  .lyric-credit-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 .lyric-menu {
