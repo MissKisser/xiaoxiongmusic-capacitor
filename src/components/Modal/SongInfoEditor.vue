@@ -133,6 +133,7 @@ import { matchSong, songLyric } from "@/api/song";
 import { debounce, isArray, isEmpty, isObject } from "lodash-es";
 import { useBlobURLManager } from "@/core/resource/BlobURLManager";
 import { formatSongsList } from "@/utils/format";
+import { bestMatch, parseFileName, songToCandidate } from "@/utils/matchSong";
 
 const props = defineProps<{
   song: SongType;
@@ -196,11 +197,21 @@ const getSongInfo = async () => {
   } = await window.electron.ipcRenderer.invoke("get-music-metadata", path);
   // 解构数据
   const { fileName, fileSize, common, format, md5, lyric } = infoData;
+  // 元信息缺失时，从文件名回退提取"歌名 - 歌手"（基于 SPlayer-Next 匹配算法）
+  const rawTitle = String(common.title ?? "");
+  const rawArtist = String(common.artist ?? "");
+  let fallbackTitle = "";
+  let fallbackArtist = "";
+  if (!rawTitle || !rawArtist) {
+    const parsed = parseFileName(fileName);
+    fallbackTitle = parsed.title;
+    fallbackArtist = parsed.artist ?? "";
+  }
   // 更新数据
   infoFormData.value = {
     fileName: String(fileName),
-    name: String(common.title ?? ""),
-    artist: String(common.artist ?? ""),
+    name: rawTitle || fallbackTitle,
+    artist: rawArtist || fallbackArtist,
     album: String(common.album ?? ""),
     alia: String(common.comment?.[0]?.text ?? ""),
     lyric: String(lyric ?? ""),
@@ -229,28 +240,37 @@ const onlineMatch = debounce(
         infoFormData.value.duration || 0,
         infoFormData.value.md5,
       );
-      const song = result.songs?.[0];
-      if (isEmpty(song)) {
+      const rawSongs: any[] = result.songs ?? [];
+      if (isEmpty(rawSongs)) {
         window.$message.error("无法匹配，请修改信息后重试");
         return;
-      } else {
-        const songData = formatSongsList([song])[0];
-        // console.log(songData);
-        // 更新数据
-        infoFormData.value = {
-          ...infoFormData.value,
-          name: songData.name,
-          artist: isArray(songData.artists)
-            ? songData.artists.map((ar: { name: string }) => ar.name).join(" / ")
-            : songData.artists,
-          album: isObject(songData.album) ? songData.album.name : songData.album,
-          alia: songData.alia,
-        };
-        // 获取歌词
-        const result = await songLyric(songData.id);
-        infoFormData.value.lyric = result.lrc.lyric;
-        window.$message.success("匹配成功");
       }
+      // 借助本地评分算法（基于 SPlayer-Next tagMatch）挑选最佳匹配
+      const candidates = rawSongs.map(songToCandidate);
+      const best = bestMatch(candidates, {
+        title: infoFormData.value.name || "",
+        artist: infoFormData.value.artist || "",
+        album: infoFormData.value.album || "",
+        durationSec: infoFormData.value.duration || 0,
+      });
+      // 若评分算法无有效匹配（评分 0 或时长偏差过大），回退到原先首项
+      const song = best ?? rawSongs[0];
+      const songData = formatSongsList([song])[0];
+      // console.log(songData);
+      // 更新数据
+      infoFormData.value = {
+        ...infoFormData.value,
+        name: songData.name,
+        artist: isArray(songData.artists)
+          ? songData.artists.map((ar: { name: string }) => ar.name).join(" / ")
+          : songData.artists,
+        album: isObject(songData.album) ? songData.album.name : songData.album,
+        alia: songData.alia,
+      };
+      // 获取歌词
+      const lyricResult = await songLyric(songData.id);
+      infoFormData.value.lyric = lyricResult.lrc.lyric;
+      window.$message.success("匹配成功");
     } catch (error) {
       console.error("Error online matching:", error);
       window.$message.error("匹配出错，请重试");
