@@ -2,6 +2,7 @@ import { qqMusicMatch } from "@/api/qqmusic";
 import { songLyric, songLyricTTML } from "@/api/song";
 import { keywords as defaultKeywords, regexes as defaultRegexes } from "@/assets/data/exclude";
 import { useCacheManager } from "@/core/resource/CacheManager";
+import { matchLocalTtml } from "@/services/localTtmlRepo";
 import { useMusicStore, useSettingStore, useStatusStore, useStreamingStore } from "@/stores";
 import { type SongLyric } from "@/types/lyric";
 import { SongType } from "@/types/main";
@@ -662,6 +663,28 @@ class LyricManager {
   private async checkLocalLyricOverride(id: number): Promise<SongLyric> {
     const statusStore = useStatusStore();
     const settingStore = useSettingStore();
+    // 优先尝试 Capacitor 本地 TTML 歌词库（移动端离线场景）
+    try {
+      const song = useMusicStore().playSong;
+      const ttmlContent = await matchLocalTtml(song);
+      if (ttmlContent) {
+        let ttmlLines: LyricLine[] = [];
+        try {
+          ttmlLines = parseTTML(ttmlContent).lines || [];
+          statusStore.usingTTMLLyric = ttmlLines.length > 0;
+          console.log("检测到 Capacitor 本地 TTML 歌词覆盖", ttmlLines);
+        } catch (err) {
+          console.error("parseTTML Capacitor 本地解析失败:", err);
+          statusStore.usingTTMLLyric = false;
+          ttmlLines = [];
+        }
+        if (ttmlLines.length > 0) {
+          return { lrcData: [], yrcData: ttmlLines };
+        }
+      }
+    } catch (error) {
+      console.error("读取 Capacitor 本地歌词失败:", error);
+    }
     const { localLyricPath } = settingStore;
     if (!isElectron || !localLyricPath.length) return { lrcData: [], yrcData: [] };
     // 从本地遍历
