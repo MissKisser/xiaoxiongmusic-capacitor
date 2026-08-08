@@ -3,7 +3,7 @@ import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { isCapacitor } from "@/utils/env";
 import { Capacitor, registerPlugin } from "@capacitor/core";
-import { syncNativeCookies } from "@/utils/cookie";
+import { syncNativeCookies, markCookiesReady } from "@/utils/cookie";
 import { useStatusStore, useAuthStore, useVersionStore, useSettingStore } from "@/stores";
 import GlobalUpdateModal from "@/components/Modal/GlobalUpdateModal.vue";
 import GlobalAuthModal from "@/components/Modal/GlobalAuthModal.vue";
@@ -85,7 +85,23 @@ const initBackButtonListener = async () => {
   }
 };
 
-// 初始化授权检查
+// 带 2 次重试的 Cookie 同步（短退避），用于克服冷启动瞬态失败
+// 失败不阻断启动，但无论成败都调用 markCookiesReady() 通知等待方放行
+const syncNativeCookiesWithRetry = async (retries = 2, delayMs = 200): Promise<void> => {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await syncNativeCookies();
+      return;
+    } catch (error) {
+      if (attempt >= retries) {
+        console.error(`❌ 启动时 Cookie 同步失败（已重试 ${retries} 次）:`, error);
+        return;
+      }
+      console.warn(`⚠️ Cookie 同步第 ${attempt + 1} 次失败，${delayMs}ms 后重试`, error);
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+};
 const initAuthCheck = async () => {
   console.log("[AuthCheck] 🔐 开始授权检查...");
   const isAuthorized = await authStore.checkAuth();
@@ -120,11 +136,15 @@ onMounted(async () => {
 
     // 应用启动时同步 Cookie 到原生层（先同步，避免缓存清除影响）
     // 这确保了之前登录保存的 Cookie 能在新会话中使用
+    // 增加 2 次重试以克服冷启动瞬态失败，无论成败都通知等待方放行
     try {
-      await syncNativeCookies();
+      await syncNativeCookiesWithRetry();
       console.log("✅ 启动时 Cookie 同步完成");
     } catch (error) {
       console.error("❌ 启动时 Cookie 同步失败:", error);
+    } finally {
+      // 即使同步失败也要放行，避免 User.vue 登录态检查永久阻塞
+      markCookiesReady();
     }
 
     // 检查版本并清除 WebView 缓存（确保加载最新资源）

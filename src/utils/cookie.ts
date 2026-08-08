@@ -2,6 +2,50 @@ import Cookies from "js-cookie";
 import { isCapacitor } from "./env";
 import { CapacitorCookies } from "@capacitor/core";
 
+/**
+ * Cookie 同步就绪信号
+ *
+ * 背景：App.vue onMounted 中的 syncNativeCookies 与 User.vue onBeforeMount 中的
+ * 登录态校验存在并发竞态——后者可能早于前者完成，导致 CapacitorHttp 原生层
+ * 尚未拿到 MUSIC_U，冷启动时用户信息加载失败。
+ *
+ * 方案：App.vue 完成 syncNativeCookies（含重试）后调用 markCookiesReady()，
+ * 依赖 cookie 的组件（如 User.vue 的 checkLoginStatus）通过 whenCookiesReady()
+ * 等待该信号，最多等待 3 秒后自动放行（避免 cookie 同步永久卡死阻塞登录态检查）。
+ */
+let cookiesReady = !isCapacitor; // 非 Capacitor 环境永远就绪
+const cookiesReadyResolvers: Array<() => void> = [];
+
+/** 标记原生层 Cookie 同步已完成 */
+export const markCookiesReady = () => {
+  if (cookiesReady) return;
+  cookiesReady = true;
+  console.log("🍪 [CookieReady] 原生 Cookie 同步就绪，通知所有等待方");
+  // 复制一份再清空，防止回调中再次注册造成无限循环
+  const pending = cookiesReadyResolvers.splice(0);
+  pending.forEach((resolve) => resolve());
+};
+
+/**
+ * 等待原生 Cookie 同步完成
+ * - 已就绪：立即 resolve
+ * - 未就绪：等待 markCookiesReady() 或 3 秒超时后 resolve（永不 reject）
+ */
+export const whenCookiesReady = (): Promise<void> => {
+  if (cookiesReady) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    // 兜底超时：避免 cookie 同步异常导致登录态检查永久阻塞
+    const timer = setTimeout(() => {
+      console.warn("🍪 [CookieReady] 等待超时（3s），强制放行");
+      resolve();
+    }, 3000);
+    cookiesReadyResolvers.push(() => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+};
+
 // 获取 Cookie
 export const getCookie = (key: string) => {
   // 优先从 localStorage 影子库获取（Capacitor 环境更可靠）

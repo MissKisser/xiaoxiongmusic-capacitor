@@ -53,7 +53,10 @@
         marginRight: settingStore.showPlaylistCount ? '12px' : null,
       }"
     >
-      <div class="menu-icon" @click.stop="statusStore.playListShow = !statusStore.playListShow">
+      <div
+        :class="['menu-icon', { active: statusStore.playListShow }]"
+        @click.stop="statusStore.playListShow = !statusStore.playListShow"
+      >
         <SvgIcon name="PlayList" />
       </div>
     </n-badge>
@@ -145,9 +148,16 @@ const handleControls = (key: string) => {
         background-color: rgba(var(--primary), 0.18);
       }
     }
-    &:hover {
-      transform: scale(1.1);
-      background-color: rgba(var(--primary), 0.28);
+    &.active {
+      background-color: rgba(var(--primary), 0.18);
+    }
+    // 仅在支持悬停的设备（桌面端）启用 hover 反馈，
+    // 避免 Android WebView 上 :hover 状态在触摸后残留导致按钮常亮
+    @media (hover: hover) {
+      &:hover {
+        transform: scale(1.1);
+        background-color: rgba(var(--primary), 0.28);
+      }
     }
     &:active {
       transform: scale(1);
