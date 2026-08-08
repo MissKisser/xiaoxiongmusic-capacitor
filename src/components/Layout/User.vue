@@ -93,6 +93,7 @@ import {
   updateSpecialUserData,
 } from "@/utils/auth";
 import { useMobile } from "@/composables/useMobile";
+import { whenCookiesReady } from "@/utils/cookie";
 
 const router = useRouter();
 const dataStore = useDataStore();
@@ -136,6 +137,10 @@ const userLikeData = computed(() => {
 const checkLoginStatus = async () => {
   console.log("🔐 [User] 开始检查登录状态...");
   console.log("🔐 [User] 当前状态: userLoginStatus =", dataStore.userLoginStatus, ", loginType =", dataStore.loginType);
+
+  // 等待 App.vue 完成原生 Cookie 同步，避免冷启动时 CapacitorHttp 拿不到 MUSIC_U
+  // 导致登录态校验误判（最多等 3 秒，超时自动放行）
+  await whenCookiesReady();
   
   // 若为 UID 登录
   if (dataStore.loginType === "uid") {

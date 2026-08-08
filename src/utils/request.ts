@@ -65,6 +65,15 @@ const server: AxiosInstance = axios.create({
 axiosRetry(server, {
   // 重试次数
   retries: 3,
+  // 重试条件：网络错误 / 5xx（默认幂等判定保留），额外覆盖 401
+  // 401 通常是 cookie 临时未就绪（冷启动竞态）或登录态过期，
+  // 重试一次能给 cookie 同步留出时间；POST 不受影响（默认只重试幂等方法）
+  retryCondition: (error) =>
+    axiosRetry.isNetworkOrIdempotentRequestError(error) || error.response?.status === 401,
+  // 指数退避
+  retryDelay: axiosRetry.exponentialDelay,
+  // 重试时重置超时计时器
+  shouldResetTimeout: true,
 });
 
 // 请求拦截器

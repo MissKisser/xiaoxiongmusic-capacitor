@@ -35,7 +35,7 @@ const yrcLine = (
   isDuet: false,
 });
 
-const { buildAndroidDesktopLyricPayload } = await loadModule();
+const { buildAndroidDesktopLyricPayload, getAndroidDesktopLyricPayloadKey } = await loadModule();
 
 {
   const playerRightMenu = readFileSync(
@@ -105,6 +105,10 @@ const { buildAndroidDesktopLyricPayload } = await loadModule();
   assert.match(overlay, /colorPanelVisible/);
   assert.match(overlay, /toggleColorPanel\(\)/);
   assert.match(overlay, /createTextButton\("色"/);
+  assert.match(overlay, /setTextIfChanged\(titleView,\s*titleText\)/);
+  assert.match(overlay, /setTextIfChanged\(primaryView,\s*primary\)/);
+  assert.match(overlay, /setTextIfChanged\(secondaryView,\s*secondary\)/);
+  assert.doesNotMatch(overlay, /primaryView\.setText\(primary\)/);
 }
 
 {
@@ -287,6 +291,57 @@ const { buildAndroidDesktopLyricPayload } = await loadModule();
   });
 
   assert.equal(payload.primaryText, "普通歌词");
+}
+
+{
+  const firstTick = buildAndroidDesktopLyricPayload({
+    playName: "长歌词",
+    artistName: "Hackerdallas",
+    playStatus: true,
+    currentTime: 1000,
+    lyricLoading: false,
+    songId: 4,
+    songOffset: 0,
+    lyricIndex: 0,
+    lrcData: [
+      line("这是一句需要横向滚动才能完整看完的桌面歌词", 0, 5000),
+      line("下一句", 5000, 9000),
+    ],
+    yrcData: [],
+  });
+  const sameLineTick = buildAndroidDesktopLyricPayload({
+    playName: "长歌词",
+    artistName: "Hackerdallas",
+    playStatus: true,
+    currentTime: 1250,
+    lyricLoading: false,
+    songId: 4,
+    songOffset: 0,
+    lyricIndex: 0,
+    lrcData: [
+      line("这是一句需要横向滚动才能完整看完的桌面歌词", 0, 5000),
+      line("下一句", 5000, 9000),
+    ],
+    yrcData: [],
+  });
+  const nextLineTick = buildAndroidDesktopLyricPayload({
+    playName: "长歌词",
+    artistName: "Hackerdallas",
+    playStatus: true,
+    currentTime: 5200,
+    lyricLoading: false,
+    songId: 4,
+    songOffset: 0,
+    lyricIndex: 1,
+    lrcData: [
+      line("这是一句需要横向滚动才能完整看完的桌面歌词", 0, 5000),
+      line("下一句", 5000, 9000),
+    ],
+    yrcData: [],
+  });
+
+  assert.equal(getAndroidDesktopLyricPayloadKey(firstTick), getAndroidDesktopLyricPayloadKey(sameLineTick));
+  assert.notEqual(getAndroidDesktopLyricPayloadKey(firstTick), getAndroidDesktopLyricPayloadKey(nextLineTick));
 }
 
 console.log("android desktop lyric payload tests passed");
