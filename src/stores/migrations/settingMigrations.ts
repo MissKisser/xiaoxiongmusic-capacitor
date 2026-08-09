@@ -6,7 +6,7 @@ import type { SettingState } from "../setting";
 /**
  * 当前设置 Schema 版本号
  */
-export const CURRENT_SETTING_SCHEMA_VERSION = 8;
+export const CURRENT_SETTING_SCHEMA_VERSION = 9;
 
 /**
  * 迁移函数类型
@@ -152,5 +152,11 @@ export const settingMigrations: Record<number, MigrationFunction> = {
   8: () => {
     // 此版本无需迁移
     return {};
+  },
+  9: () => {
+    // 新增手机端卡片列数设置，默认 2 列
+    return {
+      mobileCardColumns: 2,
+    };
   },
 };

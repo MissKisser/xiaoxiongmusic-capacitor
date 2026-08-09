@@ -360,6 +360,8 @@ export interface SettingState {
   audioCacheStrategy: "all" | "complete";
   /** 启用毛玻璃特效（低性能设备建议关闭） */
   enableBlurEffect: boolean;
+  /** 手机端卡片列数（2 或 3 列） */
+  mobileCardColumns: 2 | 3;
   /** Android 桌面歌词配置 */
   desktopLyricConfig: LyricConfig;
 }
@@ -548,6 +550,7 @@ export const useSettingStore = defineStore("setting", {
     audioCacheMaxSize: 500,
     audioCacheStrategy: "all",
     enableBlurEffect: false,
+    mobileCardColumns: 2,
     desktopLyricConfig: { ...defaultDesktopLyricConfig },
   }),
   getters: {
