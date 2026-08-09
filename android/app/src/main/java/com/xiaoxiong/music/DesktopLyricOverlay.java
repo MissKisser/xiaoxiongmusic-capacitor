@@ -2,18 +2,20 @@ package com.xiaoxiong.music;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.os.Build;
-import android.os.Handler;
-import android.os.Looper;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -35,30 +37,35 @@ class DesktopLyricOverlay {
     private static final String PREFS_NAME = "desktop_lyric_overlay";
     private static final String KEY_X = "x";
     private static final String KEY_Y = "y";
-    private static final String LOCK_ICON = "\uD83D\uDD12";
+    /** 颜色预设：{已播放色, 未播放色} */
+    private static final String[][] COLOR_PRESETS = {
+            {"#fe7971", "#f2f2f2"},
+            {"#4fc3ff", "#f2f2f2"},
+            {"#ffd166", "#f2f2f2"},
+            {"#ffffff", "#dddddd"},
+    };
 
     private final Context context;
     private final WindowManager windowManager;
     private final SharedPreferences prefs;
     private final Callback callback;
-    private final Handler handler = new Handler(Looper.getMainLooper());
 
     private LinearLayout rootView;
     private LinearLayout lyricArea;
     private LinearLayout controlBar;
     private LinearLayout actionBar;
-    private LinearLayout colorPanel;
+    private LinearLayout toolsPanel;
     private TextView titleView;
     private TextView primaryView;
     private TextView secondaryView;
-    private TextView lockButton;
-    private TextView playPauseButton;
+    private ImageView playPauseButton;
+    private final FrameLayout[] colorPresetContainers = new FrameLayout[COLOR_PRESETS.length];
     private WindowManager.LayoutParams layoutParams;
 
     private boolean showing = false;
     private boolean locked = false;
     private boolean controlsVisible = false;
-    private boolean colorPanelVisible = false;
+    private boolean toolsPanelVisible = false;
     private boolean limitBounds = false;
     private boolean alwaysShowPlayInfo = false;
     private boolean isPlaying = false;
@@ -99,11 +106,10 @@ class DesktopLyricOverlay {
 
     void hide() {
         if (!showing || rootView == null) return;
-        handler.removeCallbacksAndMessages(null);
         windowManager.removeView(rootView);
         showing = false;
         controlsVisible = false;
-        colorPanelVisible = false;
+        toolsPanelVisible = false;
     }
 
     boolean isShowing() {
@@ -144,7 +150,7 @@ class DesktopLyricOverlay {
         alwaysShowPlayInfo = config.optBoolean("alwaysShowPlayInfo", alwaysShowPlayInfo);
         if (locked) {
             controlsVisible = false;
-            colorPanelVisible = false;
+            toolsPanelVisible = false;
         }
         applyConfig();
     }
@@ -153,7 +159,7 @@ class DesktopLyricOverlay {
         this.locked = locked;
         if (locked) {
             controlsVisible = false;
-            colorPanelVisible = false;
+            toolsPanelVisible = false;
         }
         applyConfig();
     }
@@ -236,95 +242,158 @@ class DesktopLyricOverlay {
         LinearLayout bar = new LinearLayout(context);
         bar.setOrientation(LinearLayout.VERTICAL);
         bar.setGravity(Gravity.CENTER);
-        bar.setPadding(dp(6), dp(5), dp(6), dp(5));
-        bar.setBackgroundColor(Color.TRANSPARENT);
 
+        // 主工具栏：单行图标，无背景，Material 线性图标
         actionBar = new LinearLayout(context);
         actionBar.setOrientation(LinearLayout.HORIZONTAL);
         actionBar.setGravity(Gravity.CENTER);
+        actionBar.setPadding(dp(4), dp(2), dp(4), dp(2));
 
-        actionBar.addView(createTextButton("⏮", () -> notifyControlAction("previous")));
-        playPauseButton = createTextButton("⏯", () -> notifyControlAction("playPause"));
+        actionBar.addView(createIconView(R.drawable.ic_skip_previous, () -> notifyControlAction("previous")));
+        playPauseButton = createIconView(R.drawable.ic_play, () -> notifyControlAction("playPause"));
         actionBar.addView(playPauseButton);
-        actionBar.addView(createTextButton("⏭", () -> notifyControlAction("next")));
-        actionBar.addView(createTextButton("A-", () -> adjustFontSize(-2)));
-        actionBar.addView(createTextButton("A+", () -> adjustFontSize(2)));
-        actionBar.addView(createTextButton("色", this::toggleColorPanel));
-
-        lockButton = createTextButton(LOCK_ICON, () -> {
-            int beforeInset = getPrimaryTopInset(controlsVisible, colorPanelVisible);
+        actionBar.addView(createIconView(R.drawable.ic_skip_next, () -> notifyControlAction("next")));
+        actionBar.addView(createDivider());
+        actionBar.addView(createIconView(R.drawable.ic_text_decrease, () -> adjustFontSize(-2)));
+        actionBar.addView(createIconView(R.drawable.ic_text_increase, () -> adjustFontSize(2)));
+        actionBar.addView(createIconView(R.drawable.ic_palette, this::toggleToolsPanel));
+        actionBar.addView(createDivider());
+        actionBar.addView(createIconView(R.drawable.ic_lock, () -> {
+            int beforeInset = getPrimaryTopInset(controlsVisible, toolsPanelVisible);
             locked = true;
             controlsVisible = false;
-            colorPanelVisible = false;
-            int afterInset = getPrimaryTopInset(controlsVisible, colorPanelVisible);
+            toolsPanelVisible = false;
+            int afterInset = getPrimaryTopInset(controlsVisible, toolsPanelVisible);
             keepPrimaryPosition(beforeInset, afterInset);
             notifyConfigChanged();
             applyConfig();
             showToast("桌面歌词已锁定");
-        });
-        actionBar.addView(lockButton);
-        actionBar.addView(createTextButton("×", () -> {
+        }));
+        actionBar.addView(createIconView(R.drawable.ic_close, () -> {
             hide();
             if (callback != null) callback.onClose();
             showToast("桌面歌词已关闭");
         }));
 
-        colorPanel = new LinearLayout(context);
-        colorPanel.setOrientation(LinearLayout.HORIZONTAL);
-        colorPanel.setGravity(Gravity.CENTER);
-        colorPanel.setPadding(0, dp(6), 0, 0);
-        colorPanel.addView(createColorButton("#fe7971", () -> applyColorPreset("#fe7971", "#f2f2f2")));
-        colorPanel.addView(createColorButton("#4fc3ff", () -> applyColorPreset("#4fc3ff", "#f2f2f2")));
-        colorPanel.addView(createColorButton("#ffd166", () -> applyColorPreset("#ffd166", "#f2f2f2")));
-        colorPanel.addView(createColorButton("#ffffff", () -> applyColorPreset("#ffffff", "#dddddd")));
+        // 展开面板：颜色预设（无背景）
+        toolsPanel = new LinearLayout(context);
+        toolsPanel.setOrientation(LinearLayout.HORIZONTAL);
+        toolsPanel.setGravity(Gravity.CENTER);
+        toolsPanel.setPadding(dp(6), dp(4), dp(6), dp(4));
+
+        for (int i = 0; i < COLOR_PRESETS.length; i++) {
+            String primary = COLOR_PRESETS[i][0];
+            String secondary = COLOR_PRESETS[i][1];
+            toolsPanel.addView(createColorButton(i, () -> applyColorPreset(primary, secondary)));
+        }
+
+        LinearLayout.LayoutParams toolsPanelParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        toolsPanelParams.topMargin = dp(4);
+        toolsPanel.setLayoutParams(toolsPanelParams);
 
         bar.addView(actionBar, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
         ));
-        bar.addView(colorPanel, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
+        bar.addView(toolsPanel, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
         ));
         return bar;
     }
 
-    private TextView createTextButton(String text, Runnable action) {
-        TextView button = new TextView(context);
-        button.setText(text);
-        button.setTextColor(Color.WHITE);
-        button.setTextSize(13);
-        button.setGravity(Gravity.CENTER);
-        button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        button.setPadding(dp(7), dp(5), dp(7), dp(5));
-        button.setOnClickListener((view) -> action.run());
-        button.setMinWidth(dp(34));
+    /**
+     * 创建图标按钮：Material 线性图标 + 圆形涟漪反馈。
+     */
+    private ImageView createIconView(int drawableRes, Runnable action) {
+        ImageView icon = new ImageView(context);
+        icon.setImageResource(drawableRes);
+        icon.setColorFilter(Color.WHITE);
+        icon.setScaleType(ImageView.ScaleType.CENTER);
 
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-        params.setMargins(dp(1), 0, dp(1), 0);
-        button.setLayoutParams(params);
-        return button;
+        GradientDrawable mask = new GradientDrawable();
+        mask.setShape(GradientDrawable.OVAL);
+        mask.setColor(Color.WHITE);
+        RippleDrawable ripple = new RippleDrawable(
+                ColorStateList.valueOf(0x33FFFFFF), null, mask);
+        icon.setBackground(ripple);
+        icon.setOnClickListener((view) -> action.run());
+
+        int size = dp(30);
+        icon.setLayoutParams(new LinearLayout.LayoutParams(size, size));
+        return icon;
     }
 
-    private TextView createColorButton(String color, Runnable action) {
-        TextView button = new TextView(context);
-        button.setText("");
-        button.setGravity(Gravity.CENTER);
-        button.setOnClickListener((view) -> action.run());
+    /**
+     * 创建竖向分隔线，用于工具栏分组。
+     */
+    private View createDivider() {
+        View divider = new View(context);
+        divider.setBackgroundColor(0x33FFFFFF);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(1), dp(14));
+        params.setMargins(dp(3), 0, dp(3), 0);
+        divider.setLayoutParams(params);
+        return divider;
+    }
 
-        GradientDrawable background = new GradientDrawable();
-        background.setShape(GradientDrawable.OVAL);
-        background.setColor(parseColor(color, Color.WHITE));
-        background.setStroke(dp(1), 0x99FFFFFF);
-        button.setBackground(background);
+    /**
+     * 创建颜色预设按钮：外环容器 + 内部色圆，选中时外环白圈高亮。
+     */
+    private FrameLayout createColorButton(int index, Runnable action) {
+        FrameLayout container = new FrameLayout(context);
+        colorPresetContainers[index] = container;
+        container.setBackground(createSelectionRing(false));
 
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(24), dp(24));
-        params.setMargins(dp(5), 0, dp(5), 0);
-        button.setLayoutParams(params);
-        return button;
+        TextView dot = new TextView(context);
+        dot.setGravity(Gravity.CENTER);
+        dot.setOnClickListener((view) -> action.run());
+
+        GradientDrawable circle = new GradientDrawable();
+        circle.setShape(GradientDrawable.OVAL);
+        circle.setColor(parseColor(COLOR_PRESETS[index][0], Color.WHITE));
+        dot.setBackground(circle);
+
+        FrameLayout.LayoutParams dotParams = new FrameLayout.LayoutParams(dp(18), dp(18));
+        dotParams.gravity = Gravity.CENTER;
+        dot.setLayoutParams(dotParams);
+
+        FrameLayout.LayoutParams containerParams = new FrameLayout.LayoutParams(dp(26), dp(26));
+        containerParams.setMargins(dp(1), 0, dp(1), 0);
+        container.setLayoutParams(containerParams);
+
+        container.addView(dot);
+        return container;
+    }
+
+    /**
+     * 颜色预设选中环：选中时白色外圈高亮，未选中时半透明细边。
+     */
+    private GradientDrawable createSelectionRing(boolean selected) {
+        GradientDrawable ring = new GradientDrawable();
+        ring.setShape(GradientDrawable.OVAL);
+        if (selected) {
+            ring.setColor(0x26FFFFFF);
+            ring.setStroke(dp(2), 0xFFFFFFFF);
+        } else {
+            ring.setColor(Color.TRANSPARENT);
+            ring.setStroke(dp(1), 0x33FFFFFF);
+        }
+        return ring;
+    }
+
+    /**
+     * 刷新颜色预设选中态：与当前已播放色匹配的圆点高亮。
+     */
+    private void updateColorPanelSelection() {
+        for (int i = 0; i < COLOR_PRESETS.length; i++) {
+            FrameLayout container = colorPresetContainers[i];
+            if (container == null) continue;
+            boolean selected = COLOR_PRESETS[i][0].equalsIgnoreCase(playedColor);
+            container.setBackground(createSelectionRing(selected));
+        }
     }
 
     private void adjustFontSize(int delta) {
@@ -335,25 +404,24 @@ class DesktopLyricOverlay {
     }
 
     private void applyColorPreset(String primary, String secondary) {
-        int beforeInset = getPrimaryTopInset(controlsVisible, colorPanelVisible);
+        int beforeInset = getPrimaryTopInset(controlsVisible, toolsPanelVisible);
         playedColor = primary;
         unplayedColor = secondary;
         shadowColor = "rgba(0, 0, 0, 0.65)";
-        colorPanelVisible = false;
-        int afterInset = getPrimaryTopInset(controlsVisible, colorPanelVisible);
+        toolsPanelVisible = false;
+        int afterInset = getPrimaryTopInset(controlsVisible, toolsPanelVisible);
         keepPrimaryPosition(beforeInset, afterInset);
         notifyConfigChanged();
         applyConfig();
         showToast("已切换桌面歌词颜色");
     }
 
-    private void toggleColorPanel() {
-        int beforeInset = getPrimaryTopInset(controlsVisible, colorPanelVisible);
-        colorPanelVisible = !colorPanelVisible;
-        int afterInset = getPrimaryTopInset(controlsVisible, colorPanelVisible);
+    private void toggleToolsPanel() {
+        int beforeInset = getPrimaryTopInset(controlsVisible, toolsPanelVisible);
+        toolsPanelVisible = !toolsPanelVisible;
+        int afterInset = getPrimaryTopInset(controlsVisible, toolsPanelVisible);
         keepPrimaryPosition(beforeInset, afterInset);
         applyConfig();
-        showToast(colorPanelVisible ? "已展开颜色预设" : "已收起颜色预设");
     }
 
     private void notifyControlAction(String action) {
@@ -444,6 +512,7 @@ class DesktopLyricOverlay {
         applyGravity();
         updateInfoVisibility();
         updateControlBarVisibility();
+        updateColorPanelSelection();
 
         if (showing) {
             clampToScreen();
@@ -480,41 +549,35 @@ class DesktopLyricOverlay {
     private void updateControlBarVisibility() {
         if (controlBar == null) return;
         controlBar.setVisibility(!locked && controlsVisible ? View.VISIBLE : View.GONE);
-        if (colorPanel != null) {
-            colorPanel.setVisibility(!locked && controlsVisible && colorPanelVisible ? View.VISIBLE : View.GONE);
+        if (toolsPanel != null) {
+            toolsPanel.setVisibility(!locked && controlsVisible && toolsPanelVisible ? View.VISIBLE : View.GONE);
         }
-        if (lockButton != null) lockButton.setText(LOCK_ICON);
-        if (playPauseButton != null) playPauseButton.setText(isPlaying ? "⏸" : "▶");
+        if (playPauseButton != null) {
+            playPauseButton.setImageResource(isPlaying ? R.drawable.ic_pause : R.drawable.ic_play);
+        }
     }
 
+    /**
+     * 切换工具栏显示状态。
+     * 工具栏保持显示，不自动收缩；再次点击歌词区域时收缩。
+     */
     private void setControlsVisible(boolean visible) {
-        int beforeInset = getPrimaryTopInset(controlsVisible, colorPanelVisible);
+        int beforeInset = getPrimaryTopInset(controlsVisible, toolsPanelVisible);
         controlsVisible = !locked && visible;
-        if (!controlsVisible) colorPanelVisible = false;
-        int afterInset = getPrimaryTopInset(controlsVisible, colorPanelVisible);
+        if (!controlsVisible) toolsPanelVisible = false;
+        int afterInset = getPrimaryTopInset(controlsVisible, toolsPanelVisible);
         keepPrimaryPosition(beforeInset, afterInset);
-        handler.removeCallbacksAndMessages(null);
         applyConfig();
-        if (controlsVisible) {
-            handler.postDelayed(() -> {
-                int hideBeforeInset = getPrimaryTopInset(controlsVisible, colorPanelVisible);
-                controlsVisible = false;
-                colorPanelVisible = false;
-                int hideAfterInset = getPrimaryTopInset(controlsVisible, colorPanelVisible);
-                keepPrimaryPosition(hideBeforeInset, hideAfterInset);
-                applyConfig();
-            }, 3500);
-        }
     }
 
-    private int getPrimaryTopInset(boolean controlsVisible, boolean colorPanelVisible) {
+    private int getPrimaryTopInset(boolean controlsVisible, boolean toolsPanelVisible) {
         ensureView();
         ensureLayoutParams();
 
         int inset = rootView.getPaddingTop();
         if (!locked && controlsVisible) {
             inset += measureViewHeight(actionBar);
-            if (colorPanelVisible) inset += measureViewHeight(colorPanel);
+            if (toolsPanelVisible) inset += measureViewHeight(toolsPanel) + dp(4);
         }
         if (shouldShowInfo(controlsVisible)) inset += measureViewHeight(titleView);
         return inset;
@@ -576,7 +639,6 @@ class DesktopLyricOverlay {
                             .apply();
                 } else {
                     setControlsVisible(!controlsVisible);
-                    if (controlsVisible) showToast("已显示桌面歌词工具栏");
                 }
                 return true;
             default:
