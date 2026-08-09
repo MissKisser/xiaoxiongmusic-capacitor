@@ -20,7 +20,7 @@
         <VirtualScroll
           v-if="dataStore.playList.length"
           ref="playListRef"
-          :item-height="80"
+          :item-height="72"
           :item-fixed="true"
           :items="playListData"
           :default-scroll-index="statusStore.playIndex"
@@ -168,7 +168,7 @@ const cleanPlayList = () => {
     align-items: center;
     justify-content: space-between;
     flex-direction: row;
-    min-height: 64px;
+    min-height: 56px;
     overflow: hidden;
     border-radius: 8px;
     margin-bottom: 16px;
