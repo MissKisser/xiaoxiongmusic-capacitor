@@ -16,7 +16,6 @@ import CloudMatch from "@/components/Modal/CloudMatch.vue";
 import CreatePlaylist from "@/components/Modal/CreatePlaylist.vue";
 import UpdatePlaylist from "@/components/Modal/UpdatePlaylist.vue";
 import DownloadModal from "@/components/Modal/DownloadModal.vue";
-import MainSetting from "@/components/Setting/MainSetting.vue";
 import UpdateApp from "@/components/Modal/UpdateApp.vue";
 import ExcludeLyrics from "@/components/Modal/Setting/ExcludeLyrics.vue";
 import ChangeRate from "@/components/Modal/ChangeRate.vue";
@@ -31,7 +30,6 @@ import FontManager from "@/components/Modal/Setting/FontManager.vue";
 import CustomCode from "@/components/Modal/Setting/CustomCode.vue";
 import StreamingServerConfig from "@/components/Modal/Setting/StreamingServerConfig.vue";
 import BackgroundParamsModal from "@/components/Modal/Setting/BackgroundParamsModal.vue";
-import OtherSettingsModal from "@/components/Modal/Setting/OtherSettingsModal.vue";
 import type { StreamingServerConfig as StreamingServerConfigType } from "@/types/streaming";
 
 export const openUserAgreement = () => {
@@ -259,32 +257,22 @@ export const openDownloadSongs = (songs: SongType[]): void => {
   });
 };
 
-// 设置页面是否已打开
-let isSettingOpen = false;
-
-// 打开设置（默认打开歌词设置）
+// 打开设置（路由跳转至设置页；type 映射到对应 tab）
 export const openSetting = (type: SettingType = "lyrics", scrollTo?: string) => {
-  // 如果设置页面已打开，显示提醒
-  if (isSettingOpen) {
-    window.$message.warning("设置页面已打开");
-    return;
-  }
-  isSettingOpen = true;
-  window.$modal.create({
-    preset: "card",
-    transformOrigin: "center",
-    autoFocus: false,
-    maskClosable: false,
-    closeOnEsc: false,
-    bordered: false,
-    class: "main-setting",
-    content: () => {
-      return h(MainSetting, { type, scrollTo });
-    },
-    onAfterLeave: () => {
-      isSettingOpen = false;
-    },
-  });
+  // type → 分类映射：歌词/播放直连对应分类，其余归入应用设置
+  const tabMap: Record<string, string> = {
+    lyrics: "lyrics",
+    play: "play",
+    general: "app",
+    keyboard: "app",
+    local: "app",
+    third: "app",
+    streaming: "app",
+    other: "app",
+    about: "app",
+  };
+  const tab = tabMap[type] || "app";
+  router.push({ name: "settings-detail", params: { type: tab } });
 };
 
 // 软件更新
@@ -532,23 +520,7 @@ export const openBackgroundSetting = () => {
   });
 };
 
-/** 打开其他设置弹窗 */
+/** 打开应用设置（跳转设置页应用设置分类） */
 export const openOtherSettings = () => {
-  window.$modal.create({
-    preset: "card",
-    transformOrigin: "center",
-    autoFocus: false,
-    style: {
-      width: "min(80vw, 600px)",
-      maxWidth: "calc(100vw - 32px)",
-      maxHeight: "calc(80vh - env(safe-area-inset-top, 0px))",
-      marginTop: "calc(env(safe-area-inset-top, 0px) + 70px)",
-      overflow: "hidden",
-    },
-    zIndex: 3000,
-    title: "其他设置",
-    content: () => {
-      return h(OtherSettingsModal);
-    },
-  });
+  router.push({ name: "settings-detail", params: { type: "app" } });
 };

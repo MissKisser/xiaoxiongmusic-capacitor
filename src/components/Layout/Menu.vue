@@ -31,7 +31,7 @@ import type { CoverType } from "@/types/main";
 import { isLogin } from "@/utils/auth";
 import { isElectron } from "@/utils/env";
 import { renderIcon } from "@/utils/helper";
-import { openCreatePlaylist, openOtherSettings } from "@/utils/modal";
+import { openCreatePlaylist } from "@/utils/modal";
 import { debounce } from "lodash-es";
 import {
   type MenuGroupOption,
@@ -133,8 +133,9 @@ const menuOptions = computed<MenuOption[] | MenuGroupOption[]>(() => {
           }),
         },
         {
-          key: "other-settings",
-          label: "其他设置",
+          key: "settings",
+          link: "settings",
+          label: "设置",
            icon: renderIcon("Settings"),
         },
         {
@@ -450,10 +451,6 @@ const menuUpdate = (key: string, item: MenuOption) => {
           name:
             dataStore.downloadingSongs.length > 0 ? "download-downloading" : "download-downloaded",
         });
-        break;
-      // 其他设置
-      case "other-settings":
-        openOtherSettings();
         break;
       default:
         break;

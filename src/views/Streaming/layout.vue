@@ -131,7 +131,7 @@ import { useStreamingStore, useSettingStore } from "@/stores";
 import { useMobile } from "@/composables/useMobile";
 import { renderIcon } from "@/utils/helper";
 import { usePlayerController } from "@/core/player/PlayerController";
-import { openStreamingServerConfig, openSetting } from "@/utils/modal";
+import { openStreamingServerConfig } from "@/utils/modal";
 
 const router = useRouter();
 const streamingStore = useStreamingStore();
@@ -263,7 +263,7 @@ const moreOptions = computed<DropdownOption[]>(() => [
     label: "流媒体设置",
     key: "setting",
     props: {
-      onClick: () => openSetting("streaming"),
+      onClick: () => openServerConfig(),
     },
     icon: renderIcon("Settings"),
   },

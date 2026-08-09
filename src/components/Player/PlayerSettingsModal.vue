@@ -52,6 +52,21 @@
           <SvgIcon name="Right" :size="20" />
         </div>
 
+        <!-- AB 循环 -->
+        <div class="setting-item" @click="showABLoopModal = true">
+          <div class="setting-icon">
+            <SvgIcon name="Repeat" :size="24" />
+          </div>
+          <div class="setting-info">
+            <div class="setting-title">AB 循环</div>
+            <div class="setting-desc">
+              <template v-if="statusStore.abLoop.enable">已开启</template>
+              <template v-else>未开启</template>
+            </div>
+          </div>
+          <SvgIcon name="Right" :size="20" />
+        </div>
+
         <!-- 桌面歌词 -->
         <div v-if="desktopLyricAvailable" class="setting-item" @click="showDesktopLyricModal = true">
           <div class="setting-icon">
@@ -74,6 +89,7 @@
   <SleepTimerModal v-model:show="showSleepTimerModal" />
   <EqualizerModal v-model:show="showEqualizerModal" />
   <PlayRateModal v-model:show="showPlayRateModal" />
+  <ABLoopModal v-model:show="showABLoopModal" />
   <DesktopLyricSettingsModal v-model:show="showDesktopLyricModal" />
 </template>
 
@@ -83,6 +99,7 @@ import { isCapacitor, isElectron } from "@/utils/env";
 import SleepTimerModal from "./SettingsModals/SleepTimerModal.vue";
 import EqualizerModal from "./SettingsModals/EqualizerModal.vue";
 import PlayRateModal from "./SettingsModals/PlayRateModal.vue";
+import ABLoopModal from "./SettingsModals/ABLoopModal.vue";
 import DesktopLyricSettingsModal from "./SettingsModals/DesktopLyricSettingsModal.vue";
 
 interface Props {
@@ -107,6 +124,7 @@ const showModal = computed({
 const showSleepTimerModal = ref(false);
 const showEqualizerModal = ref(false);
 const showPlayRateModal = ref(false);
+const showABLoopModal = ref(false);
 const showDesktopLyricModal = ref(false);
 
 // 均衡器预设
