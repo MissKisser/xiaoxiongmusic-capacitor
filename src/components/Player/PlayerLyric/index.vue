@@ -2,7 +2,17 @@
   <div class="player-lyric">
     <!-- 歌词内容 -->
     <div class="lyric-container" ref="lyricContainer">
-      <AMLyric v-if="settingStore.useAMLyrics" :currentTime="playSeek" />
+      <AMLyric v-if="lyricEngine === 'amll'" :currentTime="playSeek" />
+      <LyricRenderer
+        v-else-if="lyricEngine === 'karaoke'"
+        :lyric-lines="activeLyricLines"
+        :current-time="playSeek"
+        :playing="statusStore.playStatus"
+        :show-translation="settingStore.showTran"
+        :show-romanization="settingStore.showRoma"
+        :enable-word-highlight="true"
+        @seek="onLyricSeek"
+      />
       <DefaultLyric v-else :currentTime="playSeek" />
     </div>
 
@@ -81,12 +91,27 @@ import { useMusicStore, useSettingStore, useStatusStore } from "@/stores";
 import { openSetting, openCopyLyrics } from "@/utils/modal";
 import { usePinch } from "@vueuse/gesture";
 import { useMobile } from "@/composables/useMobile";
+import LyricRenderer from "./LyricRenderer.vue";
 
 const musicStore = useMusicStore();
 const settingStore = useSettingStore();
 const statusStore = useStatusStore();
 const player = usePlayerController();
 const { isMobile } = useMobile();
+
+// 歌词渲染引擎（default / amll / karaoke）
+const lyricEngine = computed(() => settingStore.lyricEngine);
+
+// 当前生效的歌词行（与 DefaultLyric 一致：逐字优先）
+const isYrcMode = computed(() => settingStore.showYrc && musicStore.isHasYrc);
+const activeLyricLines = computed(() =>
+  isYrcMode.value ? musicStore.songLyric.yrcData : musicStore.songLyric.lrcData,
+);
+
+// 点击歌词行跳转播放进度
+const onLyricSeek = (timeMs: number) => {
+  player.setSeek(timeMs);
+};
 
 // 歌词作者/来源信息（LRC [by:]/[au:] 或 TTML amll:meta author）
 const lyricAuthors = computed(() => musicStore.songLyric.lyricAuthors ?? []);

@@ -111,6 +111,15 @@ interface StatusState {
   developerMode: boolean;
   /** 移动端侧边栏显示状态 */
   showAside: boolean;
+  /** AB 循环（per-song 状态，切歌重置） */
+  abLoop: {
+    /** 是否启用 */
+    enable: boolean;
+    /** A 点（毫秒），null 表示未设置 */
+    pointA: number | null;
+    /** B 点（毫秒），null 表示未设置 */
+    pointB: number | null;
+  };
 }
 
 export const useStatusStore = defineStore("status", {
@@ -161,6 +170,11 @@ export const useStatusStore = defineStore("status", {
     },
     developerMode: false,
     showAside: false,
+    abLoop: {
+      enable: false,
+      pointA: null,
+      pointB: null,
+    },
   }),
   getters: {
     // 播放音量图标

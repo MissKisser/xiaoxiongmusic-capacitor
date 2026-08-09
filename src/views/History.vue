@@ -34,6 +34,21 @@
         清空列表
       </n-button>
     </n-flex>
+    <!-- 收听统计 -->
+    <div v-if="statsLoaded" class="stats">
+      <div class="stat-item">
+        <div class="stat-value">{{ formatDuration(totalListenMs) }}</div>
+        <div class="stat-label">累计收听</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">{{ statsCount }}</div>
+        <div class="stat-label">统计歌曲</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">{{ totalPlayCount }}</div>
+        <div class="stat-label">播放次数</div>
+      </div>
+    </div>
     <Transition name="fade" mode="out-in">
       <SongList
         v-if="dataStore.historyList.length > 0"
@@ -59,9 +74,42 @@
 <script setup lang="ts">
 import { useDataStore } from "@/stores";
 import { usePlayerController } from "@/core/player/PlayerController";
+import { loadPlayStats } from "@/core/player/PlayStats";
 
 const player = usePlayerController();
 const dataStore = useDataStore();
+
+// 收听统计
+const statsLoaded = ref(false);
+const totalListenMs = ref(0);
+const statsCount = ref(0);
+const totalPlayCount = ref(0);
+
+// 加载播放统计
+const loadStats = async () => {
+  try {
+    const entries = await loadPlayStats();
+    const values = Object.values(entries);
+    statsCount.value = values.length;
+    totalListenMs.value = values.reduce((sum, s) => sum + s.totalListenMs, 0);
+    totalPlayCount.value = values.reduce((sum, s) => sum + s.playCount, 0);
+    statsLoaded.value = true;
+  } catch {
+    statsLoaded.value = false;
+  }
+};
+
+// 格式化时长（小时/分钟/秒）
+const formatDuration = (ms: number): string => {
+  if (ms <= 0) return "0s";
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+};
 
 // 清空最近播放
 const cleanHistory = () => {
@@ -76,6 +124,8 @@ const cleanHistory = () => {
     },
   });
 };
+
+onMounted(loadStats);
 </script>
 
 <style lang="scss" scoped>
@@ -112,6 +162,31 @@ const cleanHistory = () => {
   .song-list {
     flex: 1;
     overflow: hidden;
+  }
+  .stats {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+
+    .stat-item {
+      flex: 1;
+      padding: 14px 16px;
+      background-color: var(--n-color);
+      border-radius: 12px;
+      text-align: center;
+
+      .stat-value {
+        font-size: 22px;
+        font-weight: bold;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .stat-label {
+        font-size: 12px;
+        opacity: 0.6;
+        margin-top: 4px;
+      }
+    }
   }
 }
 </style>
