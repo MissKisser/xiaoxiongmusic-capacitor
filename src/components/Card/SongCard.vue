@@ -28,11 +28,11 @@
           @update:show="localCover"
         />
         <!-- 信息 -->
-        <n-flex size="small" class="info" vertical>
+        <n-flex :size="2" class="info" vertical>
           <!-- 名称 -->
           <div class="name">
             <n-ellipsis
-              :line-clamp="1"
+              :line-clamp="2"
               :tooltip="{
                 placement: 'top',
                 width: 'trigger',
@@ -241,21 +241,21 @@ const localCover = async (show: boolean) => {
 
 <style lang="scss" scoped>
 .song-card {
-  height: 90px;
+  height: 76px;
   cursor: pointer;
   @media (max-width: 768px) {
     height: auto;
-    min-height: 80px;
+    min-height: 72px;
   }
   @media (max-width: 512px) {
-    min-height: 75px;
+    min-height: 68px;
   }
   .song-content {
     display: flex;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
+    padding: 6px 10px;
     flex: 1;
     border-radius: 12px;
     border: 2px solid rgba(var(--primary), 0.12);
@@ -301,10 +301,10 @@ const localCover = async (show: boolean) => {
     display: flex;
     justify-content: center;
     align-items: center;
-    width: clamp(36px, 8vw, 40px);
-    min-width: clamp(36px, 8vw, 40px);
+    width: clamp(30px, 6vw, 34px);
+    min-width: clamp(30px, 6vw, 34px);
     font-weight: bold;
-    margin-right: clamp(8px, 2vw, 12px);
+    margin-right: clamp(6px, 1.5vw, 10px);
     .n-icon {
       transition:
         opacity 0.3s,
@@ -331,13 +331,13 @@ const localCover = async (show: boolean) => {
     min-width: 0;
     display: flex;
     align-items: center;
-    padding: 4px 20px 4px 0;
+    padding: 2px 12px 2px 0;
     .cover {
-      width: clamp(45px, 10vw, 50px);
-      height: clamp(45px, 10vw, 50px);
-      min-width: clamp(45px, 10vw, 50px);
+      width: clamp(40px, 8vw, 44px);
+      height: clamp(40px, 8vw, 44px);
+      min-width: clamp(40px, 8vw, 44px);
       border-radius: 8px;
-      margin-right: clamp(8px, 2vw, 12px);
+      margin-right: clamp(6px, 1.5vw, 10px);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -349,15 +349,15 @@ const localCover = async (show: boolean) => {
         display: flex;
         flex-direction: row;
         align-items: center;
-        line-height: normal;
-        font-size: 16px;
+        line-height: 1.2;
+        font-size: 15px;
       }
       .desc {
         min-width: 0;
-        margin-top: 2px;
-        font-size: 13px;
+        margin-top: 0;
+        font-size: 12px;
         .n-tag {
-          --n-height: 18px;
+          --n-height: 16px;
           font-size: 10px;
           cursor: pointer;
           pointer-events: none;
@@ -437,7 +437,7 @@ const localCover = async (show: boolean) => {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: clamp(36px, 8vw, 40px);
+    width: clamp(30px, 6vw, 34px);
     .n-icon {
       color: var(--primary-hex);
       transition: transform 0.3s;
