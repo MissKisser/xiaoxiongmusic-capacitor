@@ -1,7 +1,7 @@
 <template>
   <Transition name="fade" mode="out-in">
     <div v-if="data.length > 0" :class="['cover-list', type]">
-      <div class="cover-grid">
+      <div :class="['cover-grid', `cols-${settingStore.mobileCardColumns}`]">
         <div
           v-for="(item, index) in data"
           :key="index"
@@ -113,7 +113,7 @@
 import type { CoverType, SongType } from "@/types/main";
 import { albumDetail } from "@/api/album";
 import { formatNumber } from "@/utils/helper";
-import { useMusicStore, useStatusStore, useLocalStore } from "@/stores";
+import { useMusicStore, useStatusStore, useLocalStore, useSettingStore } from "@/stores";
 import { debounce } from "lodash-es";
 import { formatSongsList } from "@/utils/format";
 import { songDetail } from "@/api/song";
@@ -144,6 +144,7 @@ const router = useRouter();
 const musicStore = useMusicStore();
 const statusStore = useStatusStore();
 const localStore = useLocalStore();
+const settingStore = useSettingStore();
 const player = usePlayerController();
 
 // 右键菜单
@@ -237,28 +238,33 @@ const getListData = async (id: number | string): Promise<SongType[]> => {
 <style lang="scss" scoped>
 .cover-list {
   width: 100%;
-  padding: 20px 4px;
+  padding: 12px 2px;
   .cover-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr));
-    gap: 20px;
+    gap: 16px;
     @media (max-width: 768px) {
       grid-template-columns: repeat(auto-fill, minmax(min(140px, 30vw), 1fr));
-      gap: 16px;
-    }
-    @media (max-width: 600px) {
-      grid-template-columns: repeat(3, 1fr);
       gap: 12px;
     }
-    @media (max-width: 400px) {
-      grid-template-columns: repeat(2, 1fr);
+    @media (max-width: 600px) {
+      // 手机端列数跟随设置（2 列或 3 列）
+      &.cols-2 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      &.cols-3 {
+        grid-template-columns: repeat(3, 1fr);
+      }
       gap: 10px;
+      @media (max-width: 400px) {
+        gap: 8px;
+      }
     }
   }
   .cover-item {
     position: relative;
     height: auto;
-    border-radius: 16px;
+    border-radius: 12px;
     z-index: 0;
     transition:
       background-color 0.3s,
@@ -271,7 +277,7 @@ const getListData = async (id: number | string): Promise<SongType[]> => {
       justify-content: center;
       width: 100%;
       aspect-ratio: 1 / 1;
-      border-radius: 16px;
+      border-radius: 12px;
       overflow: hidden;
       box-shadow: 0px 0px 4px 2px rgba(0, 0, 0, 0.1);
       transition:
@@ -300,14 +306,14 @@ const getListData = async (id: number | string): Promise<SongType[]> => {
         position: absolute;
         display: flex;
         align-items: center;
-        top: 10px;
-        right: 12px;
+        top: 8px;
+        right: 10px;
         color: #fff;
         font-weight: bold;
         z-index: 2;
         .n-icon {
           color: #fff;
-          font-size: 16px;
+          font-size: 14px;
           margin-right: 4px;
         }
       }
@@ -335,8 +341,8 @@ const getListData = async (id: number | string): Promise<SongType[]> => {
         transition: all 0.3s;
         background-color: #ffffff66;
         backdrop-filter: blur(6px);
-        --n-width: 42px;
-        --n-height: 42px;
+        --n-width: 36px;
+        --n-height: 36px;
         .n-icon {
           color: #fff;
         }
@@ -354,7 +360,7 @@ const getListData = async (id: number | string): Promise<SongType[]> => {
     .cover-data {
       display: flex;
       flex-direction: column;
-      padding: 12px;
+      padding: 8px;
       .name {
         font-size: 13px;
         line-clamp: 2;
