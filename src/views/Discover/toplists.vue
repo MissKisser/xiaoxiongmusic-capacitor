@@ -8,7 +8,7 @@
             <SongListCard
               :cover="item.coverSize?.m || item.cover"
               :title="item.name"
-              :height="160"
+              :height="140"
               :description="item.updateTip"
               size="normal"
               @click="router.push({ name: 'playlist', query: { id: item.id } })"
@@ -84,20 +84,20 @@ onMounted(getTopPlaylistData);
     }
   }
   .loading {
-    height: 160px;
+    height: 140px;
     border-radius: 12px;
     cursor: pointer;
     :deep(.n-card__content) {
       display: flex;
       height: 100%;
-      padding: 16px;
+      padding: 12px;
     }
     .cover {
       height: 100%;
       width: auto;
       border-radius: 8px;
       aspect-ratio: 1/1;
-      margin-right: 20px;
+      margin-right: 12px;
     }
     .desc {
       display: flex;

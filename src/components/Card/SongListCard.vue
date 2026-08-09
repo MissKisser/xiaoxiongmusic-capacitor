@@ -79,7 +79,7 @@ const songList = computed(() => sampleSize(props.data, 3));
   :deep(.n-card__content) {
     display: flex;
     height: 100%;
-    padding: 16px;
+    padding: 12px;
   }
   .content {
     display: flex;
@@ -90,7 +90,7 @@ const songList = computed(() => sampleSize(props.data, 3));
       justify-content: center;
       align-items: center;
       aspect-ratio: 1/1;
-      margin-right: 20px;
+      margin-right: 12px;
       .cover-list {
         width: 100%;
         height: 100%;
@@ -149,10 +149,10 @@ const songList = computed(() => sampleSize(props.data, 3));
       flex-direction: column;
     }
     .title {
-      margin-bottom: 12px;
+      margin-bottom: 8px;
       line-height: normal;
       .name {
-        font-size: 18px;
+        font-size: 16px;
         font-weight: bold;
       }
       .desc {
@@ -165,14 +165,14 @@ const songList = computed(() => sampleSize(props.data, 3));
   }
   &.vertical {
     :deep(.n-card__content) {
-      padding: 12px;
+      padding: 10px;
     }
     .content {
       flex-direction: column;
       .cover {
         width: 100%;
         margin-right: 0;
-        margin-bottom: 12px;
+        margin-bottom: 8px;
         .n-image {
            transform-origin: center bottom;
         }
@@ -180,11 +180,11 @@ const songList = computed(() => sampleSize(props.data, 3));
       .info {
         flex: 0;
         .name {
-          font-size: 16px;
+          font-size: 14px;
           margin-bottom: 4px;
         }
         .desc {
-          font-size: 12px;
+          font-size: 11px;
           display: -webkit-box;
           -webkit-line-clamp: 1;
           -webkit-box-orient: vertical;

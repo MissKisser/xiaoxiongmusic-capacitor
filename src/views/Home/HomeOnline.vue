@@ -3,7 +3,7 @@
     <!-- 登录功能 -->
     <div v-if="isLogin()" class="main-rec">
       <div class="main-rec-grid">
-        <n-flex :size="20" class="rec-list" justify="space-between" vertical>
+        <n-flex :size="12" class="rec-list" justify="space-between" vertical>
           <!-- 每日推荐 -->
           <SongListCard
             :data="musicStore.dailySongsData.list"
@@ -237,7 +237,7 @@ onMounted(() => {
   .main-rec-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 20px;
+    gap: 12px;
   }
   .date {
     display: flex;
@@ -274,7 +274,7 @@ onMounted(() => {
   }
 }
 .title {
-  margin-top: 28px;
+  margin-top: 20px;
   padding: 0 4px;
   width: max-content;
   .n-h {
