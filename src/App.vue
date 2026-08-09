@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import { isCapacitor } from "@/utils/env";
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { syncNativeCookies, markCookiesReady } from "@/utils/cookie";
+import { handleProtocolUrl } from "@/utils/protocol";
 import { useStatusStore, useAuthStore, useVersionStore, useSettingStore } from "@/stores";
 import GlobalUpdateModal from "@/components/Modal/GlobalUpdateModal.vue";
 import GlobalAuthModal from "@/components/Modal/GlobalAuthModal.vue";
@@ -80,6 +81,18 @@ const initBackButtonListener = async () => {
     });
     
     console.log("✅ 返回按钮监听器注册成功");
+
+    // 注册深链（orpheus://）监听：应用运行中收到 VIEW intent 时触发
+    App.addListener("appUrlOpen", (data: { url: string }) => {
+      if (data?.url) handleProtocolUrl(data.url);
+    });
+    // 冷启动时拉取启动 URL（若有 orpheus:// 深链）
+    try {
+      const launch = await App.getLaunchUrl();
+      if (launch?.url) handleProtocolUrl(launch.url);
+    } catch {
+      // 无启动 URL 属正常情况
+    }
   } catch (error) {
     console.warn("⚠️ @capacitor/app 未安装或加载失败，返回按钮功能不可用:", error);
   }

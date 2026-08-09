@@ -70,7 +70,7 @@ const handleConfirm = async () => {
   const url = serverUrl.value;
   // 验证 URL 格式和 %s
   if (isValidServer(url)) {
-    await window.api.store.set("amllDbServer", url);
+    // 直接写入设置（settingStore 已配置 localStorage 持久化）
     settingStore.amllDbServer = url;
     window.$message.success("AMLL TTML DB 地址已更新");
     props.onClose();

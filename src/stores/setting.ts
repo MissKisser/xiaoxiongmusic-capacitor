@@ -193,6 +193,8 @@ export interface SettingState {
   showHotSearch: boolean;
   /** 是否使用 AMLL 歌词 */
   useAMLyrics: boolean;
+  /** 歌词渲染引擎：default 默认 / amll AMLL / karaoke 逐字卡拉OK */
+  lyricEngine: "default" | "amll" | "karaoke";
   /** 是否使用 AMLL 歌词弹簧效果 */
   useAMSpring: boolean;
   /** 隐藏已播放歌词 */
@@ -209,6 +211,8 @@ export interface SettingState {
   localLyricQQMusicMatch: boolean;
   /** 歌词源优先级 */
   lyricPriority: "auto" | "qm" | "ttml" | "official";
+  /** 是否优先使用网易云 KRC 逐字歌词（有则用，否则退回 YRC） */
+  preferKrcLyric: boolean;
   /** AMLL DB 服务地址 */
   amllDbServer: string;
   /** 菜单显示封面 */
@@ -245,6 +249,8 @@ export interface SettingState {
   enableExcludeTTML: boolean;
   /** 「排除歌词」是否适用于本地歌词 */
   enableExcludeLocalLyrics: boolean;
+  /** 是否将歌词中星号遮蔽词（如 f\*\*k）还原为原词 */
+  uncensorLyrics: boolean;
   /** 用户自定义的排除歌词关键字 */
   excludeUserKeywords: string[];
   /** 用户自定义的排除歌词正则表达式 */
@@ -426,6 +432,7 @@ export const useSettingStore = defineStore("setting", {
     lyricRomaFontSize: 14,
     lyricFontWeight: 700,
     useAMLyrics: false,
+    lyricEngine: "default",
     useAMSpring: false,
     hidePassedLines: false,
     wordFadeWidth: 0.5,
@@ -434,6 +441,7 @@ export const useSettingStore = defineStore("setting", {
     preferQQMusicLyric: false,
     localLyricQQMusicMatch: false,
     lyricPriority: "auto",
+    preferKrcLyric: true,
     amllDbServer: defaultAMLLDbServer,
     showYrc: true,
     showTran: true,
@@ -449,6 +457,7 @@ export const useSettingStore = defineStore("setting", {
     enableExcludeLyrics: true,
     enableExcludeTTML: false,
     enableExcludeLocalLyrics: false,
+    uncensorLyrics: true,
     excludeUserKeywords: [],
     excludeUserRegexes: [],
     localFilesPath: [],

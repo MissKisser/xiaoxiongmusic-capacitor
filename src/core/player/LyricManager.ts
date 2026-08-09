@@ -3,12 +3,14 @@ import { songLyric, songLyricTTML } from "@/api/song";
 import { keywords as defaultKeywords, regexes as defaultRegexes } from "@/assets/data/exclude";
 import { useCacheManager } from "@/core/resource/CacheManager";
 import { matchLocalTtml } from "@/services/localTtmlRepo";
+import { resolveNeteaseLyric } from "@/services/lyricResolve";
 import { useMusicStore, useSettingStore, useStatusStore, useStreamingStore } from "@/stores";
 import { type SongLyric } from "@/types/lyric";
 import { SongType } from "@/types/main";
 import { isElectron } from "@/utils/env";
 import { extractLyricAuthors } from "@/utils/lyric/author";
 import { isWordLevelFormat, parseSmartLrc } from "@/utils/lyricParser";
+import { applyProfanityUncensor } from "@/utils/lyric/profanity";
 import { stripLyricMetadata } from "@/utils/lyricStripper";
 import { getConverter } from "@/utils/opencc";
 import { type LyricLine, parseLrc, parseTTML, parseYrc } from "@applemusic-like-lyrics/lyric";
@@ -494,9 +496,14 @@ class LyricManager {
         if (data?.romalrc?.lyric)
           lrcLines = this.alignLyrics(lrcLines, parseLrc(data.romalrc.lyric), "romanLyric");
       }
-      // 逐字歌词
-      if (data?.yrc?.lyric) {
-        yrcLines = parseYrc(data.yrc.lyric) || [];
+      // 逐字歌词（优先 KRC / 其次 YRC；KRC 可开关）
+      if (data?.klyric?.lyric || data?.yrc?.lyric) {
+        // 关闭 KRC 时忽略 klyric，退回 YRC
+        const resolveData = settingStore.preferKrcLyric
+          ? data
+          : { ...data, klyric: null };
+        const resolved = resolveNeteaseLyric(resolveData);
+        yrcLines = resolved.yrcData;
         // 逐字歌词翻译
         if (data?.ytlrc?.lyric)
           yrcLines = this.alignLyrics(yrcLines, parseLrc(data.ytlrc.lyric), "translatedLyric");
@@ -920,6 +927,12 @@ class LyricManager {
     const statusStore = useStatusStore();
     // 若非本次
     if (this.activeLyricReq !== req) return;
+    // 还原屏蔽词（如 f\*\*k → fuck），默认开启
+    const settingStore = useSettingStore();
+    if (settingStore.uncensorLyrics) {
+      if (lyricData.lrcData?.length) applyProfanityUncensor(lyricData.lrcData);
+      if (lyricData.yrcData?.length) applyProfanityUncensor(lyricData.yrcData);
+    }
     // 如果只有逐字歌词
     if (lyricData.lrcData.length === 0 && lyricData.yrcData.length > 0) {
       // 构成普通歌词

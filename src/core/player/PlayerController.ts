@@ -13,7 +13,10 @@ import lastfmScrobbler from "@/utils/lastfmScrobbler";
 import { calculateProgress } from "@/utils/time";
 import { LyricLine } from "@applemusic-like-lyrics/lyric";
 import { DebouncedFunc, throttle } from "lodash-es";
+import { checkABLoop, resetABLoop } from "./AbLoopManager";
 import { useAudioManager } from "./AudioManager";
+import { installPlayStats, onTrackEnded } from "./PlayStats";
+import { scheduleNextTrackPreload } from "./NextTrackPreloader";
 import { useLyricManager } from "./LyricManager";
 import { mediaSessionManager } from "./MediaSessionManager";
 import * as playerIpc from "./PlayerIpc";
@@ -57,6 +60,9 @@ class PlayerController {
     }
 
     this.bindAudioEvents();
+
+    // 安装播放统计累加器（幂等）
+    installPlayStats();
 
     // [SleepTimer] 监听原生层定时器完成事件
     if (isCapacitor) {
@@ -111,6 +117,11 @@ class PlayerController {
     // 生成新的请求标识
     this.currentRequestToken++;
     const requestToken = this.currentRequestToken;
+
+    // AB 循环为 per-song 状态，切歌时重置
+    resetABLoop();
+    // 预载下一首封面（浏览器解码缓存，提升切歌体验）
+    scheduleNextTrackPreload();
 
     const { autoPlay = true, seek = 0 } = options;
     // 要播放的歌曲对象
@@ -524,6 +535,8 @@ class PlayerController {
     audioManager.addEventListener("ended", () => {
       console.log(`⏹️ [${musicStore.playSong?.id}] 歌曲结束`);
       lastfmScrobbler.stop();
+      // 播放统计：结算本曲；单曲循环时每圈独立记录
+      onTrackEnded(statusStore.repeatMode === "one");
       // 检查定时关闭
       if (this.checkAutoClose()) return;
       // 自动播放下一首
@@ -553,6 +566,8 @@ class PlayerController {
         progress: calculateProgress(currentTime, duration),
         lyricIndex,
       });
+      // AB 循环：到达 B 点跳回 A
+      checkABLoop(currentTime, (timeMs) => this.setSeek(timeMs));
       // 成功播放一段距离后，重置失败跳过计数
       if (currentTime > 500 && this.failSkipCount > 0) {
         this.failSkipCount = 0;
