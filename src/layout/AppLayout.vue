@@ -48,7 +48,7 @@
             display: 'grid',
             gridTemplateRows: '1fr',
             minHeight: '100%',
-            padding: isMobile ? '0 16px' : '0 24px',
+            padding: isMobile ? '0 12px' : '0 24px',
           }"
           position="absolute"
           embedded
