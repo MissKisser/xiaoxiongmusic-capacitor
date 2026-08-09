@@ -64,6 +64,7 @@ const menus: Record<string, { title: string; items: { item: string; label: strin
     title: "应用设置",
     items: [
       { item: "theme", label: "主题与背景", desc: "主题模式、全局背景、背景参数", icon: "ColorLens" },
+      { item: "layout", label: "界面布局", desc: "卡片列数、布局密度", icon: "SettingsOther" },
       { item: "other", label: "缓存 / 性能 / 更多", desc: "音频缓存、毛玻璃、音源管理", icon: "Settings" },
     ],
   },

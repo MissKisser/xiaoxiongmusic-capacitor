@@ -15,6 +15,7 @@ declare module 'vue' {
     ABLoopModal: typeof import('./src/components/Player/SettingsModals/ABLoopModal.vue')['default']
     AMLLServer: typeof import('./src/components/Modal/Setting/AMLLServer.vue')['default']
     AMLyric: typeof import('./src/components/Player/PlayerLyric/AMLyric.vue')['default']
+    AppLayoutSetting: typeof import('./src/components/Setting/groups/AppLayoutSetting.vue')['default']
     AppOtherSetting: typeof import('./src/components/Setting/groups/AppOtherSetting.vue')['default']
     AppThemeSetting: typeof import('./src/components/Setting/groups/AppThemeSetting.vue')['default']
     ArtistList: typeof import('./src/components/List/ArtistList.vue')['default']

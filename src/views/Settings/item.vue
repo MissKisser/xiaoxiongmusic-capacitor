@@ -26,6 +26,7 @@
       <DesktopLyricItem v-else-if="type === 'lyrics' && item === 'desktop'" />
 
       <!-- 应用设置 -->
+      <AppLayoutSetting v-else-if="type === 'app' && item === 'layout'" />
       <AppThemeSetting v-else-if="type === 'app' && item === 'theme'" />
       <AppOtherSetting v-else-if="type === 'app' && item === 'other'" />
 
@@ -49,6 +50,7 @@ import LyricContentSetting from "@/components/Setting/groups/LyricContentSetting
 import LyricEngineSetting from "@/components/Setting/groups/LyricEngineSetting.vue";
 import LyricTtmlSetting from "@/components/Setting/groups/LyricTtmlSetting.vue";
 import AppThemeSetting from "@/components/Setting/groups/AppThemeSetting.vue";
+import AppLayoutSetting from "@/components/Setting/groups/AppLayoutSetting.vue";
 import AppOtherSetting from "@/components/Setting/groups/AppOtherSetting.vue";
 
 const route = useRoute();
@@ -71,6 +73,7 @@ const titles: Record<string, string> = {
   ttml: "本地 TTML 库",
   desktop: "桌面歌词",
   theme: "主题与背景",
+  layout: "界面布局",
   other: "缓存 / 性能 / 更多",
 };
 const itemTitle = computed(() => titles[item.value] || "设置");
