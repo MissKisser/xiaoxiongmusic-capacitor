@@ -124,6 +124,12 @@ isDev        // 开发环境
 - 添加日志 TAG 标识后通过 Logcat 过滤器定向追踪
 - 不使用 ADB 命令行调试方案
 
+## 开发工作流程（必须遵守）
+
+1. **修改代码 → 代码审查 → 直接构建**：完成代码修改后，依次执行类型检查（`vue-tsc --noEmit`，对比既有基线判断是否有新增错误）、生产构建（`vite build`）、同步 Android（`cap sync android`）、Gradle 构建 APK（`assembleDebug`）
+2. **禁止启动模拟器/真机进行自动验证**：构建完成后直接交付 APK，不在模拟器或真机上安装、截图、UI 自动化验证；UI 效果与功能验证由用户手动进行
+3. 构建产物路径：`android/app/build/outputs/apk/debug/app-debug.apk`
+
 ## 关键配置文件
 
 - `capacitor.config.ts`：Capacitor 配置（appId: `com.xiaoxiong.music`）

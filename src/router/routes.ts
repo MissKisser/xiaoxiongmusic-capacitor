@@ -325,6 +325,43 @@ const appRoutes: Array<RouteRecordRaw> = [
     name: "history",
     component: () => import("@/views/History.vue"),
   },
+  // 设置
+  {
+    path: "/settings",
+    name: "settings",
+    component: () => import("@/views/Settings/index.vue"),
+  },
+  // 设置分类详情
+  {
+    path: "/settings/:type",
+    name: "settings-detail",
+    component: () => import("@/views/Settings/detail.vue"),
+    beforeEnter: (to, _, next) => {
+      // 仅允许已知分类，其余回退到设置主页
+      const valid = ["play", "lyrics", "app"];
+      if (!valid.includes(String(to.params.type))) next({ name: "settings" });
+      else next();
+    },
+  },
+  // 设置三级子菜单（具体设置项页面）
+  {
+    path: "/settings/:type/:item",
+    name: "settings-item",
+    component: () => import("@/views/Settings/item.vue"),
+    beforeEnter: (to, _, next) => {
+      // 校验 type/item 组合是否合法，非法回退到设置主页
+      const validCombos: Record<string, string[]> = {
+        play: ["timer", "equalizer", "rate", "abloop"],
+        lyrics: ["display", "word", "translate", "content", "engine", "ttml", "desktop"],
+        app: ["theme", "other"],
+      };
+      const type = String(to.params.type);
+      const item = String(to.params.item);
+      const valid = validCombos[type]?.includes(item);
+      if (!valid) next({ name: "settings" });
+      else next();
+    },
+  },
   // 评论页
   {
     path: "/comment/:id",
