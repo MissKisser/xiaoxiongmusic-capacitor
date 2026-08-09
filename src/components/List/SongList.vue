@@ -76,10 +76,10 @@
           <!-- 虚拟列表 -->
           <VirtualScroll
             ref="listRef"
-            :item-height="90"
+            :item-height="76"
             :item-fixed="true"
             :items="virtualListItems"
-            :height="`calc(100% - 40px)`"
+            :height="`calc(100% - 36px)`"
             :padding-bottom="80"
             @scroll="onScroll"
           >
@@ -360,7 +360,7 @@ const onScroll = (e: Event) => {
   const target = e.target as HTMLElement;
   const top = target.scrollTop;
   scrollTop.value = top;
-  scrollIndex.value = Math.floor(top / 90);
+  scrollIndex.value = Math.floor(top / 76);
 
   // 触底检测
   const scrollHeight = target.scrollHeight;
@@ -455,13 +455,13 @@ onBeforeUnmount(() => {
   border-radius: 12px 0 0 12px;
   overflow: hidden;
   .song-card {
-    padding-bottom: 12px;
+    padding-bottom: 8px;
     // padding-right: 4px;
   }
   // 悬浮顶栏
   .list-header {
     width: 100%;
-    height: 40px;
+    height: 36px;
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -478,17 +478,17 @@ onBeforeUnmount(() => {
       display: flex;
       justify-content: center;
       align-items: center;
-      width: clamp(36px, 8vw, 40px);
-      min-width: clamp(36px, 8vw, 40px);
+      width: clamp(30px, 6vw, 34px);
+      min-width: clamp(30px, 6vw, 34px);
       font-weight: bold;
-      margin-right: clamp(8px, 2vw, 12px);
+      margin-right: clamp(6px, 1.5vw, 10px);
     }
     .title {
       position: relative;
       flex: 1;
       display: flex;
       align-items: center;
-      padding: 4px 20px 4px 0;
+      padding: 2px 12px 2px 0;
       cursor: pointer;
       .sort {
         margin-left: 6px;
@@ -527,7 +527,7 @@ onBeforeUnmount(() => {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: clamp(36px, 8vw, 40px);
+      width: clamp(30px, 6vw, 34px);
     }
     .meta {
       width: clamp(45px, 10vw, 50px);
