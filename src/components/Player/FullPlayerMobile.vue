@@ -328,9 +328,23 @@ watch(pageIndex, (newIndex) => {
 // 滑动偏移量
 const swipeOffset = ref(0);
 
+// 手势起点是否位于进度条区域（起点在进度条时整个手势不触发页面切换，避免拖动进度条时误切页）
+const swipeStartInSlider = ref(false);
+
 const { direction, isSwiping, lengthX } = useSwipe(mobileStart, {
   threshold: 5,
+  onSwipeStart: (event) => {
+    // 记录手势起点是否在进度条区域
+    const target = event?.target as HTMLElement;
+    swipeStartInSlider.value = !!(
+      target?.closest('.n-slider') ||
+      target?.closest('.player-slider') ||
+      target?.closest('.progress-section')
+    );
+  },
   onSwipe: (event) => {
+    // 手势起点在进度条区域时不处理页面滑动（让进度条自己处理拖动）
+    if (swipeStartInSlider.value) return;
     // 检查是否在进度条区域，如果是则不处理页面滑动（让进度条自己处理）
     const target = event?.target as HTMLElement;
     if (target?.closest('.n-slider') || target?.closest('.player-slider') || target?.closest('.progress-section')) {
@@ -343,6 +357,11 @@ const { direction, isSwiping, lengthX } = useSwipe(mobileStart, {
     swipeOffset.value = lengthX.value;
   },
   onSwipeEnd: (event) => {
+    // 手势起点在进度条区域时不处理页面切换
+    if (swipeStartInSlider.value) {
+      swipeOffset.value = 0;
+      return;
+    }
     // 检查是否在进度条区域
     const target = event?.target as HTMLElement;
     if (target?.closest('.n-slider') || target?.closest('.player-slider') || target?.closest('.progress-section')) {
