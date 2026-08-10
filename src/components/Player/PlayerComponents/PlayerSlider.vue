@@ -40,8 +40,6 @@ const player = usePlayerController();
 const dragValue = ref(0);
 // 是否拖动
 const isDragging = ref(false);
-// 拖动前是否在播放（拖动结束后据此恢复）
-const wasPlaying = ref(false);
 // 是否显示提示
 // const showSliderTooltip = ref(false);
 
@@ -71,7 +69,7 @@ const unlockPageScroll = () => {
 };
 
 // 开始拖动（按下进度条，捕获阶段先于 naive-ui 内部事件，确保 isDragging 先置位）
-const handlePointerDown = async (e: PointerEvent) => {
+const handlePointerDown = (e: PointerEvent) => {
   // 不允许拖动（点击模式）或禁用时不处理
   if (!props.draggable || props.disabled) {
     return;
@@ -83,11 +81,6 @@ const handlePointerDown = async (e: PointerEvent) => {
   isDragging.value = true;
   // 立即赋值当前时间
   dragValue.value = statusStore.currentTime;
-  // 记录播放状态并暂停播放，避免拖动期间音频持续播放/反复 seek
-  wasPlaying.value = statusStore.playStatus;
-  if (wasPlaying.value) {
-    await player.pause();
-  }
   // 屏蔽页面滚动
   lockPageScroll();
   // 注册全局结束监听（手指可能移出进度条区域）
@@ -96,8 +89,8 @@ const handlePointerDown = async (e: PointerEvent) => {
   emit('drag-start');
 };
 
-// 结束拖动（松手）
-const handlePointerUp = async () => {
+// 结束拖动（松手）：立即跳转到目标进度
+const handlePointerUp = () => {
   if (!isDragging.value) {
     return;
   }
@@ -107,12 +100,8 @@ const handlePointerUp = async () => {
   // 移除全局监听
   window.removeEventListener("pointerup", handlePointerUp);
   window.removeEventListener("pointercancel", handlePointerUp);
-  // 跳转到目标进度
+  // 跳转到目标进度（拖动过程中不 seek，松手一次性跳转，避免逐个播放中间内容）
   setSeek(dragValue.value);
-  // 拖动前在播放则恢复播放
-  if (wasPlaying.value) {
-    await player.play();
-  }
   emit('drag-end');
 };
 
