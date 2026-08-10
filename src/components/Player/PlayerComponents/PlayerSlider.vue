@@ -9,8 +9,7 @@
     :tooltip="settingStore.progressTooltipShow && showTooltip"
     :disabled="disabled"
     :class="['player-slider', { drag: isDragging, disabled, 'no-drag': !draggable }]"
-    @dragstart="handleDragStart"
-    @dragend="handleDragEnd"
+    @pointerdown.capture="handlePointerDown"
   />
 </template>
 
@@ -52,17 +51,12 @@ const sliderProgress = computed({
   get: () => (isDragging.value ? dragValue.value : statusStore.currentTime),
   // 设置进度
   set: (value) => {
-    // 如果不允许拖动，直接设置进度（点击模式）
-    if (!props.draggable) {
-      setSeek(value);
-      return;
-    }
-    // 若为拖动中
+    // 若为拖动中，仅更新拖动预览值（不触发 seek，松手时才跳转）
     if (isDragging.value) {
       dragValue.value = value;
       return;
     }
-    // 结束或者为点击，直接跳转进度
+    // 非拖动场景（点击 / 键盘等），直接跳转进度
     setSeek(value);
   },
 });
@@ -76,35 +70,44 @@ const unlockPageScroll = () => {
   document.removeEventListener("touchmove", preventScroll);
 };
 
-// 开始拖拽
-const handleDragStart = async () => {
-  // 如果不允许拖动，阻止拖拽
-  if (!props.draggable) {
+// 开始拖动（按下进度条，捕获阶段先于 naive-ui 内部事件，确保 isDragging 先置位）
+const handlePointerDown = async (e: PointerEvent) => {
+  // 不允许拖动（点击模式）或禁用时不处理
+  if (!props.draggable || props.disabled) {
+    return;
+  }
+  // 忽略鼠标非左键
+  if (e.pointerType === "mouse" && e.button !== 0) {
     return;
   }
   isDragging.value = true;
   // 立即赋值当前时间
   dragValue.value = statusStore.currentTime;
-  // 记录播放状态并暂停播放，避免拖动期间音频持续播放
+  // 记录播放状态并暂停播放，避免拖动期间音频持续播放/反复 seek
   wasPlaying.value = statusStore.playStatus;
   if (wasPlaying.value) {
     await player.pause();
   }
   // 屏蔽页面滚动
   lockPageScroll();
+  // 注册全局结束监听（手指可能移出进度条区域）
+  window.addEventListener("pointerup", handlePointerUp);
+  window.addEventListener("pointercancel", handlePointerUp);
   emit('drag-start');
 };
 
-// 结束拖拽
-const handleDragEnd = async () => {
-  // 如果不允许拖动，不处理
-  if (!props.draggable) {
+// 结束拖动（松手）
+const handlePointerUp = async () => {
+  if (!isDragging.value) {
     return;
   }
   isDragging.value = false;
   // 解除页面滚动屏蔽
   unlockPageScroll();
-  // 直接更改进度
+  // 移除全局监听
+  window.removeEventListener("pointerup", handlePointerUp);
+  window.removeEventListener("pointercancel", handlePointerUp);
+  // 跳转到目标进度
   setSeek(dragValue.value);
   // 拖动前在播放则恢复播放
   if (wasPlaying.value) {
@@ -113,9 +116,11 @@ const handleDragEnd = async () => {
   emit('drag-end');
 };
 
-// 组件销毁时解除滚动屏蔽，避免残留
+// 组件销毁时解除滚动屏蔽与全局监听，避免残留
 onBeforeUnmount(() => {
   unlockPageScroll();
+  window.removeEventListener("pointerup", handlePointerUp);
+  window.removeEventListener("pointercancel", handlePointerUp);
 });
 
 /**

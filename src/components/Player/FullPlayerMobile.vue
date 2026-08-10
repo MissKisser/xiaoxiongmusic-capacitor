@@ -91,7 +91,6 @@
             <PlayerSlider 
               class="player" 
               :show-tooltip="false"
-              :draggable="false"
             />
             <span class="time" @click="toggleTimeFormat">{{ timeDisplay[1] }}</span>
           </div>
@@ -606,7 +605,7 @@ const contentTransform = computed(() => {
           display: flex;
           align-items: center;
           margin: 0 4px 30px;
-          // 禁用拖动，只允许点击
+          // 拖动进度条时屏蔽页面滚动
           touch-action: none;
           .time {
             font-size: 12px;
@@ -618,7 +617,7 @@ const contentTransform = computed(() => {
           }
           .n-slider {
             margin: 0 12px;
-            // 禁用拖动，只允许点击
+            // 允许触摸拖动进度条
             touch-action: none;
             // 确保圆纽始终显示
             :deep(.n-slider-handles) {
@@ -629,7 +628,6 @@ const contentTransform = computed(() => {
                 height: 16px;
                 border: 2px solid var(--n-handle-color);
                 box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-                pointer-events: none; // 禁用圆纽的拖动
               }
             }
             :deep(.n-slider.drag) {
@@ -640,7 +638,7 @@ const contentTransform = computed(() => {
               }
             }
             :deep(.n-slider-rail) {
-              touch-action: none; // 禁用拖动
+              touch-action: none; // 屏蔽触摸引发的页面滚动
               cursor: pointer; // 显示点击光标
             }
           }
