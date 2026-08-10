@@ -113,7 +113,7 @@ const openCropModal = (imageSrc: string) => {
     style: {
       width: "min(90vw, 600px)",
       maxWidth: "calc(100vw - 32px)",
-      marginTop: "calc(env(safe-area-inset-top, 0px) + 70px)",
+      marginTop: "calc(env(safe-area-inset-top, 0px) + var(--nav-height, 70px))",
     },
     zIndex: 4000,
     title: "裁剪背景图片",

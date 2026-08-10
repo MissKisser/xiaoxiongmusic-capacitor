@@ -6,7 +6,7 @@ import type { SettingState } from "../setting";
 /**
  * 当前设置 Schema 版本号
  */
-export const CURRENT_SETTING_SCHEMA_VERSION = 9;
+export const CURRENT_SETTING_SCHEMA_VERSION = 10;
 
 /**
  * 迁移函数类型
@@ -157,6 +157,12 @@ export const settingMigrations: Record<number, MigrationFunction> = {
     // 新增手机端卡片列数设置，默认 2 列
     return {
       mobileCardColumns: 2,
+    };
+  },
+  10: () => {
+    // 新增顶栏高度设置，默认 70px
+    return {
+      navHeight: 70,
     };
   },
 };

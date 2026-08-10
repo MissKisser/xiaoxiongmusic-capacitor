@@ -362,6 +362,8 @@ export interface SettingState {
   enableBlurEffect: boolean;
   /** 手机端卡片列数（2 或 3 列） */
   mobileCardColumns: 2 | 3;
+  /** 顶栏高度（px，可调 50-70） */
+  navHeight: number;
   /** Android 桌面歌词配置 */
   desktopLyricConfig: LyricConfig;
 }
@@ -551,6 +553,7 @@ export const useSettingStore = defineStore("setting", {
     audioCacheStrategy: "all",
     enableBlurEffect: false,
     mobileCardColumns: 2,
+    navHeight: 70,
     desktopLyricConfig: { ...defaultDesktopLyricConfig },
   }),
   getters: {
