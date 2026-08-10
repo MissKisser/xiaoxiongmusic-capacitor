@@ -49,7 +49,7 @@ export const openUserAgreement = () => {
       width: "min(80vw, 600px)",
       maxWidth: "calc(100vw - 32px)",
       maxHeight: "calc(80vh - env(safe-area-inset-top, 0px))",
-      marginTop: "calc(env(safe-area-inset-top, 0px) + 70px)", // 不与顶栏接触
+      marginTop: "calc(env(safe-area-inset-top, 0px) + var(--nav-height, 70px))", // 不与顶栏接触
       overflow: "hidden",
     },
     zIndex: 3000,
@@ -510,7 +510,7 @@ export const openBackgroundSetting = () => {
     style: {
       width: "500px",
       maxWidth: "calc(100vw - 32px)",
-      marginTop: "calc(env(safe-area-inset-top, 0px) + 70px)", // 不与顶栏接触
+      marginTop: "calc(env(safe-area-inset-top, 0px) + var(--nav-height, 70px))", // 不与顶栏接触
     },
     zIndex: 3000,
     title: "背景设置",

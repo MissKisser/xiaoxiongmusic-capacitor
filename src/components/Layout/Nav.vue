@@ -324,7 +324,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: calc(70px + env(safe-area-inset-top, 0px));
+  height: calc(var(--nav-height, 70px) + env(safe-area-inset-top, 0px));
   padding: 0 1rem;
   padding-top: env(safe-area-inset-top, 0px); // 适配系统状态栏高度
   -webkit-app-region: drag;

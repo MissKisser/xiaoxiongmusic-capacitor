@@ -1,5 +1,9 @@
 <template>
-  <div id="app-layout" ref="appLayoutRef">
+  <div
+    id="app-layout"
+    ref="appLayoutRef"
+    :style="{ '--nav-height': `${settingStore.navHeight}px` }"
+  >
     <!-- 主框架 -->
     <n-layout
       id="main"
@@ -292,7 +296,7 @@ onMounted(() => {
     background-color: transparent;
   }
   #main-content {
-    top: calc(70px + env(safe-area-inset-top, 0px));
+    top: calc(var(--nav-height, 70px) + env(safe-area-inset-top, 0px));
     background-color: transparent;
     transition: bottom 0.3s;
     .router-view {
