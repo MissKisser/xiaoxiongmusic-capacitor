@@ -91,6 +91,8 @@
             <PlayerSlider 
               class="player" 
               :show-tooltip="false"
+              @drag-start="onSliderDragStart"
+              @drag-end="onSliderDragEnd"
             />
             <span class="time" @click="toggleTimeFormat">{{ timeDisplay[1] }}</span>
           </div>
@@ -331,6 +333,21 @@ const swipeOffset = ref(0);
 // 手势起点是否位于进度条区域（起点在进度条时整个手势不触发页面切换，避免拖动进度条时误切页）
 const swipeStartInSlider = ref(false);
 
+// 进度条是否正在拖动（拖动期间禁止页面平移/切换）
+const sliderDragging = ref(false);
+
+// 进度条拖动开始：禁止页面平移
+const onSliderDragStart = () => {
+  sliderDragging.value = true;
+  swipeOffset.value = 0;
+};
+
+// 进度条拖动结束：恢复页面手势
+const onSliderDragEnd = () => {
+  sliderDragging.value = false;
+  swipeOffset.value = 0;
+};
+
 const { direction, isSwiping, lengthX } = useSwipe(mobileStart, {
   threshold: 5,
   onSwipeStart: (event) => {
@@ -343,6 +360,8 @@ const { direction, isSwiping, lengthX } = useSwipe(mobileStart, {
     );
   },
   onSwipe: (event) => {
+    // 进度条拖动期间禁止页面平移
+    if (sliderDragging.value) return;
     // 手势起点在进度条区域时不处理页面滑动（让进度条自己处理拖动）
     if (swipeStartInSlider.value) return;
     // 检查是否在进度条区域，如果是则不处理页面滑动（让进度条自己处理）
@@ -357,6 +376,11 @@ const { direction, isSwiping, lengthX } = useSwipe(mobileStart, {
     swipeOffset.value = lengthX.value;
   },
   onSwipeEnd: (event) => {
+    // 进度条拖动结束阶段不处理页面切换
+    if (sliderDragging.value) {
+      swipeOffset.value = 0;
+      return;
+    }
     // 手势起点在进度条区域时不处理页面切换
     if (swipeStartInSlider.value) {
       swipeOffset.value = 0;
@@ -388,7 +412,8 @@ const { direction, isSwiping, lengthX } = useSwipe(mobileStart, {
 // 计算实时的变换位置
 const contentTransform = computed(() => {
   const baseOffset = pageIndex.value * (100 / totalPages.value); // 百分比
-  if (!isSwiping.value || totalPages.value <= 1) {
+  // 进度条拖动期间禁止页面跟手移动（isSwiping 由 useSwipe 内部驱动，需在此隔离）
+  if (!isSwiping.value || totalPages.value <= 1 || sliderDragging.value) {
     return `translateX(-${baseOffset}%)`;
   }
   let pixelOffset = lengthX.value;
