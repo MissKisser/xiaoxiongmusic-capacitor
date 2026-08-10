@@ -138,6 +138,15 @@ const itemTitle = computed(() => titles[item.value] || "设置");
     --n-color-focus: var(--n-color-hover);
   }
 
+  // 单选按钮（radio-button）与主题模式按钮一致：选中纯色主色底白字，未选中灰底
+  .n-radio-button {
+    --n-button-color: var(--surface-container-hex);
+    --n-button-color-active: rgb(var(--primary));
+    --n-button-text-color-active: #fff;
+    --n-button-border-color: transparent;
+    --n-button-border-color-active: transparent;
+  }
+
   .set-list {
     padding-bottom: 20px;
 
