@@ -35,3 +35,14 @@ keystore.properties
 # 发布产物
 *.apk
 SHA256SUMS-*.txt
+
+# 文档：仅保留 README.md（其余为 agent 创建/使用的文档，不提交）
+*.md
+!README.md
+docs/
+CHANGELOG.md
+AGENTS.md
+CLAUDE.md
+.agents/
+.omc/
+.omx/
