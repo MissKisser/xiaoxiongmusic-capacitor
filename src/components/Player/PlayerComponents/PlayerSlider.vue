@@ -41,6 +41,8 @@ const player = usePlayerController();
 const dragValue = ref(0);
 // 是否拖动
 const isDragging = ref(false);
+// 拖动前是否在播放（拖动结束后据此恢复）
+const wasPlaying = ref(false);
 // 是否显示提示
 // const showSliderTooltip = ref(false);
 
@@ -60,13 +62,22 @@ const sliderProgress = computed({
       dragValue.value = value;
       return;
     }
-    // 结束或者为点击
-    useThrottleFn((value: number) => setSeek(value), 30);
+    // 结束或者为点击，直接跳转进度
+    setSeek(value);
   },
 });
 
+// 拖动期间屏蔽页面滚动（touchmove 阻止默认）
+const preventScroll = (e: TouchEvent) => e.preventDefault();
+const lockPageScroll = () => {
+  document.addEventListener("touchmove", preventScroll, { passive: false });
+};
+const unlockPageScroll = () => {
+  document.removeEventListener("touchmove", preventScroll);
+};
+
 // 开始拖拽
-const handleDragStart = () => {
+const handleDragStart = async () => {
   // 如果不允许拖动，阻止拖拽
   if (!props.draggable) {
     return;
@@ -74,20 +85,38 @@ const handleDragStart = () => {
   isDragging.value = true;
   // 立即赋值当前时间
   dragValue.value = statusStore.currentTime;
+  // 记录播放状态并暂停播放，避免拖动期间音频持续播放
+  wasPlaying.value = statusStore.playStatus;
+  if (wasPlaying.value) {
+    await player.pause();
+  }
+  // 屏蔽页面滚动
+  lockPageScroll();
   emit('drag-start');
 };
 
 // 结束拖拽
-const handleDragEnd = () => {
+const handleDragEnd = async () => {
   // 如果不允许拖动，不处理
   if (!props.draggable) {
     return;
   }
   isDragging.value = false;
+  // 解除页面滚动屏蔽
+  unlockPageScroll();
   // 直接更改进度
   setSeek(dragValue.value);
+  // 拖动前在播放则恢复播放
+  if (wasPlaying.value) {
+    await player.play();
+  }
   emit('drag-end');
 };
+
+// 组件销毁时解除滚动屏蔽，避免残留
+onBeforeUnmount(() => {
+  unlockPageScroll();
+});
 
 /**
  * 获取当前时间最近一句歌词
@@ -133,6 +162,8 @@ const formatTooltip = (value: number) => {
 <style scoped lang="scss">
 .player-slider {
   width: 100%;
+  // 屏蔽触摸拖动引发的页面滚动（与 JS 锁滚动双保险）
+  touch-action: none;
   &:not(.drag) {
     :deep(.n-slider-rail) {
       .n-slider-rail__fill {
