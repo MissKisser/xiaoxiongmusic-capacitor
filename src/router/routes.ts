@@ -353,7 +353,7 @@ const appRoutes: Array<RouteRecordRaw> = [
       const validCombos: Record<string, string[]> = {
         play: ["timer", "equalizer", "rate", "abloop"],
         lyrics: ["display", "word", "translate", "content", "engine", "ttml", "desktop"],
-        app: ["theme", "other"],
+        app: ["theme", "layout", "other"],
       };
       const type = String(to.params.type);
       const item = String(to.params.item);
