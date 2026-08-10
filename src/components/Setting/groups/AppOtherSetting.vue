@@ -61,7 +61,7 @@
           <n-button
             size="small"
             type="warning"
-            secondary
+           
             :disabled="cacheSize === '0'"
             @click="handleClearCache"
           >

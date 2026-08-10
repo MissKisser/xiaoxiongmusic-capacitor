@@ -129,6 +129,15 @@ const itemTitle = computed(() => titles[item.value] || "设置");
 
 <style lang="scss">
 .settings-item-page {
+  // 设置页按钮统一纯色背景（default 类型按钮使用表面色实底，
+  // 排除 primary/error 等彩色类型与 secondary/tertiary 半透明模式）
+  .n-button:not(.n-button--primary-type):not(.n-button--error-type):not(.n-button--warning-type):not(.n-button--info-type):not(.n-button--success-type):not(.n-button--secondary):not(.n-button--tertiary) {
+    --n-color: var(--surface-container-hex);
+    --n-color-hover: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 10%));
+    --n-color-pressed: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 16%));
+    --n-color-focus: var(--n-color-hover);
+  }
+
   .set-list {
     padding-bottom: 20px;
 

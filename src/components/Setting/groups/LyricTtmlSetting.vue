@@ -18,10 +18,10 @@
             hidden
             @change="onLocalTtmlPick"
           />
-          <n-button type="primary" strong secondary @click="openLocalTtmlPicker">
+          <n-button type="primary" strong @click="openLocalTtmlPicker">
             导入 TTML 文件
           </n-button>
-          <n-button secondary @click="refreshLocalTtml"> 刷新列表 </n-button>
+          <n-button @click="refreshLocalTtml"> 刷新列表 </n-button>
         </div>
         <n-empty v-if="!localTtmlList.length" description="暂无本地 TTML 文件" />
         <n-scrollbar v-else style="max-height: 220px" trigger="none">
@@ -35,12 +35,12 @@
                   </n-text>
                 </div>
                 <n-flex>
-                  <n-button size="tiny" secondary @click="renameLocalTtmlItem(item)">
+                  <n-button size="tiny" @click="renameLocalTtmlItem(item)">
                     重命名
                   </n-button>
                   <n-popconfirm @positive-click="removeLocalTtmlItem(item)">
                     <template #trigger>
-                      <n-button size="tiny" type="error" secondary> 删除 </n-button>
+                      <n-button size="tiny" type="error"> 删除 </n-button>
                     </template>
                     确认删除 {{ item.name }}？
                   </n-popconfirm>

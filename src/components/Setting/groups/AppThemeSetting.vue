@@ -31,7 +31,7 @@
         </div>
         <n-flex vertical :size="10" class="background-controls">
           <n-flex :size="8">
-            <n-button size="small" secondary @click="triggerUpload">
+            <n-button size="small" @click="triggerUpload">
               <template #icon>
                 <component :is="renderIcon('Image')" />
               </template>
@@ -41,7 +41,7 @@
               v-if="settingStore.globalBackgroundImage"
               size="small"
               type="error"
-              secondary
+             
               @click="resetBackground"
             >
               <template #icon>
