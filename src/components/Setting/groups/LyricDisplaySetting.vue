@@ -52,7 +52,7 @@
               v-if="settingStore.lyricFontSize !== 46"
               type="primary"
               strong
-              secondary
+             
               @click="settingStore.lyricFontSize = 46"
             >
               恢复默认
@@ -81,7 +81,7 @@
               v-if="settingStore.lyricTranFontSize !== 22"
               type="primary"
               strong
-              secondary
+             
               @click="settingStore.lyricTranFontSize = 22"
             >
               恢复默认
@@ -114,7 +114,7 @@
               v-if="settingStore.lyricRomaFontSize !== 18"
               type="primary"
               strong
-              secondary
+             
               @click="settingStore.lyricRomaFontSize = 18"
             >
               恢复默认
@@ -143,7 +143,7 @@
           <n-text class="name">歌词字体设置</n-text>
           <n-text class="tip" :depth="3"> 统一配置各语种歌词区域的字体 </n-text>
         </div>
-        <n-button type="primary" strong secondary @click="openFontManager"> 配置 </n-button>
+        <n-button type="primary" strong @click="openFontManager"> 配置 </n-button>
       </n-card>
       <n-card class="set-item">
         <div class="label">
@@ -233,7 +233,7 @@
               v-if="settingStore.lyricOffsetStep !== 500"
               type="primary"
               strong
-              secondary
+             
               @click="settingStore.lyricOffsetStep = 500"
             >
               恢复默认

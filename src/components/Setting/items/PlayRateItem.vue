@@ -40,7 +40,7 @@
     <!-- 重置按钮 -->
     <n-button
       v-if="Math.abs(playRate - 1) > 0.01"
-      type="tertiary"
+      type="primary"
       block
       @click="resetPlayRate"
     >

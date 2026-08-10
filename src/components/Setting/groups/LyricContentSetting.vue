@@ -55,7 +55,7 @@
               AMLL TTML DB 地址，请确保地址正确，否则将导致歌词获取失败
             </n-text>
           </div>
-          <n-button type="primary" strong secondary @click="openAMLLServer"> 配置 </n-button>
+          <n-button type="primary" strong @click="openAMLLServer"> 配置 </n-button>
         </n-card>
       </n-collapse-transition>
 
@@ -98,7 +98,7 @@
             <n-text class="name">歌词排除内容</n-text>
             <n-text class="tip" :depth="3"> 包含关键词或匹配正则表达式的歌词行将不会显示 </n-text>
           </div>
-          <n-button type="primary" strong secondary @click="openLyricExclude">配置</n-button>
+          <n-button type="primary" strong @click="openLyricExclude">配置</n-button>
         </n-card>
         <n-card class="set-item">
           <div class="label">

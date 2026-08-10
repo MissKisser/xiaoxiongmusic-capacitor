@@ -12,20 +12,20 @@
       <div class="point-card">
         <div class="point-label">A 点</div>
         <div class="point-value">{{ formatTime(abLoop.pointA) }}</div>
-        <n-button size="small" type="primary" secondary block @click="setA">
+        <n-button size="small" type="primary" block @click="setA">
           设为当前时间 A
         </n-button>
-        <n-button size="tiny" tertiary block :disabled="abLoop.pointA === null" @click="clearA">
+        <n-button size="tiny" block :disabled="abLoop.pointA === null" @click="clearA">
           清除 A
         </n-button>
       </div>
       <div class="point-card">
         <div class="point-label">B 点</div>
         <div class="point-value">{{ formatTime(abLoop.pointB) }}</div>
-        <n-button size="small" type="primary" secondary block @click="setB">
+        <n-button size="small" type="primary" block @click="setB">
           设为当前时间 B
         </n-button>
-        <n-button size="tiny" tertiary block :disabled="abLoop.pointB === null" @click="clearB">
+        <n-button size="tiny" block :disabled="abLoop.pointB === null" @click="clearB">
           清除 B
         </n-button>
       </div>
@@ -46,7 +46,7 @@
     </div>
 
     <!-- 清空 -->
-    <n-button type="error" tertiary block :disabled="!hasAnyPoint" @click="clearAll">
+    <n-button type="error" block :disabled="!hasAnyPoint" @click="clearAll">
       清空 AB 循环
     </n-button>
   </n-flex>

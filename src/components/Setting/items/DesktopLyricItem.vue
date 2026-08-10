@@ -176,7 +176,7 @@
       />
     </div>
 
-    <n-button type="primary" secondary strong block @click="restoreDesktopLyricConfig">
+    <n-button type="primary" strong block @click="restoreDesktopLyricConfig">
       恢复默认
     </n-button>
   </n-flex>
