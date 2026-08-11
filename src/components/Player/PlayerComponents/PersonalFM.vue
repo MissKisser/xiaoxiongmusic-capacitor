@@ -248,18 +248,24 @@ onMounted(() => songManager.initPersonalFM());
     }
   }
   @media (max-width: 768px) {
-    height: 120px;
+    // 首页大卡片比例缩放（跟随布局模式/自定义滑块），按钮保持可点击尺寸
+    --s: var(--home-card-scale, 1);
+    height: max(100px, calc(120px * var(--s)));
+    :deep(.n-card__content) {
+      padding: max(10px, calc(20px * var(--s)));
+    }
     .cover {
-      min-width: 80px;
-      height: 80px;
-      width: 80px;
+      min-width: max(48px, calc(80px * var(--s)));
+      height: max(48px, calc(80px * var(--s)));
+      width: max(48px, calc(80px * var(--s)));
+      margin-right: max(8px, calc(20px * var(--s)));
     }
     .info {
       .name {
-        font-size: 16px;
+        font-size: max(12px, calc(16px * var(--s)));
       }
-      .album {
-        display: none;
+      .artists {
+        font-size: max(10px, calc(14px * var(--s)));
       }
       .menu {
         margin-top: 8px;

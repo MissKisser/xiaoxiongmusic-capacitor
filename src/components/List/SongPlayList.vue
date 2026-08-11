@@ -20,7 +20,7 @@
         <VirtualScroll
           v-if="dataStore.playList.length"
           ref="playListRef"
-          :item-height="72"
+          :item-height="queueRowHeight"
           :item-fixed="true"
           :items="playListData"
           :default-scroll-index="statusStore.playIndex"
@@ -111,13 +111,17 @@
 </template>
 
 <script setup lang="ts">
-import { useStatusStore, useDataStore } from "@/stores";
+import { useStatusStore, useDataStore, useSettingStore } from "@/stores";
 import VirtualScroll from "@/components/UI/VirtualScroll.vue";
 import { usePlayerController } from "@/core/player/PlayerController";
 
 const dataStore = useDataStore();
 const statusStore = useStatusStore();
+const settingStore = useSettingStore();
 const player = usePlayerController();
+
+// 播放队列行高（跟随布局模式：大=80 / 小=72）
+const queueRowHeight = computed(() => (settingStore.listRowHeight === 90 ? 80 : 72));
 
 const playListRef = ref<InstanceType<typeof VirtualScroll> | null>(null);
 
@@ -168,7 +172,7 @@ const cleanPlayList = () => {
     align-items: center;
     justify-content: space-between;
     flex-direction: row;
-    min-height: 56px;
+    min-height: calc(var(--queue-row-height, 72px) - 16px);
     overflow: hidden;
     border-radius: 8px;
     margin-bottom: 16px;

@@ -6,7 +6,7 @@ import type { SettingState } from "../setting";
 /**
  * 当前设置 Schema 版本号
  */
-export const CURRENT_SETTING_SCHEMA_VERSION = 10;
+export const CURRENT_SETTING_SCHEMA_VERSION = 11;
 
 /**
  * 迁移函数类型
@@ -163,6 +163,17 @@ export const settingMigrations: Record<number, MigrationFunction> = {
     // 新增顶栏高度设置，默认 70px
     return {
       navHeight: 70,
+    };
+  },
+  11: (state) => {
+    // 新增布局模式：若用户手动调整过顶栏高度或卡片列数则视为自定义，否则默认大比例
+    const custom =
+      (state.navHeight !== undefined && state.navHeight !== 70) ||
+      (state.mobileCardColumns !== undefined && state.mobileCardColumns !== 2);
+    return {
+      layoutMode: custom ? "custom" : "large",
+      homeCardScale: 100,
+      listRowHeight: 90,
     };
   },
 };

@@ -364,6 +364,12 @@ export interface SettingState {
   mobileCardColumns: 2 | 3;
   /** 顶栏高度（px，可调 50-70） */
   navHeight: number;
+  /** 布局模式：large 大比例 / small 小比例 / custom 自定义 */
+  layoutMode: "large" | "small" | "custom";
+  /** 首页大卡片比例（60-100，含问候语/每日推荐/我喜欢/私人FM） */
+  homeCardScale: number;
+  /** 歌曲列表行高（跟随模式预设：large=90 / small=76） */
+  listRowHeight: 90 | 76;
   /** Android 桌面歌词配置 */
   desktopLyricConfig: LyricConfig;
 }
@@ -554,6 +560,9 @@ export const useSettingStore = defineStore("setting", {
     enableBlurEffect: false,
     mobileCardColumns: 2,
     navHeight: 70,
+    layoutMode: "large",
+    homeCardScale: 100,
+    listRowHeight: 90,
     desktopLyricConfig: { ...defaultDesktopLyricConfig },
   }),
   getters: {
@@ -600,6 +609,23 @@ export const useSettingStore = defineStore("setting", {
         // 统一设置版本号
         this.schemaVersion = targetVersion;
         console.log(`[Setting Migration] 迁移完成，已更新到版本 ${targetVersion}`);
+      }
+    },
+    // 应用布局模式预设（大比例/小比例/自定义）
+    applyLayoutMode(mode: "large" | "small" | "custom") {
+      this.layoutMode = mode;
+      if (mode === "large") {
+        // 大比例：菜单栏 70 / 卡片 2 列 / 大卡片 100% / 列表原尺寸
+        this.navHeight = 70;
+        this.mobileCardColumns = 2;
+        this.homeCardScale = 100;
+        this.listRowHeight = 90;
+      } else if (mode === "small") {
+        // 小比例：菜单栏 50 / 卡片 3 列 / 大卡片 60% / 列表紧凑
+        this.navHeight = 50;
+        this.mobileCardColumns = 3;
+        this.homeCardScale = 60;
+        this.listRowHeight = 76;
       }
     },
     // 更换明暗模式
