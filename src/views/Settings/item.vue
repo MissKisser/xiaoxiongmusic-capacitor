@@ -139,6 +139,13 @@ const itemTitle = computed(() => titles[item.value] || "设置");
   }
 
   // 单选按钮（radio-button）与主题模式按钮一致：选中纯色主色底白字，未选中浅灰底
+  .n-radio-group {
+    flex-wrap: wrap;
+    // 按钮之间留出间距（splitor 为按钮间 1px 分割线）
+    .n-radio-group__splitor + .n-radio-button {
+      margin-left: 8px;
+    }
+  }
   .n-radio-button {
     --n-button-color: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 10%));
     --n-button-color-active: rgb(var(--primary));
