@@ -16,7 +16,7 @@
         </div>
         <n-switch v-model:value="settingStore.preferKrcLyric" class="set" :round="false" />
       </n-card>
-      <n-card class="set-item">
+      <n-card class="set-item priority-item">
         <div class="label">
           <n-text class="name">歌词来源优先级</n-text>
           <n-text class="tip" :depth="3"> 选择在线歌词的获取顺序，可应对不同平台的缺失与差异 </n-text>
@@ -60,3 +60,17 @@ import { isElectron } from "@/utils/env";
 
 const settingStore = useSettingStore();
 </script>
+
+<style lang="scss" scoped>
+// 歌词来源优先级：按钮较多，描述与按钮分行显示，避免挤压
+.priority-item {
+  :deep(.n-card__content) {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+  :deep(.label) {
+    padding-right: 0 !important;
+  }
+}
+</style>
