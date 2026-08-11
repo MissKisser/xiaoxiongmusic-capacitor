@@ -21,7 +21,7 @@
           <n-text class="name">歌词来源优先级</n-text>
           <n-text class="tip" :depth="3"> 选择在线歌词的获取顺序，可应对不同平台的缺失与差异 </n-text>
         </div>
-        <n-radio-group v-model:value="settingStore.lyricPriority" class="priority-group" size="small">
+        <n-radio-group v-model:value="settingStore.lyricPriority" size="small">
           <n-radio-button value="auto">自动</n-radio-button>
           <n-radio-button value="qm">QM 优先</n-radio-button>
           <n-radio-button value="ttml">TTML 优先</n-radio-button>
@@ -60,10 +60,3 @@ import { isElectron } from "@/utils/env";
 
 const settingStore = useSettingStore();
 </script>
-
-<style lang="scss" scoped>
-.priority-group {
-  display: flex;
-  flex-wrap: wrap;
-}
-</style>
