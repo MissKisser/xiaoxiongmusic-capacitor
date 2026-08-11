@@ -3,7 +3,7 @@
     <!-- 登录功能 -->
     <div v-if="isLogin()" class="main-rec">
       <div class="main-rec-grid">
-        <n-flex :size="12" class="rec-list" justify="space-between" vertical>
+        <div class="rec-list">
           <!-- 每日推荐 -->
           <SongListCard
             :data="musicStore.dailySongsData.list"
@@ -23,7 +23,7 @@
             vertical
             @click="router.push({ name: 'like-songs' })"
           />
-        </n-flex>
+        </div>
         <!-- 私人FM -->
         <PersonalFM />
       </div>
@@ -237,7 +237,12 @@ onMounted(() => {
   .main-rec-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    // 间距随大卡片比例联动：缩小时留白同步缩小，保持紧凑
+    // 间距随大卡片比例联动缩放，保持自然比例
+    gap: calc(12px * var(--home-card-scale, 1));
+  }
+  .rec-list {
+    display: flex;
+    flex-direction: column;
     gap: calc(12px * var(--home-card-scale, 1));
   }
   .date {
@@ -269,10 +274,14 @@ onMounted(() => {
       grid-template-columns: repeat(1, 1fr);
     }
     .rec-list {
-      display: grid !important;
-      grid-template-columns: repeat(2, 1fr);
-      // 覆盖 n-flex 的 12px 间距，与大卡片比例联动
-      gap: calc(12px * var(--home-card-scale, 1)) !important;
+      // 移动端：两个卡片并排居中，卡片整体随比例等比缩放，间距同比例联动
+      flex-direction: row;
+      justify-content: center;
+      gap: calc(12px * var(--home-card-scale, 1));
+      > * {
+        flex: 0 1 calc(50% * var(--home-card-scale, 1));
+        min-width: 0;
+      }
     }
   }
 }
