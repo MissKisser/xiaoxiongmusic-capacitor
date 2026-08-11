@@ -172,7 +172,7 @@ const cleanPlayList = () => {
     align-items: center;
     justify-content: space-between;
     flex-direction: row;
-    min-height: calc(var(--queue-row-height, 72px) - 16px);
+    min-height: calc(var(--queue-row-height, 80px) - 16px);
     overflow: hidden;
     border-radius: 8px;
     margin-bottom: 16px;

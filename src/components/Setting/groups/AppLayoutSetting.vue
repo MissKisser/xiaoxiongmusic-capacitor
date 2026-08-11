@@ -149,6 +149,11 @@ const hidePreview = () => {
     previewVisible.value = false;
   }, 600);
 };
+
+// 组件卸载时清理预览定时器
+onUnmounted(() => {
+  if (previewTimer) clearTimeout(previewTimer);
+});
 </script>
 
 <style scoped lang="scss">

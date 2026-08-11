@@ -79,7 +79,7 @@
             :item-height="rowHeight"
             :item-fixed="true"
             :items="virtualListItems"
-            :height="`calc(100% - var(--list-header-height, 36px))`"
+            :height="`calc(100% - var(--list-header-height, 40px))`"
             :padding-bottom="80"
             @scroll="onScroll"
           >
@@ -206,8 +206,13 @@ const player = usePlayerController();
 const { isSmallScreen } = useMobile();
 const settingStore = useSettingStore();
 
-// 列表行高（跟随布局模式预设：大=90 / 小=76）
-const rowHeight = computed(() => settingStore.listRowHeight);
+// 列表行高（跟随布局模式预设：大=90 / 小=76；移动端与卡片 min-height 同步取 80/72，避免虚拟列表滚动错位）
+const rowHeight = computed(() => {
+  if (isSmallScreen.value) {
+    return settingStore.listRowHeight === 90 ? 80 : 72;
+  }
+  return settingStore.listRowHeight;
+});
 
 // 处理移动端单击播放
 const handleSongClick = (song: SongType) => {
@@ -465,7 +470,7 @@ onBeforeUnmount(() => {
   // 悬浮顶栏
   .list-header {
     width: 100%;
-    height: var(--list-header-height, 36px);
+    height: var(--list-header-height, 40px);
     display: flex;
     flex-direction: row;
     align-items: center;
