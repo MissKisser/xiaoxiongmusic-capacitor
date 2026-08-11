@@ -267,6 +267,10 @@ onMounted(() => songManager.initPersonalFM());
       .artists {
         font-size: max(10px, calc(14px * var(--s)));
       }
+      // 移动端隐藏专辑行，避免内容溢出裁剪按钮
+      .album {
+        display: none;
+      }
       .menu {
         margin-top: 8px;
         .play {

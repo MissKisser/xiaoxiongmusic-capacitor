@@ -119,6 +119,9 @@ class DesktopLyricOverlay {
         showing = false;
         controlsVisible = false;
         toolsPanelVisible = false;
+        // 清理解锁按钮状态，避免重新显示时残留
+        if (unlockButton != null) unlockButton.setVisibility(View.GONE);
+        unlockHandler.removeCallbacks(hideUnlockRunnable);
     }
 
     boolean isShowing() {
