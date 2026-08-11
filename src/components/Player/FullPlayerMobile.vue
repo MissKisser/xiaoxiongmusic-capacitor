@@ -327,25 +327,20 @@ watch(pageIndex, (newIndex) => {
   }
 });
 
-// 滑动偏移量
-const swipeOffset = ref(0);
-
 // 手势起点是否位于进度条区域（起点在进度条时整个手势不触发页面切换，避免拖动进度条时误切页）
 const swipeStartInSlider = ref(false);
 
-// 进度条是否正在拖动（拖动期间禁止页面平移/切换）
+// 进度条是否正在拖动（拖动期间禁止页面平移/切换，由 contentTransform 计算属性消费）
 const sliderDragging = ref(false);
 
-// 进度条拖动开始：禁止页面平移
+// 进度条拖动开始：标记拖动状态
 const onSliderDragStart = () => {
   sliderDragging.value = true;
-  swipeOffset.value = 0;
 };
 
 // 进度条拖动结束：恢复页面手势
 const onSliderDragEnd = () => {
   sliderDragging.value = false;
-  swipeOffset.value = 0;
 };
 
 const { direction, isSwiping, lengthX } = useSwipe(mobileStart, {
@@ -359,38 +354,14 @@ const { direction, isSwiping, lengthX } = useSwipe(mobileStart, {
       target?.closest('.progress-section')
     );
   },
-  onSwipe: (event) => {
-    // 进度条拖动期间禁止页面平移
-    if (sliderDragging.value) return;
-    // 手势起点在进度条区域时不处理页面滑动（让进度条自己处理拖动）
-    if (swipeStartInSlider.value) return;
-    // 检查是否在进度条区域，如果是则不处理页面滑动（让进度条自己处理）
-    const target = event?.target as HTMLElement;
-    if (target?.closest('.n-slider') || target?.closest('.player-slider') || target?.closest('.progress-section')) {
-      // 在进度条区域，不处理页面滑动
-      return;
-    }
-    // 如果有多个页面（歌词页或评论页），允许滑动
-    if (totalPages.value <= 1) return;
-    // 为正表示向左滑，为负表示向右滑
-    swipeOffset.value = lengthX.value;
-  },
   onSwipeEnd: (event) => {
     // 进度条拖动结束阶段不处理页面切换
-    if (sliderDragging.value) {
-      swipeOffset.value = 0;
-      return;
-    }
+    if (sliderDragging.value) return;
     // 手势起点在进度条区域时不处理页面切换
-    if (swipeStartInSlider.value) {
-      swipeOffset.value = 0;
-      return;
-    }
-    // 检查是否在进度条区域
+    if (swipeStartInSlider.value) return;
+    // 手势当前位置在进度条区域时不处理页面切换
     const target = event?.target as HTMLElement;
     if (target?.closest('.n-slider') || target?.closest('.player-slider') || target?.closest('.progress-section')) {
-      // 在进度条区域，不处理页面滑动
-      swipeOffset.value = 0;
       return;
     }
     // 左滑切换到下一页，右滑切换到上一页
@@ -405,7 +376,6 @@ const { direction, isSwiping, lengthX } = useSwipe(mobileStart, {
         pageIndex.value--;
       }
     }
-    swipeOffset.value = 0;
   },
 });
 

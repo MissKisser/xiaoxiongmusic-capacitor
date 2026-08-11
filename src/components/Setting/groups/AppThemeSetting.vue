@@ -41,7 +41,6 @@
               v-if="settingStore.globalBackgroundImage"
               size="small"
               type="error"
-             
               @click="resetBackground"
             >
               <template #icon>

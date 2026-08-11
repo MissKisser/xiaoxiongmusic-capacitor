@@ -93,9 +93,11 @@ const settingStore = useSettingStore();
 // 日推标题
 const dailySongsTitle = computed(() => {
   const day = new Date().getDate();
+  // 图标尺寸随大卡片比例联动（预览/缩放时保持协调）
+  const scale = settingStore.homeCardScale / 100;
   return h("div", { class: "date" }, [
     h("div", { class: "date-icon" }, [
-      h(SvgIcon, { name: "Calendar-Empty", size: 30, depth: 2 }),
+      h(SvgIcon, { name: "Calendar-Empty", size: Math.max(20, 30 * scale), depth: 2 }),
       h(NText, null, () => day),
     ]),
     h(NText, { class: "name text-hidden" }, () => ["每日推荐"]),
@@ -257,7 +259,8 @@ onMounted(() => {
       margin-right: 4px;
       .n-text {
         position: absolute;
-        font-size: 12px;
+        // 日期数字随大卡片比例联动
+        font-size: max(9px, calc(12px * var(--home-card-scale, 1)));
         color: var(--primary-hex);
         line-height: normal;
         margin-top: 4px;
@@ -265,7 +268,8 @@ onMounted(() => {
       }
     }
     .name {
-      font-size: 18px;
+      // 标题字号随大卡片比例联动
+      font-size: max(12px, calc(18px * var(--home-card-scale, 1)));
       font-weight: bold;
     }
   }
@@ -274,10 +278,11 @@ onMounted(() => {
       grid-template-columns: repeat(1, 1fr);
     }
     .rec-list {
-      // 移动端：两个卡片并排居中，卡片整体随比例等比缩放，间距同比例联动
+      // 移动端：两个卡片并排居中，卡片宽度随比例缩放，
+      // 卡片间距与两侧屏幕留白相等（三处空隙均衡），下限 12px 保证最小间距
       flex-direction: row;
       justify-content: center;
-      gap: calc(12px * var(--home-card-scale, 1));
+      gap: max(12px, calc((100% - 100% * var(--home-card-scale, 1)) / 3));
       > * {
         flex: 0 1 calc(50% * var(--home-card-scale, 1));
         min-width: 0;
