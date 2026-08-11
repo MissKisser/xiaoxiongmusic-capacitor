@@ -205,7 +205,8 @@ const songList = computed(() => sampleSize(props.data, 3));
       }
       .content {
         .cover {
-          width: calc(100% * var(--s));
+          // 卡片宽度已由外部布局随比例缩放，封面占满卡片即可（避免双重缩放）
+          width: 100%;
           margin-bottom: calc(8px * var(--s));
         }
         .info {
