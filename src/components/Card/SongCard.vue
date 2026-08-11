@@ -241,14 +241,14 @@ const localCover = async (show: boolean) => {
 
 <style lang="scss" scoped>
 .song-card {
-  height: 76px;
+  height: var(--row-height, 76px);
   cursor: pointer;
   @media (max-width: 768px) {
     height: auto;
-    min-height: 72px;
+    min-height: var(--row-height-m, 72px);
   }
   @media (max-width: 512px) {
-    min-height: 68px;
+    min-height: var(--row-height-s, 68px);
   }
   .song-content {
     display: flex;
@@ -333,9 +333,9 @@ const localCover = async (show: boolean) => {
     align-items: center;
     padding: 2px 12px 2px 0;
     .cover {
-      width: clamp(40px, 8vw, 44px);
-      height: clamp(40px, 8vw, 44px);
-      min-width: clamp(40px, 8vw, 44px);
+      width: var(--cover-size, 44px);
+      height: var(--cover-size, 44px);
+      min-width: var(--cover-size, 44px);
       border-radius: 8px;
       margin-right: clamp(6px, 1.5vw, 10px);
       display: flex;

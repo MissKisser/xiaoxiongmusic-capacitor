@@ -76,10 +76,10 @@
           <!-- 虚拟列表 -->
           <VirtualScroll
             ref="listRef"
-            :item-height="76"
+            :item-height="rowHeight"
             :item-fixed="true"
             :items="virtualListItems"
-            :height="`calc(100% - 36px)`"
+            :height="`calc(100% - var(--list-header-height, 36px))`"
             :padding-bottom="80"
             @scroll="onScroll"
           >
@@ -138,7 +138,7 @@
 
 <script setup lang="ts">
 import { SongType, SortField, SortOrder } from "@/types/main";
-import { useMusicStore, useStatusStore } from "@/stores";
+import { useMusicStore, useStatusStore, useSettingStore } from "@/stores";
 import { isEmpty } from "lodash-es";
 import { sortFieldOptions, sortOrderOptions } from "@/utils/meta";
 import { usePlayerController } from "@/core/player/PlayerController";
@@ -204,6 +204,10 @@ const musicStore = useMusicStore();
 const statusStore = useStatusStore();
 const player = usePlayerController();
 const { isSmallScreen } = useMobile();
+const settingStore = useSettingStore();
+
+// 列表行高（跟随布局模式预设：大=90 / 小=76）
+const rowHeight = computed(() => settingStore.listRowHeight);
 
 // 处理移动端单击播放
 const handleSongClick = (song: SongType) => {
@@ -360,7 +364,7 @@ const onScroll = (e: Event) => {
   const target = e.target as HTMLElement;
   const top = target.scrollTop;
   scrollTop.value = top;
-  scrollIndex.value = Math.floor(top / 76);
+  scrollIndex.value = Math.floor(top / rowHeight.value);
 
   // 触底检测
   const scrollHeight = target.scrollHeight;
@@ -461,7 +465,7 @@ onBeforeUnmount(() => {
   // 悬浮顶栏
   .list-header {
     width: 100%;
-    height: 36px;
+    height: var(--list-header-height, 36px);
     display: flex;
     flex-direction: row;
     align-items: center;

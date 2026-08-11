@@ -29,11 +29,11 @@ const greetings = computed(getGreeting);
   max-width: 1500px;
   margin: 0 auto;
   .welcome {
-    font-size: 15px;
+    font-size: calc(15px * var(--home-card-scale, 1));
     margin-top: 5px;
     margin-bottom: 20px;
     .n-h1 {
-      font-size: 24px;
+      font-size: calc(24px * var(--home-card-scale, 1));
       margin: 0;
       font-weight: bold;
     }

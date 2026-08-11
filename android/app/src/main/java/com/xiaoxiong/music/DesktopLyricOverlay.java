@@ -9,6 +9,8 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -59,6 +61,13 @@ class DesktopLyricOverlay {
     private TextView primaryView;
     private TextView secondaryView;
     private ImageView playPauseButton;
+    /** 锁定状态下的解锁按钮（歌词正上方，透明锁图标，3 秒自动隐藏） */
+    private ImageView unlockButton;
+    /** 解锁按钮自动隐藏定时器 */
+    private final Handler unlockHandler = new Handler(Looper.getMainLooper());
+    private final Runnable hideUnlockRunnable = () -> {
+        if (unlockButton != null) unlockButton.setVisibility(View.GONE);
+    };
     private final FrameLayout[] colorPresetContainers = new FrameLayout[COLOR_PRESETS.length];
     private WindowManager.LayoutParams layoutParams;
 
@@ -201,6 +210,24 @@ class DesktopLyricOverlay {
 
         controlBar = createControlBar();
 
+        // 锁定状态下的解锁按钮：歌词正上方，透明锁图标，点击解锁
+        unlockButton = new ImageView(context);
+        unlockButton.setImageResource(R.drawable.ic_lock);
+        unlockButton.setBackground(null);
+        unlockButton.setPadding(dp(10), dp(6), dp(10), dp(6));
+        unlockButton.setVisibility(View.GONE);
+        unlockButton.setContentDescription("解锁歌词");
+        unlockButton.setOnClickListener(v -> {
+            // 点击解锁并同步前端锁定状态
+            setLocked(false);
+            notifyConfigChanged();
+            unlockButton.setVisibility(View.GONE);
+        });
+
+        rootView.addView(unlockButton, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
         rootView.addView(controlBar, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -476,7 +503,7 @@ class DesktopLyricOverlay {
         int flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                 | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                 | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
-        if (locked) flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+        // 锁定不再禁用触摸：锁定时点击/拖动歌词可唤出解锁按钮
         return flags;
     }
 
@@ -609,7 +636,14 @@ class DesktopLyricOverlay {
     }
 
     private boolean handleLyricTouch(View view, MotionEvent event) {
-        if (locked || layoutParams == null) return false;
+        if (layoutParams == null) return false;
+        // 锁定时：点击/拖动歌词唤出解锁按钮，不响应拖动、不切换控制栏
+        if (locked) {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                showUnlockButton();
+            }
+            return true;
+        }
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 downX = Math.round(event.getRawX());
@@ -644,6 +678,14 @@ class DesktopLyricOverlay {
             default:
                 return false;
         }
+    }
+
+    /** 显示解锁按钮（歌词正上方），3 秒后自动隐藏 */
+    private void showUnlockButton() {
+        if (unlockButton == null) return;
+        unlockButton.setVisibility(View.VISIBLE);
+        unlockHandler.removeCallbacks(hideUnlockRunnable);
+        unlockHandler.postDelayed(hideUnlockRunnable, 3000);
     }
 
     private void clampToScreen() {

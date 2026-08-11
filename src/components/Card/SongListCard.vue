@@ -164,6 +164,9 @@ const songList = computed(() => sampleSize(props.data, 3));
     }
   }
   &.vertical {
+    // 首页大卡片整体比例缩放（跟随布局模式/自定义滑块）
+    transform: scale(var(--home-card-scale, 1));
+    transform-origin: center top;
     :deep(.n-card__content) {
       padding: 10px;
     }

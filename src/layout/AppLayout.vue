@@ -2,7 +2,16 @@
   <div
     id="app-layout"
     ref="appLayoutRef"
-    :style="{ '--nav-height': `${settingStore.navHeight}px` }"
+    :style="{
+      '--nav-height': `${settingStore.navHeight}px`,
+      '--row-height': `${settingStore.listRowHeight}px`,
+      '--cover-size': `${settingStore.listRowHeight === 90 ? 50 : 44}px`,
+      '--row-height-m': `${settingStore.listRowHeight === 90 ? 80 : 72}px`,
+      '--row-height-s': `${settingStore.listRowHeight === 90 ? 75 : 68}px`,
+      '--list-header-height': `${settingStore.listRowHeight === 90 ? 40 : 36}px`,
+      '--queue-row-height': `${settingStore.listRowHeight === 90 ? 80 : 72}px`,
+      '--home-card-scale': `${settingStore.homeCardScale / 100}`,
+    }"
   >
     <!-- 主框架 -->
     <n-layout
