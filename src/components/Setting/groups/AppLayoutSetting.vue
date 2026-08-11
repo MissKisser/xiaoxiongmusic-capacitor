@@ -13,9 +13,6 @@
         <n-card class="set-item">
           <div class="label">
             <n-text class="name">预设模式</n-text>
-            <n-text class="tip" :depth="3">
-              大比例使用原有布局，小比例整体紧凑；手动调节下方任意滑块将自动切换为自定义
-            </n-text>
           </div>
           <div class="mode-group">
             <n-button
