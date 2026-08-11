@@ -170,9 +170,20 @@ const onScrollRestore = () => {
 const appLayoutRef = ref<HTMLElement | null>(null);
 
 // 右滑展开菜单手势（仅移动端，全屏播放器关闭时）
+const swipeStartInSlider = ref(false);
 const { direction, lengthX } = useSwipe(appLayoutRef, {
   threshold: 10,
+  onSwipeStart: (event) => {
+    // 手势起点在滑块/进度条区域时不触发菜单展开（避免拖动滑块误触）
+    const target = event?.target as HTMLElement;
+    swipeStartInSlider.value = !!(
+      target?.closest('.n-slider') ||
+      target?.closest('.player-slider')
+    );
+  },
   onSwipeEnd: (event) => {
+    // 起点在滑块区域的手势不处理
+    if (swipeStartInSlider.value) return;
     // 全屏播放器打开时不响应
     if (statusStore.showFullPlayer) return;
     // 桌面端不响应
