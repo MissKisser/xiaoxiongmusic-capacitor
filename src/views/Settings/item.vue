@@ -129,18 +129,18 @@ const itemTitle = computed(() => titles[item.value] || "设置");
 
 <style lang="scss">
 .settings-item-page {
-  // 设置页按钮统一纯色背景（default 类型按钮使用表面色实底，
+  // 设置页按钮统一纯色背景（default 类型按钮使用浅灰实底，
   // 排除 primary/error 等彩色类型与 secondary/tertiary 半透明模式）
   .n-button:not(.n-button--primary-type):not(.n-button--error-type):not(.n-button--warning-type):not(.n-button--info-type):not(.n-button--success-type):not(.n-button--secondary):not(.n-button--tertiary) {
-    --n-color: var(--surface-container-hex);
-    --n-color-hover: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 10%));
-    --n-color-pressed: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 16%));
+    --n-color: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 10%));
+    --n-color-hover: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 16%));
+    --n-color-pressed: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 22%));
     --n-color-focus: var(--n-color-hover);
   }
 
-  // 单选按钮（radio-button）与主题模式按钮一致：选中纯色主色底白字，未选中灰底
+  // 单选按钮（radio-button）与主题模式按钮一致：选中纯色主色底白字，未选中浅灰底
   .n-radio-button {
-    --n-button-color: var(--surface-container-hex);
+    --n-button-color: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 10%));
     --n-button-color-active: rgb(var(--primary));
     --n-button-text-color-active: #fff;
     --n-button-border-color: transparent;
