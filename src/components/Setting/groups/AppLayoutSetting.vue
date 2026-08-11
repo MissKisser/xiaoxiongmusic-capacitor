@@ -1,12 +1,12 @@
 <template>
   <div class="layout-setting">
-    <!-- 背景：真实首页（实时反映布局调节） -->
-    <div class="home-bg">
+    <!-- 首页预览层：仅拖动大卡片滑块时显示（其余时间隐藏，不透出） -->
+    <div v-show="previewVisible" class="home-bg">
       <Home />
     </div>
 
-    <!-- 前景：设置项（半透明，悬浮于首页之上） -->
-    <div class="settings-overlay">
+    <!-- 设置项层：拖动滑块时隐藏其他元素，仅保留滑块可操作 -->
+    <div class="settings-overlay" :class="{ previewing: previewVisible }">
       <div class="set-list">
         <!-- 布局模式 -->
         <n-h3 prefix="bar"> 布局模式 </n-h3>
@@ -52,11 +52,11 @@
 
         <!-- 首页比例 -->
         <n-h3 prefix="bar"> 首页比例 </n-h3>
-        <n-card class="set-item">
+        <n-card class="set-item preview-card">
           <div class="label">
             <n-text class="name">大卡片比例</n-text>
             <n-text class="tip" :depth="3">
-              问候语、每日推荐、我喜欢的音乐、私人FM 统一缩放，拖动滑块实时预览下方首页
+              问候语、每日推荐、我喜欢的音乐、私人FM 统一缩放，拖动时实时预览首页
             </n-text>
           </div>
           <n-slider
@@ -67,6 +67,8 @@
             class="card-slider"
             :format-tooltip="(v: number) => v + '%'"
             @update:value="handleCardScaleChange"
+            @dragstart="startPreview"
+            @dragend="endPreview"
           />
         </n-card>
 
@@ -107,6 +109,19 @@ const layoutModes = [
   { value: "custom", label: "自定义" },
 ] as const;
 
+// 首页预览显隐（仅拖动大卡片滑块时透出）
+const previewVisible = ref(false);
+
+// 开始拖动：透出首页
+const startPreview = () => {
+  previewVisible.value = true;
+};
+
+// 结束拖动：恢复设置页
+const endPreview = () => {
+  previewVisible.value = false;
+};
+
 // 切换布局模式（应用预设值）
 const handleModeChange = (mode: "large" | "small" | "custom") => {
   settingStore.applyLayoutMode(mode);
@@ -121,7 +136,7 @@ const handleColumnChange = (value: 2 | 3) => {
   settingStore.layoutMode = "custom";
 };
 
-// 大卡片比例变化（手动调节 → 自定义模式，首页背景实时预览）
+// 大卡片比例变化（手动调节 → 自定义模式）
 const handleCardScaleChange = (value: number) => {
   settingStore.homeCardScale = value;
   settingStore.layoutMode = "custom";
@@ -138,28 +153,51 @@ const handleNavHeightChange = (value: number) => {
 .layout-setting {
   position: relative;
   height: 100%;
-  // 背景首页：全屏铺底，实时反映布局调节
+  // 首页预览层：仅拖动滑块时显示，全屏铺底
   .home-bg {
     position: fixed;
     inset: 0;
     z-index: 0;
     overflow: hidden;
-    pointer-events: none; // 背景不拦截交互，避免遮挡滑块
+    pointer-events: none; // 不拦截滑块交互
   }
-  // 前景设置项：半透明悬浮层，可滚动
+  // 设置项层
   .settings-overlay {
     position: relative;
     z-index: 1;
     height: 100%;
     overflow-y: auto;
     padding: 16px;
-    background-color: color-mix(in srgb, var(--background-hex, #fff) 72%, transparent);
+    background-color: var(--background-hex);
+    transition: background-color 0.2s;
     .set-list {
       max-width: 480px;
       margin: 0 auto;
       padding-bottom: 40px;
-      .n-card {
-        --n-color: color-mix(in srgb, var(--surface-container-hex, #fff) 88%, transparent);
+    }
+    // 拖动预览中：背景透明，仅保留滑块所在卡片与滑块
+    &.previewing {
+      background-color: transparent;
+      .set-list {
+        > *:not(.preview-card) {
+          opacity: 0;
+          pointer-events: none;
+        }
+      }
+      .preview-card {
+        background-color: transparent;
+        box-shadow: none;
+        border-color: transparent;
+        :deep(.n-card__content) {
+          justify-content: center;
+        }
+        .label {
+          display: none; // 隐藏文字，只留滑块
+        }
+        :deep(.card-slider) {
+          width: 80%;
+          max-width: 320px;
+        }
       }
     }
   }
