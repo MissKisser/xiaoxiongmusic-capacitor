@@ -195,6 +195,30 @@ const songList = computed(() => sampleSize(props.data, 3));
         }
       }
     }
+    @media (max-width: 768px) {
+      // 移动端改为真实尺寸缩放：transform 不改变布局空间，缩小比例后卡片间会产生大段留白
+      // 与 PersonalFM 的移动端缩放方式保持一致，间距由布局 gap 随比例联动
+      --s: var(--home-card-scale, 1);
+      transform: none;
+      :deep(.n-card__content) {
+        padding: calc(10px * var(--s));
+      }
+      .content {
+        .cover {
+          width: calc(100% * var(--s));
+          margin-bottom: calc(8px * var(--s));
+        }
+        .info {
+          .name {
+            font-size: max(11px, calc(14px * var(--s)));
+            margin-bottom: calc(4px * var(--s));
+          }
+          .desc {
+            font-size: max(9px, calc(11px * var(--s)));
+          }
+        }
+      }
+    }
   }
 }
 </style>

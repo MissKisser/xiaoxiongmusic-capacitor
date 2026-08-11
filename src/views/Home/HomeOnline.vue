@@ -237,7 +237,8 @@ onMounted(() => {
   .main-rec-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    // 间距随大卡片比例联动：缩小时留白同步缩小，保持紧凑
+    gap: calc(12px * var(--home-card-scale, 1));
   }
   .date {
     display: flex;
@@ -270,6 +271,8 @@ onMounted(() => {
     .rec-list {
       display: grid !important;
       grid-template-columns: repeat(2, 1fr);
+      // 覆盖 n-flex 的 12px 间距，与大卡片比例联动
+      gap: calc(12px * var(--home-card-scale, 1)) !important;
     }
   }
 }
