@@ -145,6 +145,10 @@ const itemTitle = computed(() => titles[item.value] || "设置");
     .n-radio-group__splitor + .n-radio-button {
       margin-left: 8px;
     }
+    // 分割线透明，避免选中态主色泄露到按钮间隙
+    .n-radio-group__splitor {
+      background-color: transparent !important;
+    }
   }
   .n-radio-button {
     --n-button-color: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 10%));
