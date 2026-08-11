@@ -158,23 +158,20 @@ const handleNavHeightChange = (value: number) => {
     overflow: hidden;
     pointer-events: none; // 不拦截滑块交互
   }
-  // 设置项层
+  // 设置项层（与其他设置页统一：透明背景）
   .settings-overlay {
     position: relative;
     z-index: 1;
     height: 100%;
     overflow-y: auto;
     padding: 16px;
-    background-color: var(--background-hex);
-    transition: background-color 0.2s;
     .set-list {
       max-width: 480px;
       margin: 0 auto;
       padding-bottom: 40px;
     }
-    // 拖动预览中：背景透明，仅保留滑块所在卡片与滑块
+    // 拖动预览中：仅保留滑块所在卡片与滑块
     &.previewing {
-      background-color: transparent;
       .set-list {
         > *:not(.preview-card) {
           opacity: 0;
