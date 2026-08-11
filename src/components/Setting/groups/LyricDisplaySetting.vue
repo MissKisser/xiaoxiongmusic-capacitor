@@ -52,7 +52,6 @@
               v-if="settingStore.lyricFontSize !== 46"
               type="primary"
               strong
-             
               @click="settingStore.lyricFontSize = 46"
             >
               恢复默认
@@ -81,7 +80,6 @@
               v-if="settingStore.lyricTranFontSize !== 22"
               type="primary"
               strong
-             
               @click="settingStore.lyricTranFontSize = 22"
             >
               恢复默认
@@ -114,7 +112,6 @@
               v-if="settingStore.lyricRomaFontSize !== 18"
               type="primary"
               strong
-             
               @click="settingStore.lyricRomaFontSize = 18"
             >
               恢复默认
@@ -233,7 +230,6 @@
               v-if="settingStore.lyricOffsetStep !== 500"
               type="primary"
               strong
-             
               @click="settingStore.lyricOffsetStep = 500"
             >
               恢复默认

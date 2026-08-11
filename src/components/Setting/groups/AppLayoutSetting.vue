@@ -1,7 +1,7 @@
 <template>
   <div class="layout-setting">
-    <!-- 首页预览层：仅拖动大卡片滑块时显示（其余时间隐藏，不透出） -->
-    <div v-show="previewVisible" class="home-bg">
+    <!-- 首页预览层：首次拖动大卡片滑块时懒加载挂载，之后仅切换显隐（避免进入设置页即触发首页网络请求） -->
+    <div v-if="previewMounted" v-show="previewVisible" class="home-bg">
       <Home />
     </div>
 
@@ -108,9 +108,12 @@ const layoutModes = [
 
 // 首页预览显隐（仅拖动大卡片滑块时透出）
 const previewVisible = ref(false);
+// 首页预览是否已挂载（首次拖动时懒加载，之后保持挂载仅切换显隐，避免重复触发网络请求）
+const previewMounted = ref(false);
 
-// 开始拖动：透出首页
+// 开始拖动：懒加载首页并透出预览
 const startPreview = () => {
+  previewMounted.value = true;
   previewVisible.value = true;
 };
 

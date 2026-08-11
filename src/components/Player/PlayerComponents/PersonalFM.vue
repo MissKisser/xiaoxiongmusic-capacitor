@@ -20,14 +20,17 @@
     <!-- 信息 -->
     <Transition name="fade" mode="out-in">
       <div :key="musicStore.personalFMSong?.id" class="info">
-        <n-text class="name text-hidden">
-          {{ musicStore.personalFMSong?.name || "未知曲目" }}
-        </n-text>
-        <div v-if="Array.isArray(musicStore.personalFMSong?.artists)" class="artists text-hidden">
-          <SvgIcon name="Artist" :depth="3" />
-          <n-text v-for="ar in musicStore.personalFMSong.artists" :key="ar.id" class="ar">
-            {{ ar.name }}
+        <!-- 标题行：歌名 + 作者（移动端同行显示） -->
+        <div class="title-line">
+          <n-text class="name text-hidden">
+            {{ musicStore.personalFMSong?.name || "未知曲目" }}
           </n-text>
+          <div v-if="Array.isArray(musicStore.personalFMSong?.artists)" class="artists text-hidden">
+            <SvgIcon name="Artist" :depth="3" />
+            <n-text v-for="ar in musicStore.personalFMSong.artists" :key="ar.id" class="ar">
+              {{ ar.name }}
+            </n-text>
+          </div>
         </div>
         <div v-if="isObject(musicStore.personalFMSong.album)" class="album text-hidden">
           <SvgIcon name="Album" :depth="3" />
@@ -123,6 +126,7 @@ onMounted(() => songManager.initPersonalFM());
   display: flex;
   align-items: center;
   justify-content: center;
+  // 保持大比例原始样式：圆角与卡片家族一致
   border-radius: 16px;
   overflow: hidden;
   cursor: pointer;
@@ -154,6 +158,12 @@ onMounted(() => songManager.initPersonalFM());
     height: 100%;
     display: flex;
     flex-direction: column;
+    .title-line {
+      // 桌面端保持歌名/作者分行，歌名块级化以支持省略
+      .name {
+        display: block;
+      }
+    }
     .n-text {
       line-height: normal;
     }
@@ -253,6 +263,8 @@ onMounted(() => songManager.initPersonalFM());
     height: max(100px, calc(120px * var(--s)));
     :deep(.n-card__content) {
       padding: max(10px, calc(20px * var(--s)));
+      // 标题与封面顶部对齐
+      align-items: flex-start;
     }
     .cover {
       min-width: max(48px, calc(80px * var(--s)));
@@ -261,10 +273,24 @@ onMounted(() => songManager.initPersonalFM());
       margin-right: max(8px, calc(20px * var(--s)));
     }
     .info {
+      .title-line {
+        // 歌名与作者同行，作者跟在标题后面不换行
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        .name {
+          flex-shrink: 0;
+        }
+      }
       .name {
         font-size: max(12px, calc(16px * var(--s)));
       }
       .artists {
+        margin-top: 0;
+        margin-left: max(4px, calc(8px * var(--s)));
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
         font-size: max(10px, calc(14px * var(--s)));
       }
       // 移动端隐藏专辑行，避免内容溢出裁剪按钮
@@ -285,6 +311,10 @@ onMounted(() => songManager.initPersonalFM());
           height: 26px;
         }
       }
+    }
+    .radio {
+      // 保持右下角定位，仅字号随比例压缩
+      font-size: max(10px, calc(12px * var(--s)));
     }
   }
 }
