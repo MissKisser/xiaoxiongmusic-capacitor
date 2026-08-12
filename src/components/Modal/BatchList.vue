@@ -108,7 +108,8 @@
 <script setup lang="ts">
 import type { DataTableColumns, DataTableRowKey } from "naive-ui";
 import type { SongType } from "@/types/main";
-import { isArray, isObject } from "lodash-es";
+import { isArray } from "lodash-es";
+import { isElectron } from "@/utils/env";
 import { openPlaylistAdd } from "@/utils/modal";
 import { deleteSongs } from "@/utils/auth";
 import { NInput, NInputNumber, NButton, NText, NFlex } from "naive-ui";
@@ -257,16 +258,18 @@ const handleDeleteLocalSongs = () => {
       const loading = window.$message.loading("正在删除...", { duration: 0 });
       try {
         const deletePromises = checkSongData.value.map(async (song) => {
-          if (song.path) {
-            const result = await window.electron.ipcRenderer.invoke("delete-file", song.path);
-            return { id: song.id, success: result };
+          // 非 Electron 环境或无路径的歌曲跳过删除，不计入失败数
+          if (!isElectron || !song.path) {
+            return { id: song.id, success: false, skipped: true };
           }
-          return { id: song.id, success: false };
+          const result = await window.electron.ipcRenderer.invoke("delete-file", song.path);
+          return { id: song.id, success: result, skipped: false };
         });
 
         const results = await Promise.all(deletePromises);
         const successIds = results.filter((r) => r.success).map((r) => r.id);
-        const failCount = results.length - successIds.length;
+        // 失败数不包含被跳过的歌曲
+        const failCount = results.filter((r) => !r.success && !r.skipped).length;
 
         // 更新本地数据
         if (successIds.length > 0) {
@@ -282,6 +285,10 @@ const handleDeleteLocalSongs = () => {
           // 刷新列表
           const localEventBus = useEventBus("local");
           localEventBus.emit();
+          // 删除成功后清空选中状态
+          checkedRowKeys.value = [];
+          checkCount.value = 0;
+          checkSongData.value = [];
         } else {
           window.$message.error("删除失败，请重试");
         }

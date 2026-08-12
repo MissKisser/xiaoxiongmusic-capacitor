@@ -80,7 +80,8 @@ const tagList = computed<SelectOption[]>(() => {
   return Object.keys(dataStore.catData?.type).map((key) => ({
     type: "group",
     key,
-    label: dataStore.catData?.type[key],
+    // key 为 Object.keys 返回的字符串，catData.type 索引为 number，需转换
+    label: dataStore.catData?.type[Number(key)],
     children: dataStore.catData?.cats
       ?.filter((cat) => cat.category === Number(key))
       .map((cat) => ({

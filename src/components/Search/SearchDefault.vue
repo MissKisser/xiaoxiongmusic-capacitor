@@ -100,11 +100,16 @@ const isShow = computed(() => {
 // 获取热搜数据
 const getSearchHotData = async () => {
   if (!settingStore.useOnlineService || !settingStore.showHotSearch) return;
-  const result = await getCacheData(searchHot, {
-    key: "searchHotData",
-    time: 10,
-  });
-  searchHotData.value = result.data;
+  try {
+    const result = await getCacheData(searchHot, {
+      key: "searchHotData",
+      time: 10,
+    });
+    searchHotData.value = result.data;
+  } catch (error) {
+    // 获取失败时保持空数组，隐藏热搜榜而非展示错误
+    console.error("获取热搜数据失败", error);
+  }
 };
 
 // 删除搜索历史

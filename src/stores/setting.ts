@@ -57,6 +57,8 @@ export interface SettingState {
   checkUpdateOnStart: boolean;
   /** 隐藏 VIP 标签 */
   hideVipTag: boolean;
+  /** 隐藏歌曲名/歌手名中的括号内容（如「(Live)」） */
+  hideBracketedContent: boolean;
   /** 歌词字体大小 */
   lyricFontSize: number;
   /** 歌词翻译字体大小 */
@@ -390,6 +392,7 @@ export const useSettingStore = defineStore("setting", {
     englishLyricFont: "follow",
     koreanLyricFont: "follow",
     hideVipTag: false,
+    hideBracketedContent: false,
     showSearchHistory: true,
     showHotSearch: true,
     menuShowCover: true,
@@ -656,9 +659,10 @@ export const useSettingStore = defineStore("setting", {
       );
     },
   },
-  // 持久化
+  // 持久化（omit 排除大字段 base64 背景图，其余字段保持全量持久化）
   persist: {
     key: "setting-store",
     storage: localStorage,
+    omit: ["globalBackgroundImage"],
   },
 });

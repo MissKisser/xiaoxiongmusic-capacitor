@@ -43,15 +43,22 @@ const searchResultData = ref<CoverType[]>([]);
 const getSearchResult = async () => {
   // 获取数据
   loading.value = true;
-  const result = await searchResult(props.keyword, 50, searchOffset.value, 10);
-  // 是否还有
-  hasMore.value = result.result?.hasMore || result.result?.albumCount > searchOffset.value + 50;
-  // 搜索总数
-  searchCount.value = result.result?.albumCount;
-  // 处理数据
-  const albumData = formatCoverList(result.result.albums);
-  searchResultData.value = searchResultData.value?.concat(albumData);
-  loading.value = false;
+  try {
+    const result = await searchResult(props.keyword, 50, searchOffset.value, 10);
+    // 是否还有
+    hasMore.value = result.result?.hasMore || result.result?.albumCount > searchOffset.value + 50;
+    // 搜索总数
+    searchCount.value = result.result?.albumCount;
+    // 处理数据
+    const albumData = formatCoverList(result.result.albums);
+    searchResultData.value = searchResultData.value?.concat(albumData);
+  } catch (error) {
+    console.error("获取搜索结果失败", error);
+    window.$message.error("加载失败，请重试");
+  } finally {
+    // 复位加载状态，避免失败后永久加载
+    loading.value = false;
+  }
 };
 
 // 加载更多

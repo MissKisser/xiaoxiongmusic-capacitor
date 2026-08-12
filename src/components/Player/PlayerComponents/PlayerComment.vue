@@ -104,37 +104,50 @@ const commentHasMore = ref<boolean>(true);
 // 获取热门评论
 const getHotCommentData = async () => {
   if (!songId.value) return;
-  // 获取评论
-  const result = await getHotComment(songId.value);
-  // 处理数据
-  const formatData = formatCommentList(result.hotComments);
-  commentHotData.value = formatData?.length > 0 ? formatData : null;
-  // 滚动到顶部
-  commentScroll.value?.scrollTo({ top: 0, behavior: "smooth" });
+  try {
+    // 获取评论
+    const result = await getHotComment(songId.value);
+    // 处理数据
+    const formatData = formatCommentList(result.hotComments);
+    commentHotData.value = formatData?.length > 0 ? formatData : null;
+    // 滚动到顶部
+    commentScroll.value?.scrollTo({ top: 0, behavior: "smooth" });
+  } catch (error) {
+    console.error("获取热门评论失败", error);
+    window.$message.error("评论加载失败，请重试");
+    // 失败时隐藏热门评论区域，避免空态展示骨架屏
+    commentHotData.value = null;
+  }
 };
 
 // 获取歌曲评论
 const getAllComment = async () => {
   if (!songId.value) return;
   commentLoading.value = true;
-  // 分页参数
-  const cursor =
-    commentPage.value > 1 && commentData.value?.length > 0
-      ? commentData.value[commentData.value.length - 1]?.time
-      : undefined;
-  // 获取评论
-  const result = await getComment(songId.value, songType.value, commentPage.value, 20, 3, cursor);
-  if (isEmpty(result.data?.comments)) {
-    commentHasMore.value = false;
+  try {
+    // 分页参数
+    const cursor =
+      commentPage.value > 1 && commentData.value?.length > 0
+        ? commentData.value[commentData.value.length - 1]?.time
+        : undefined;
+    // 获取评论
+    const result = await getComment(songId.value, songType.value, commentPage.value, 20, 3, cursor);
+    if (isEmpty(result.data?.comments)) {
+      commentHasMore.value = false;
+      return;
+    }
+    // 处理数据
+    const formatData = formatCommentList(result.data.comments);
+    commentData.value = commentData.value.concat(formatData);
+    // 是否还有
+    commentHasMore.value = result.data.hasMore;
+  } catch (error) {
+    console.error("获取评论失败", error);
+    window.$message.error("评论加载失败，请重试");
+  } finally {
+    // 复位加载状态，避免失败后永久加载
     commentLoading.value = false;
-    return;
   }
-  // 处理数据
-  const formatData = formatCommentList(result.data.comments);
-  commentData.value = commentData.value.concat(formatData);
-  // 是否还有
-  commentHasMore.value = result.data.hasMore;
-  commentLoading.value = false;
 };
 
 // 加载更多

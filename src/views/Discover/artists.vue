@@ -79,22 +79,29 @@ const artistsData = ref<ArtistType[]>([]);
 const getArtistListData = async () => {
   // 获取数据
   loading.value = true;
-  const result = await artistTypeList(
-    // 类型
-    artistType[artistTypeNamesChoose.value] || -1,
-    // 地区
-    artistArea[artistTypeNamesChoose.value] || -1,
-    // 首字母索引
-    artistInitialChoose.value,
-    artistsOffset.value,
-    50,
-  );
-  // 是否还有
-  hasMore.value = result?.more;
-  // 处理数据
-  const arData = formatArtistsList(result.artists);
-  artistsData.value = artistsData.value?.concat(arData);
-  loading.value = false;
+  try {
+    const result = await artistTypeList(
+      // 类型
+      artistType[artistTypeNamesChoose.value] || -1,
+      // 地区
+      artistArea[artistTypeNamesChoose.value] || -1,
+      // 首字母索引
+      artistInitialChoose.value,
+      artistsOffset.value,
+      50,
+    );
+    // 是否还有
+    hasMore.value = result?.more;
+    // 处理数据
+    const arData = formatArtistsList(result.artists);
+    artistsData.value = artistsData.value?.concat(arData);
+  } catch (error) {
+    console.error("获取歌手数据失败", error);
+    window.$message.error("加载失败，请重试");
+  } finally {
+    // 复位加载状态，避免失败后永久加载
+    loading.value = false;
+  }
 };
 
 // 参数变化

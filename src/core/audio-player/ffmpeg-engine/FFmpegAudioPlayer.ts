@@ -53,6 +53,8 @@ export class FFmpegAudioPlayer extends BaseAudioPlayer {
 
   /** 时间更新定时器 ID */
   private timeUpdateIntervalId: ReturnType<typeof setInterval> | null = null;
+  /** 页面可见性监听器（用于 Worker 解码节流，屏幕熄灭时降低后台功耗） */
+  private visibilityHandler: (() => void) | null = null;
   /** 当前消息 ID，用于过滤过期的 Worker 消息 */
   private currentMessageId = 0;
 
@@ -166,6 +168,13 @@ export class FFmpegAudioPlayer extends BaseAudioPlayer {
           this.worker = new AudioWorker();
           this.setupWorkerListeners();
 
+          // 同步页面可见性给 Worker：屏幕熄灭/切后台时放慢解码调度以降低功耗
+          this.visibilityHandler = () => {
+            this.worker?.postMessage({ type: "VISIBILITY", hidden: document.hidden });
+          };
+          document.addEventListener("visibilitychange", this.visibilityHandler);
+          this.visibilityHandler();
+
           if (this.worker) {
             this.worker.postMessage({
               type: "INIT",
@@ -240,7 +249,11 @@ export class FFmpegAudioPlayer extends BaseAudioPlayer {
    * @param time 目标时间（秒）
    */
   protected doSeek(time: number) {
-    if (!this.worker || !this.audioCtx || !this.metadata) return;
+    if (!this.worker || !this.audioCtx || !this.metadata) {
+      // 资源未就绪时无法执行 Seek，复位标记避免 currentTime 卡死在目标时间
+      this.isWorkerSeeking = false;
+      return;
+    }
 
     this.activeSources.forEach((s) => {
       try {
@@ -326,6 +339,12 @@ export class FFmpegAudioPlayer extends BaseAudioPlayer {
       this.worker = null;
     }
 
+    // 移除可见性监听，避免 worker 重建后重复绑定
+    if (this.visibilityHandler) {
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
+
     // 在停止音频源前，先将音量设为0避免爆音
     if (this.gainNode && this.activeSources.length > 0) {
       try {
@@ -353,6 +372,10 @@ export class FFmpegAudioPlayer extends BaseAudioPlayer {
     this.isDecodingFinished = false;
     this.timeOffset = this.audioCtx ? this.audioCtx.currentTime : 0;
     this.nextStartTime = this.timeOffset;
+
+    // 复位 Seek 状态，避免旧标记导致下次播放进度/歌词冻结
+    this.isWorkerSeeking = false;
+    this.targetSeekTime = 0;
 
     this.setState("idle");
   }

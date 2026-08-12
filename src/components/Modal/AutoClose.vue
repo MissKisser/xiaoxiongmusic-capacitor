@@ -77,8 +77,12 @@ const customTime = ref(1);
 // 是否开启
 const handleUpdate = (value: boolean) => {
   if (value) {
-    player.startAutoCloseTimer(statusStore.autoClose.time, statusStore.autoClose.remainTime);
+    // 首次开启时 remainTime 可能为 0（未初始化），回退为完整时长避免定时器不启动
+    const remain = statusStore.autoClose.remainTime || statusStore.autoClose.time * 60;
+    player.startAutoCloseTimer(statusStore.autoClose.time, remain);
   } else {
+    // 关闭开关时同步清除原生定时器，避免到点仍暂停播放
+    player.stopAutoCloseTimer();
     statusStore.autoClose.enable = false;
     statusStore.autoClose.remainTime = statusStore.autoClose.time * 60;
     statusStore.autoClose.endTime = 0;

@@ -63,6 +63,7 @@
 
 <script setup lang="ts">
 import type { DropdownOption, MessageReactive } from "naive-ui";
+import type { SongType } from "@/types/main";
 import { formatCoverList, formatSongsList } from "@/utils/format";
 import { renderIcon, copyData } from "@/utils/helper";
 import { useDataStore } from "@/stores";
@@ -85,7 +86,6 @@ const {
   getSongListHeight,
   setDetailData,
   setListData,
-  appendListData,
   setLoading,
 } = useListDetail();
 const { searchValue, searchData, displayData, clearSearch, performSearch } =
@@ -211,14 +211,26 @@ const getRadioDetail = async (id: number, refresh: boolean = false) => {
   }
 
   // 获取播客详情
-  if (detailData.value?.id !== id) {
-    setDetailData(null);
+  try {
+    if (detailData.value?.id !== id) {
+      setDetailData(null);
+      // 切换电台时同步清空旧电台的节目列表，避免混排
+      setListData([]);
+    }
+    const detail = await radioDetail(id);
+    if (currentRequestId.value !== id) return;
+    setDetailData(formatCoverList(detail.data)[0]);
+    // 获取全部节目
+    await getRadioAllProgram(id, detailData.value?.count as number, refresh);
+  } catch (error) {
+    console.error("获取播客详情失败", error);
+    window.$message.error("加载失败，请重试");
+    // 关闭加载提示并复位加载状态
+    loadingMsgShow(false);
+  } finally {
+    // 仅当前请求有效时复位加载状态，避免影响新请求
+    if (currentRequestId.value === id) setLoading(false);
   }
-  const detail = await radioDetail(id);
-  if (currentRequestId.value !== id) return;
-  setDetailData(formatCoverList(detail.data)[0]);
-  // 获取全部节目
-  await getRadioAllProgram(id, detailData.value?.count as number);
 };
 
 // 后台检查更新
@@ -239,14 +251,21 @@ const backgroundCheck = async (id: number, cached: ListCacheData) => {
 };
 
 // 获取播客全部歌曲
-const getRadioAllProgram = async (id: number, count: number) => {
-  if (!id || !count) return;
+const getRadioAllProgram = async (id: number, count: number, refresh: boolean = false) => {
+  if (!id || !count) {
+    // 空电台提前返回时复位加载状态，避免永久加载
+    setLoading(false);
+    return;
+  }
   setLoading(true);
   // 加载提示
   if (count > 500) loadingMsgShow();
+  // 刷新模式：先清空旧数据，避免重复追加
+  if (refresh) setListData([]);
   // 循环获取
   let offset: number = 0;
   const limit: number = 500;
+  const listDataArray: SongType[] = [];
   do {
     if (currentRequestId.value !== id) {
       loadingMsgShow(false);
@@ -258,7 +277,7 @@ const getRadioAllProgram = async (id: number, count: number) => {
       return;
     }
     const songData = formatSongsList(result.programs);
-    appendListData(songData);
+    listDataArray.push(...songData);
     // 更新数据
     offset += limit;
   } while (offset < count && isPlaylistPage.value && currentRequestId.value === id);
@@ -266,6 +285,8 @@ const getRadioAllProgram = async (id: number, count: number) => {
     loadingMsgShow(false);
     return;
   }
+  // 整体替换列表数据，避免与上一电台节目混排或刷新时重复
+  setListData(listDataArray);
   // 保存缓存
   if (detailData.value && listData.value.length > 0) {
     saveCache("radio", id, detailData.value, listData.value);

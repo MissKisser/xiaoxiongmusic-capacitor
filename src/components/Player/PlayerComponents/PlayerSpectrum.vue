@@ -6,6 +6,7 @@
 
 <script setup lang="ts">
 import { usePlayerController } from "@/core/player/PlayerController";
+import { useStatusStore } from "@/stores";
 
 const props = defineProps<{
   show: boolean;
@@ -15,10 +16,14 @@ const props = defineProps<{
 }>();
 
 const player = usePlayerController();
+const statusStore = useStatusStore();
 
 // canvas
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const isKeepDrawing = ref<boolean>(true);
+/** 已设置的画布尺寸（仅在实际变化时重置画布，避免每帧重设带来的开销） */
+let lastCanvasWidth = 0;
+let lastCanvasHeight = 0;
 
 /**
  * 绘制音乐频谱图
@@ -30,32 +35,37 @@ const drawSpectrum = () => {
   // 转换为普通数组并处理
   const data = Array.from(spectrumData).slice(10);
   if (!isKeepDrawing.value || !canvasRef.value) return;
-  // 设置画布宽度，最大为 1600
-  canvasRef.value.width = document.body.clientWidth >= 1600 ? 1600 : document.body.clientWidth;
-  // 设置画布高度
-  canvasRef.value.height = props.height || 80;
+  // 画布尺寸仅在实际变化时设置
+  const canvasWidth = document.body.clientWidth >= 1600 ? 1600 : document.body.clientWidth;
+  const canvasHeight = props.height || 80;
+  if (canvasWidth !== lastCanvasWidth || canvasHeight !== lastCanvasHeight) {
+    lastCanvasWidth = canvasWidth;
+    lastCanvasHeight = canvasHeight;
+    canvasRef.value.width = canvasWidth;
+    canvasRef.value.height = canvasHeight;
+  }
   // 获取2D上下文
   const ctx: CanvasRenderingContext2D | null = canvasRef.value.getContext("2d");
   // 画布宽高
-  const canvasWidth = canvasRef.value.width;
-  const canvasHeight = canvasRef.value.height;
+  const w = canvasWidth;
+  const h = canvasHeight;
   // 频谱数量
   const numBars = data.length / 2.5;
   // 圆角半径
   const cornerRadius = props.radius || 2.5;
   // 柱形宽度
-  const barWidth = canvasWidth / numBars / 2;
+  const barWidth = w / numBars / 2;
   if (!ctx) return;
   // 清除画布
-  ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+  ctx.clearRect(0, 0, w, h);
   // 遍历音频频谱数据
   for (let i = 0; i < numBars; i++) {
     // 计算柱形高度
-    const barHeight = (data[i] / 255) * canvasHeight;
+    const barHeight = (data[i] / 255) * h;
     // 计算柱形的 x 和 y 坐标
-    const x1 = i * barWidth + canvasWidth / 2;
-    const x2 = canvasWidth / 2 - (i + 1) * barWidth;
-    const y = canvasHeight - barHeight;
+    const x1 = i * barWidth + w / 2;
+    const x2 = w / 2 - (i + 1) * barWidth;
+    const y = h - barHeight;
     // 设置柱形颜色，如果未设置则使用默认颜色
     ctx.fillStyle = props.color || "#efefef";
     // 检查柱形高度是否大于0，避免绘制高度为0的柱形
@@ -101,6 +111,8 @@ const roundRect = (
 // 开始绘制频谱
 const { pause: pauseDraw, resume: resumeDraw } = useRafFn(
   () => {
+    // 暂停或未在播放时不绘制，避免每帧空转消耗性能
+    if (!statusStore.playStatus) return;
     drawSpectrum();
   },
   { immediate: false },

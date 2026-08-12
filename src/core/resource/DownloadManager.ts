@@ -289,12 +289,12 @@ class DownloadManager {
           const sortedServers = priorityOrder.filter((server) => enabledServers.includes(server));
           
           const artist = (Array.isArray(song.artists) ? song.artists[0]?.name : song.artists) || "";
-          const keyWord = `${song.name}-${artist}`;
 
           // 按顺序请求，一旦成功就使用
           for (const server of sortedServers) {
             try {
-              const result = await unlockSongUrl(song.id, keyWord, server);
+              // 解锁接口签名：(id, songName, artist, server)，须传全 4 个参数
+              const result = await unlockSongUrl(song.id, song.name, artist, server);
               if (result.code === 200 && result.url) {
                 url = result.url;
                 // 尝试推断类型

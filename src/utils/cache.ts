@@ -27,6 +27,7 @@ export const getCacheData = async <T>(
   const { key, time, storage = "sessionStorage", useCache = true } = options;
   // 储存方式
   const storageObj = window[storage];
+  // 读取缓存（独立处理：缓存损坏或读取异常仅告警，跳过缓存直接请求）
   try {
     // 获取缓存数据
     const cachedData = storageObj.getItem(key);
@@ -38,14 +39,19 @@ export const getCacheData = async <T>(
         return value;
       }
     }
-    // 请求数据
-    const result = await promiseFunc(...args);
+  } catch (error) {
+    // 缓存读取失败（如 JSON 损坏），跳过缓存直接请求
+    console.warn(`⚠️ Failed to read cache for key: ${key}, fetching fresh data`, error);
+  }
+  // 请求数据
+  const result = await promiseFunc(...args);
+  // 写入缓存（独立处理：存储配额不足等异常仅告警，不影响请求结果）
+  try {
     const expiry = time === -1 ? -1 : new Date().getTime() + time * 60 * 1000;
     // 存储数据
     storageObj.setItem(key, JSON.stringify({ value: result, expiry }));
-    return result;
   } catch (error) {
-    console.error(`❌ Error in getCacheData: ${error}`);
-    throw error;
+    console.warn(`⚠️ Failed to write cache for key: ${key}`, error);
   }
+  return result;
 };

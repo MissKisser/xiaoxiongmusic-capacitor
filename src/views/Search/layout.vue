@@ -16,7 +16,8 @@
     <!-- 路由 -->
     <RouterView v-slot="{ Component }">
       <Transition :name="`router-${settingStore.routeAnimation}`" mode="out-in">
-        <KeepAlive v-if="settingStore.useKeepAlive">
+        <!-- max=3 限制缓存实例数量，避免每个搜索词累积页面实例导致内存增长 -->
+        <KeepAlive v-if="settingStore.useKeepAlive" :max="3">
           <component
             :is="Component"
             :key="route.fullPath"

@@ -19,6 +19,13 @@ export interface MetadataParam {
     album?: string;
     albumArt?: string;
     duration?: number;
+    // 原生媒体集成扩展字段（Electron 端 EMITypes 协议）
+    songName?: string;
+    authorName?: string;
+    albumName?: string;
+    originalCoverUrl?: string;
+    coverData?: Uint8Array;
+    ncmId?: number;
 }
 
 export interface DiscordConfigPayload {
@@ -26,14 +33,19 @@ export interface DiscordConfigPayload {
     clientId?: string;
     details?: string;
     state?: string;
+    /** 暂停时是否显示 */
+    showWhenPaused?: boolean;
+    /** 显示模式 */
+    displayMode?: string;
 }
 
-export enum SystemMediaEvent {
-    Play = "play",
-    Pause = "pause",
-    Next = "next",
-    Previous = "previous",
-    Stop = "stop",
+/**
+ * 系统媒体事件（Electron 主进程通过 media-event 通道下发）
+ */
+export interface SystemMediaEvent {
+    type: "Play" | "Pause" | "Stop" | "NextSong" | "PreviousSong" | "Seek" | "ToggleShuffle" | "ToggleRepeat";
+    /** Seek 事件的目标位置（毫秒） */
+    positionMs?: number;
 }
 
 // 桩实现 - 在 web 环境下不执行任何操作
@@ -42,11 +54,17 @@ export const init = () => {
 };
 
 export const updateMetadata = (metadata: MetadataParam) => {
-    console.log("[EMI Stub] Update metadata:", metadata);
+    // 每次切歌都会调用且 payload 较大，仅开发环境输出，避免生产日志刷屏
+    if (import.meta.env.DEV) {
+        console.log("[EMI Stub] Update metadata:", metadata);
+    }
 };
 
 export const updatePlaybackStatus = (status: PlaybackStatus) => {
-    console.log("[EMI Stub] Update playback status:", status);
+    // 播放状态切换频繁，仅开发环境输出
+    if (import.meta.env.DEV) {
+        console.log("[EMI Stub] Update playback status:", status);
+    }
 };
 
 export const setDiscordConfig = (config: DiscordConfigPayload) => {
@@ -60,5 +78,4 @@ export default {
     setDiscordConfig,
     PlaybackStatus,
     RepeatMode,
-    SystemMediaEvent,
 };

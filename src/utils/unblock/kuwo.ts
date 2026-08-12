@@ -52,8 +52,9 @@ const getKuwoSongId = async (keyword: string, songName?: string): Promise<string
         const musicPage = (data.content as Record<string, unknown>[])[1].musicpage as Record<string, unknown[]>;
         const firstSong = musicPage.abslist[0] as Record<string, string>;
         const songId = firstSong.MUSICRID;
-        const songName = firstSong.SONGNAME;
-        unblockLog.log("🔍 Kuwo: 找到歌曲 songId:", songId, "songName:", songName);
+        // 搜索到的歌曲名（用于与原曲名匹配验证，避免与函数参数 songName 冲突）
+        const foundSongName = firstSong.SONGNAME;
+        unblockLog.log("🔍 Kuwo: 找到歌曲 songId:", songId, "songName:", foundSongName);
 
         // 是否与原曲吻合（使用传入的 songName 进行验证，避免 split("-") 解析错误）
         const originalName = songName || (keyword?.split("-")?.[0] ?? keyword);

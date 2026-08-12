@@ -37,7 +37,6 @@ const qrPause = ref(false);
 
 // 保存登录信息
 const saveLogin = async (loginData: any, type: LoginType = "qr") => {
-  console.log("🔐 [Login] 登录响应数据:", loginData);
   if (!loginData) return;
   if (loginData.code === 200) {
     // 更改状态
@@ -46,10 +45,9 @@ const saveLogin = async (loginData: any, type: LoginType = "qr") => {
     dataStore.loginType = type;
     window.$message.success("登录成功");
     
-    // Cookie 调试日志
+    // Cookie 调试日志（只输出长度与关键凭证存在性，不输出内容）
     if (loginData.cookie) {
       console.log(`🍪 [Login] 获取到 Cookie，长度: ${loginData.cookie.length}`);
-      console.log(`🍪 [Login] Cookie 预览: ${loginData.cookie.slice(0, 100)}...`);
       // 检查是否包含 MUSIC_U
       if (loginData.cookie.includes("MUSIC_U")) {
         console.log("✅ [Login] Cookie 包含 MUSIC_U 关键凭证");

@@ -297,7 +297,8 @@ const changeLocalPath =
     const { settingsKey, includeSubFolders, title, errorConsole, errorMessage } = options;
     try {
       if (!isElectron) return;
-      const settingStore = useSettingStore();
+      // settingsKey 为运行时字符串键，需断言以支持动态索引 setting store
+      const settingStore = useSettingStore() as unknown as Record<string, any>;
       // 删除目录
       if (typeof delIndex === "number" && delIndex >= 0) {
         settingStore[settingsKey].splice(delIndex, 1);
@@ -446,14 +447,14 @@ export const handleSongQuality = (
   if (typeof song === "object" && song) {
     // 含有 level 特殊处理
     if ("level" in song) {
-      const quality = levelQualityMap[song.level];
+      const quality = levelQualityMap[song.level as keyof typeof levelQualityMap];
       if (quality) return quality;
     }
     // 云盘歌曲适配
     if ("privilege" in song) {
       const privilege = song.privilege;
-      const quality = levelQualityMap[privilege?.playMaxBrLevel]
-        ?? levelQualityMap[privilege?.plLevel];
+      const quality = levelQualityMap[privilege?.playMaxBrLevel as keyof typeof levelQualityMap]
+        ?? levelQualityMap[privilege?.plLevel as keyof typeof levelQualityMap];
       if (quality) return quality;
     }
   }
@@ -475,7 +476,7 @@ export const handleSongQuality = (
       if (disableAiAudio && AI_AUDIO_KEYS.includes(itemKey.key)) {
           continue;
       }
-    if (song[itemKey.key] && Number(song[itemKey.key].br) > 0) {
+    if ((song as AnyObject)[itemKey.key] && Number((song as AnyObject)[itemKey.key].br) > 0) {
       return itemKey.type;
     }
   }

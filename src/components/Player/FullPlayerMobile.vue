@@ -205,6 +205,7 @@
 <script setup lang="ts">
 import { useRouter } from "vue-router";
 import { useSwipe } from "@vueuse/core";
+import type { LyricLine } from "@applemusic-like-lyrics/lyric";
 import { useMusicStore, useStatusStore, useDataStore, useSettingStore } from "@/stores";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useTimeFormat } from "@/composables/useTimeFormat";
@@ -224,20 +225,66 @@ const { timeDisplay, toggleTimeFormat } = useTimeFormat();
 
 // 实时播放进度和歌词索引
 const playSeek = ref(0);
-useRafFn(() => {
+
+/** 歌词行索引游标（歌词按 startTime 升序，播放中索引单调递增，避免每帧全量 findIndex） */
+let lyricCursorIndex = -1;
+/** 游标对应的歌词数组（歌词数据变化时重置游标） */
+let lyricCursorLyrics: readonly LyricLine[] | null = null;
+
+/**
+ * 游标探测：查找最后一个 startTime <= seek 的歌词行索引
+ * 从上次索引向两侧小范围探测，正常播放时仅需常数次比较
+ * @param lrc 歌词行数组（按 startTime 升序）
+ * @param seek 当前播放时间（毫秒）
+ * @returns 行索引；无匹配返回 -1
+ */
+const findLastLineIndex = (lrc: readonly LyricLine[], seek: number): number => {
+  if (lrc.length === 0) return -1;
+  // 歌词数据变化时重置游标
+  if (lyricCursorLyrics !== lrc) {
+    lyricCursorLyrics = lrc;
+    lyricCursorIndex = 0;
+  }
+  let i = lyricCursorIndex;
+  if (i < 0 || i >= lrc.length) i = 0;
+  // 向后探测（播放推进）
+  while (i < lrc.length - 1 && (lrc[i + 1].startTime || 0) <= seek) {
+    i++;
+  }
+  // 向前探测（拖动进度条回退）
+  while (i > 0 && (lrc[i].startTime || 0) > seek) {
+    i--;
+  }
+  if ((lrc[i].startTime || 0) > seek) return -1;
+  lyricCursorIndex = i;
+  return i;
+};
+
+/** 同步播放进度（与歌词行索引计算共用） */
+const updatePlaySeek = () => {
   const songId = musicStore.playSong?.id;
   const offsetTime = statusStore.getSongOffset(songId);
   playSeek.value = player.getSeek() + offsetTime;
+};
+
+useRafFn(() => {
+  // 暂停时跳过逐帧推进，避免空转；暂停中拖动进度条/切歌由下方 watch 兜底同步
+  if (!statusStore.playStatus) return;
+  updatePlaySeek();
 });
+
+// 暂停期间播放位置变化（如拖动进度条触发 setSeek、暂停中切歌）时同步歌词行
+watch(
+  [() => statusStore.currentTime, () => musicStore.playSong?.id],
+  () => {
+    if (!statusStore.playStatus) updatePlaySeek();
+  },
+);
 
 const currentLineIndex = computed(() => {
   const lrc = musicStore.songLyric.lrcData;
   if (!lrc || lrc.length === 0) return -1;
-  const index = lrc.findIndex((line, i) => {
-    const nextStart = lrc[i + 1]?.startTime || Infinity;
-    return playSeek.value >= line.startTime && playSeek.value < nextStart;
-  });
-  return index;
+  return findLastLineIndex(lrc, playSeek.value);
 });
 
 const getLineText = (line: any) => {

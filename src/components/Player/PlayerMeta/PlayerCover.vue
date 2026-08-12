@@ -63,7 +63,8 @@ const cleanupDynamicCover = () => {
 const { start: dynamicCoverStart, stop: dynamicCoverStop } = useTimeoutFn(
   () => {
     dynamicCoverLoaded.value = true;
-    videoRef.value?.play();
+    // 播放失败时静默忽略（例如视频资源已失效）
+    videoRef.value?.play().catch(() => {});
   },
   2000,
   { immediate: false },
@@ -75,16 +76,28 @@ const getDynamicCover = async () => {
     isLogin() !== 1 ||
     musicStore.playSong.path ||
     !musicStore.playSong.id ||
+    // FM/电台歌曲无 MV 动态封面，跳过请求
+    musicStore.playSong.type === "radio" ||
     !settingStore.dynamicCover ||
     settingStore.playerType !== "cover"
   )
     return;
+  // 记录请求时的歌曲 ID，用于响应后校验（防止竞态）
+  const songId = musicStore.playSong.id;
   dynamicCoverStop();
   dynamicCoverLoaded.value = false;
-  const result = await songDynamicCover(musicStore.playSong.id);
-  if (!isEmpty(result.data) && result?.data?.videoPlayUrl) {
-    dynamicCover.value = result.data.videoPlayUrl;
-  } else {
+  try {
+    const result = await songDynamicCover(songId);
+    // 响应时歌曲已切换，丢弃过期结果
+    if (musicStore.playSong.id !== songId) return;
+    if (!isEmpty(result.data) && result?.data?.videoPlayUrl) {
+      dynamicCover.value = result.data.videoPlayUrl;
+    } else {
+      dynamicCover.value = "";
+    }
+  } catch (error) {
+    // 请求失败时清空动态封面
+    console.error("获取动态封面失败:", error);
     dynamicCover.value = "";
   }
 };

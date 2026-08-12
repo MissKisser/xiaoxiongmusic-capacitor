@@ -44,21 +44,27 @@ const searchResultData = ref<SongType[]>([]);
 const getSearchResult = async () => {
   // 获取数据
   loading.value = true;
-  const result = await searchResult(props.keyword, 50, searchOffset.value, 1);
-  // 是否还有
-  hasMore.value = result.result?.hasMore || result.result?.songCount > searchOffset.value + 50;
-  // 搜索总数
-  searchCount.value = result.result?.songCount;
-  // 处理数据
-  const songData = formatSongsList(result.result.songs);
-  searchResultData.value = searchResultData.value?.concat(songData);
-  loading.value = false;
+  try {
+    const result = await searchResult(props.keyword, 50, searchOffset.value, 1);
+    // 是否还有
+    hasMore.value = result.result?.hasMore || result.result?.songCount > searchOffset.value + 50;
+    // 搜索总数
+    searchCount.value = result.result?.songCount;
+    // 处理数据
+    const songData = formatSongsList(result.result.songs);
+    searchResultData.value = searchResultData.value?.concat(songData);
+  } catch (error) {
+    console.error("获取搜索结果失败", error);
+    window.$message.error("加载失败，请重试");
+  } finally {
+    // 复位加载状态，避免失败后永久加载
+    loading.value = false;
+  }
 };
 
 // 列表触底
 const reachBottom = () => {
   if (hasMore.value) {
-    console.log("加载");
     searchOffset.value += 50;
     getSearchResult();
   } else {

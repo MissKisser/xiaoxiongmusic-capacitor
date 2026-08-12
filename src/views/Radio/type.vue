@@ -13,10 +13,10 @@
     <n-tabs class="tabs" type="segment" animated>
       <!-- 类别热门 -->
       <n-tab-pane name="type-hot" tab="热门">
-        <CoverList :data="radioHotData" :loading="true" type="radio" />
+        <CoverList :data="radioHotData" :loading="loading" type="radio" />
       </n-tab-pane>
       <n-tab-pane name="type-rec" tab="推荐">
-        <CoverList :data="radioRecData" :loading="true" type="radio" />
+        <CoverList :data="radioRecData" :loading="loading" type="radio" />
       </n-tab-pane>
     </n-tabs>
   </div>
@@ -30,6 +30,7 @@ import { formatCoverList } from "@/utils/format";
 const router = useRouter();
 
 // 播客数据
+const loading = ref<boolean>(true);
 const radioId = ref<number>(Number(router.currentRoute.value.query.id as string));
 const radioName = ref<string>(router.currentRoute.value.query.name as string);
 const radioHotData = ref<CoverType[]>([]);
@@ -37,6 +38,7 @@ const radioRecData = ref<CoverType[]>([]);
 
 // 获取播客分类数据
 const getRadioTypeData = async () => {
+  loading.value = true;
   try {
     radioHotData.value = [];
     radioRecData.value = [];
@@ -52,12 +54,16 @@ const getRadioTypeData = async () => {
   } catch (error) {
     console.error("Error getting rec radio:", error);
     window.$message.error("获取电台分类出现错误");
+  } finally {
+    // 复位加载状态，避免失败后永久加载
+    loading.value = false;
   }
 };
 
 onBeforeRouteUpdate((to) => {
   if (to.name !== "radio-type") return;
-  radioId.value = Number(to.query.type as string);
+  // 上游跳转携带的查询参数为 id（与 onActivated 保持一致）
+  radioId.value = Number(to.query.id as string);
   radioName.value = to.query.name as string;
   getRadioTypeData();
 });

@@ -8,6 +8,12 @@ import type {
 
 let ffmpegModulePromise: Promise<AudioDecoderModule> | null = null;
 
+/**
+ * 主线程同步的页面可见性（Worker 内无法访问 document，由 VISIBILITY 消息转发）
+ * 屏幕熄灭/切后台时放慢解码调度，降低后台功耗
+ */
+let isPageHidden = false;
+
 function getModule(): Promise<AudioDecoderModule> {
   if (!ffmpegModulePromise) {
     ffmpegModulePromise = createAudioDecoderCore({
@@ -72,6 +78,8 @@ class DecoderSession {
 
     let coverUrl: string | undefined;
     if (props.coverArt.size() > 0) {
+      // coverArt 为 embind 对象（Uint8List），仅暴露 size()/get(i) 逐字节接口，
+      // 无法直接取得 WASM 堆指针做 HEAPU8 整块拷贝，保留逐字节读取
       const cover = new Uint8Array(props.coverArt.size());
       for (let i = 0; i < props.coverArt.size(); i++) {
         cover[i] = props.coverArt.get(i);
@@ -124,6 +132,9 @@ class DecoderSession {
       if (result.isEOF) {
         this.post({ type: "EOF", id: this.req.id });
         this.isRunning = false;
+      } else if (isPageHidden) {
+        // 屏幕熄灭/切后台时延后调度，降低后台功耗与发热
+        setTimeout(this.decodeLoop, 200);
       } else {
         // 让出主线程，避免 UI 卡死
         setTimeout(this.decodeLoop, 0);
@@ -232,9 +243,16 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         currentSession.resume();
       }
       break;
+    case "VISIBILITY":
+      // 同步主线程页面可见性（Worker 内无 document，由主线程转发）
+      isPageHidden = req.hidden;
+      break;
     case "SEEK":
       if (currentSession) {
         currentSession.seek(req.seekTime, req.id);
+      } else {
+        // 无活动会话时无法执行解码，回发 SEEK_DONE 解除主线程的 Seek 卡死状态
+        self.postMessage({ type: "SEEK_DONE", id: req.id, time: req.seekTime });
       }
       break;
   }

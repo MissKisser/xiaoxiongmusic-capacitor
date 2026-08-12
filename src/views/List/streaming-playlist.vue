@@ -59,6 +59,9 @@ const { playAllSongs: playAllSongsAction } = useListActions();
 // 歌单 ID
 const playlistId = computed<string>(() => router.currentRoute.value.query.id as string);
 
+// 当前正在请求的歌单 ID，用于防止竞态条件
+const currentRequestId = ref<string>("");
+
 // 列表高度
 const songListHeight = computed(() => getSongListHeight(listScrolling.value));
 
@@ -105,6 +108,8 @@ const getPlaylistDetail = async (id: string) => {
     return;
   }
 
+  // 记录当前请求的歌单 ID，用于防止竞态条件
+  currentRequestId.value = id;
   setLoading(true);
   clearSearch();
   resetScroll();
@@ -113,6 +118,8 @@ const getPlaylistDetail = async (id: string) => {
     // 从缓存的歌单列表中查找歌单信息
     const playlist = streamingStore.playlists.value.find((p) => p.id === id);
     if (playlist) {
+      // 请求已过期则丢弃结果
+      if (currentRequestId.value !== id) return;
       setDetailData({
         id: Number(playlist.id) || 0,
         name: playlist.name,
@@ -124,6 +131,8 @@ const getPlaylistDetail = async (id: string) => {
 
     // 获取歌单歌曲
     const songs = await streamingStore.fetchPlaylistSongs(id);
+    // 请求已过期则丢弃结果
+    if (currentRequestId.value !== id) return;
     setListData(songs);
 
     // 如果之前没有获取到歌单信息，更新歌曲数量
@@ -131,10 +140,16 @@ const getPlaylistDetail = async (id: string) => {
       detailData.value.count = songs.length;
     }
   } catch (error) {
-    console.error("Failed to fetch streaming playlist:", error);
-    window.$message.error("获取歌单详情失败");
+    // 请求已过期则忽略错误提示
+    if (currentRequestId.value === id) {
+      console.error("Failed to fetch streaming playlist:", error);
+      window.$message.error("获取歌单详情失败");
+    }
   } finally {
-    setLoading(false);
+    // 仅当前请求可结束加载状态
+    if (currentRequestId.value === id) {
+      setLoading(false);
+    }
   }
 };
 

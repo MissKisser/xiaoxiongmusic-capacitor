@@ -23,7 +23,24 @@ const lastfmClient: AxiosInstance = axios.create({
 
 // 响应拦截器，显示错误提示
 lastfmClient.interceptors.response.use(
-  (response) => response,
+  // Last.fm 的 API 错误以 HTTP 200 + 响应体 { error, message } 返回，须在成功分支检测
+  (response) => {
+    const data = response.data as LastfmErrorResponse & { error?: number; message?: string };
+    if (typeof data?.error === "number") {
+      const code = data.error;
+      if (code === 9 || code === 4 || code === 3 || code === 26) {
+        // 会话失效 / 认证失败：断开连接并提示重新授权
+        window.$message.error("Last.fm 认证失败，需要重新授权，已断开与 Last.fm 的连接！");
+        disconnect();
+      } else if (code === 11 || code === 29) {
+        window.$message.error("Last.fm 请求过于频繁，请稍后再试");
+      } else {
+        window.$message.error(`Last.fm 请求失败: ${data.message || code}`);
+      }
+      return Promise.reject(new Error(`Last.fm error ${code}: ${data.message || ""}`));
+    }
+    return response;
+  },
   (error: AxiosError<LastfmErrorResponse>) => {
     const response = error.response;
     if (!response) {

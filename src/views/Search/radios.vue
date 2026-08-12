@@ -43,15 +43,23 @@ const searchResultData = ref<CoverType[]>([]);
 const getSearchResult = async () => {
   // 获取数据
   loading.value = true;
-  const result = await searchResult(props.keyword, 50, searchOffset.value, 1009);
-  // 是否还有
-  hasMore.value = result.result?.hasMore || result.result?.playlistCount > searchOffset.value + 50;
-  // 搜索总数
-  searchCount.value = result.result?.djRadiosCount;
-  // 处理数据
-  const radioData = formatCoverList(result.result.djRadios);
-  searchResultData.value = searchResultData.value?.concat(radioData);
-  loading.value = false;
+  try {
+    const result = await searchResult(props.keyword, 50, searchOffset.value, 1009);
+    // 是否还有（使用电台计数，而非歌单字段）
+    hasMore.value =
+      result.result?.hasMore || result.result?.djRadiosCount > searchOffset.value + 50;
+    // 搜索总数
+    searchCount.value = result.result?.djRadiosCount;
+    // 处理数据
+    const radioData = formatCoverList(result.result.djRadios);
+    searchResultData.value = searchResultData.value?.concat(radioData);
+  } catch (error) {
+    console.error("获取搜索结果失败", error);
+    window.$message.error("加载失败，请重试");
+  } finally {
+    // 复位加载状态，避免失败后永久加载
+    loading.value = false;
+  }
 };
 
 // 加载更多

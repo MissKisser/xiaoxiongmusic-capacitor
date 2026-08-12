@@ -71,7 +71,7 @@ export interface IPlaybackEngine {
    * 暂停播放
    * @param options 暂停选项
    */
-  pause(options?: PauseOptions): void;
+  pause(options?: PauseOptions): Promise<void>;
 
   /** 停止播放并重置进度 */
   stop(): void;

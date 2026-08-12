@@ -5,7 +5,7 @@
       :style="{ height: height === 'auto' ? 'auto' : `${height || commentListHeight}px` }"
       class="comment-container"
     >
-      <n-scrollbar ref="scrollbarRef" class="comment-scroll">
+      <n-scrollbar class="comment-scroll">
         <div class="comment-content">
           <template v-if="commentHotData">
             <div class="placeholder">
@@ -61,31 +61,9 @@ const props = withDefaults(
 );
 
 const commentListRef = ref<HTMLElement | null>(null);
-const scrollbarRef = ref<any>(null);
 
 // 列表高度
 const { height: commentListHeight, stop: stopCalcHeight } = useElementSize(commentListRef);
-
-// 滚动容器引用
-let scrollContainerElement: HTMLElement | null = null;
-
-// 获取滚动容器元素
-const getScrollContainer = (): HTMLElement | null => {
-  if (scrollContainerElement) return scrollContainerElement;
-  
-  if (!scrollbarRef.value) return null;
-  
-  // 尝试多种方式获取滚动容器
-  const el = (scrollbarRef.value as any).$el || scrollbarRef.value;
-  if (!el) return null;
-  
-  // n-scrollbar 的滚动容器是 .n-scrollbar-container
-  const container = el.querySelector?.('.n-scrollbar-container') || el;
-  if (container) {
-    scrollContainerElement = container as HTMLElement;
-  }
-  return scrollContainerElement;
-};
 
 // 评论数据
 const commentLoading = ref<boolean>(false);
@@ -177,15 +155,10 @@ watch(
   { immediate: true },
 );
 
-// 取消自动加载，移除滚动监听
-// 组件卸载时清理
+// 取消自动加载（已改为手动点击加载更多按钮）
+// 组件卸载时停止高度计算
 onBeforeUnmount(() => {
-  const container = getScrollContainer();
-  if (container) {
-    container.removeEventListener('scroll', handleScroll);
-    container.removeAttribute('data-scroll-listener');
-    scrollContainerElement = null;
-  }
+  stopCalcHeight();
 });
 </script>
 

@@ -143,29 +143,36 @@ const moreOptions = computed<DropdownOption[]>(() => [
 // 获取全部云盘歌曲
 const getAllCloudMusic = async () => {
   loading.value = true;
-  // 必要数据
-  let offset: number = 0;
-  const limit: number = 500;
-  const listData: SongType[] = [];
-  // 循环获取
-  do {
-    const result = await userCloud(limit, offset);
-    const songData = formatSongsList(result.data);
-    // 歌曲总数
-    cloudCount.value = result.count;
-    // 云盘空间
-    cloudSize.value = {
-      size: Number((result.size / Math.pow(1024, 3)).toFixed(2)),
-      maxSize: Number((result.maxSize / Math.pow(1024, 3)).toFixed(0)),
-    };
-    // 更新数据
-    listData.push(...songData);
-    cloudData.value = listData;
-    offset += limit;
-  } while (offset < cloudCount.value && isCloudPage.value);
-  // 更新云盘数据
-  dataStore.setCloudPlayList(cloudData.value);
-  loading.value = false;
+  try {
+    // 必要数据
+    let offset: number = 0;
+    const limit: number = 500;
+    const listData: SongType[] = [];
+    // 循环获取
+    do {
+      const result = await userCloud(limit, offset);
+      const songData = formatSongsList(result.data);
+      // 歌曲总数
+      cloudCount.value = result.count;
+      // 云盘空间
+      cloudSize.value = {
+        size: Number((result.size / Math.pow(1024, 3)).toFixed(2)),
+        maxSize: Number((result.maxSize / Math.pow(1024, 3)).toFixed(0)),
+      };
+      // 更新数据
+      listData.push(...songData);
+      cloudData.value = listData;
+      offset += limit;
+    } while (offset < cloudCount.value && isCloudPage.value);
+    // 更新云盘数据
+    dataStore.setCloudPlayList(cloudData.value);
+  } catch (error) {
+    console.error("获取云盘歌曲失败", error);
+    window.$message.error("加载失败，请重试");
+  } finally {
+    // 复位加载状态，避免失败后永久加载
+    loading.value = false;
+  }
 };
 
 watchDebounced(

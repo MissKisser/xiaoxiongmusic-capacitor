@@ -31,7 +31,11 @@
           </div>
         </Transition>
       </div>
-      <n-skeleton v-else class="qr" />
+      <n-skeleton v-else-if="!qrError" class="qr" />
+      <!-- 获取失败 -->
+      <div v-else class="qr qr-fail">
+        <n-button type="primary" secondary strong round @click="retryGetQr"> 重新获取 </n-button>
+      </div>
     </div>
     <n-text class="tip" depth="3">{{ qrTipText }}</n-text>
   </div>
@@ -63,6 +67,13 @@ const qrImg = ref<string>("");
 const qrUnikey = ref<string>("");
 const qrStatusCode = ref<keyof typeof qrCodeTip>(801);
 
+// 二维码获取失败状态（重试耗尽后展示重新获取按钮）
+const qrError = ref<boolean>(false);
+// 二维码获取失败重试次数（最多重试 3 次）
+const qrRetryCount = ref<number>(0);
+// 重试定时器
+let qrRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
 // 提示文本
 const qrTipText = computed(() => {
   return qrCodeTip[qrStatusCode.value] || "遇到未知状态，请重试";
@@ -84,50 +95,76 @@ const getQrData = async () => {
     qrImg.value = `https://music.163.com/login?codekey=${res.data.unikey}`;
     // 更改 key
     qrUnikey.value = res.data.unikey;
+    // 重置失败状态
+    qrError.value = false;
+    qrRetryCount.value = 0;
     // 检查状态
     resumeCheck();
   } catch (error) {
     pauseCheck();
     console.error("二维码获取失败：", error);
+    // 失败后延时重试，最多重试 3 次
+    if (qrRetryCount.value < 3) {
+      qrRetryCount.value += 1;
+      qrRetryTimer = setTimeout(getQrData, 2000);
+    } else {
+      // 重试耗尽，展示重新获取按钮
+      qrRetryCount.value = 0;
+      qrError.value = true;
+    }
   }
+};
+
+// 手动重新获取二维码
+const retryGetQr = () => {
+  qrRetryCount.value = 0;
+  qrError.value = false;
+  getQrData();
 };
 
 // 检查二维码状态
 const checkQrStatus = async () => {
   if (!qrUnikey.value || props.pause) return;
-  // 检查状态
-  const { code, cookie, nickname, avatarUrl } = await checkQr(qrUnikey.value);
-  switch (code) {
-    // 二维码过期
-    case 800:
-      qrStatusCode.value = 800;
-      getQrData();
-      break;
-    // 等待扫码
-    case 801:
-      qrStatusCode.value = 801;
-      break;
-    // 待确认
-    case 802:
-      qrStatusCode.value = 802;
-      loginName.value = nickname;
-      loginAvatar.value = avatarUrl;
-      break;
-    // 登录成功
-    case 803:
-      qrStatusCode.value = 803;
-      pauseCheck();
-      // 是否含有 MUSIC_U
-      if (cookie && cookie.includes("MUSIC_U")) {
-        // 储存登录信息
-        emit("saveLogin", { code: 200, cookie }, "qr");
-      } else {
-        window.$message.error("登录出错，请重试");
+  try {
+    // 检查状态
+    const { code, cookie, nickname, avatarUrl } = await checkQr(qrUnikey.value);
+    switch (code) {
+      // 二维码过期
+      case 800:
+        qrStatusCode.value = 800;
         getQrData();
-      }
-      break;
-    default:
-      break;
+        break;
+      // 等待扫码
+      case 801:
+        qrStatusCode.value = 801;
+        break;
+      // 待确认
+      case 802:
+        qrStatusCode.value = 802;
+        loginName.value = nickname;
+        loginAvatar.value = avatarUrl;
+        break;
+      // 登录成功
+      case 803:
+        qrStatusCode.value = 803;
+        pauseCheck();
+        // 是否含有 MUSIC_U
+        if (cookie && cookie.includes("MUSIC_U")) {
+          // 储存登录信息
+          emit("saveLogin", { code: 200, cookie }, "qr");
+        } else {
+          window.$message.error("登录出错，请重试");
+          getQrData();
+        }
+        break;
+      default:
+        break;
+    }
+  } catch (error) {
+    console.error("二维码状态检查失败：", error);
+    // 检查失败时暂停轮询并提示，避免反复请求
+    pauseCheck();
+    window.$message.error("二维码状态获取失败，请重新获取");
   }
 };
 
@@ -137,7 +174,14 @@ const { pause: pauseCheck, resume: resumeCheck } = useIntervalFn(checkQrStatus, 
 });
 
 onMounted(getQrData);
-onBeforeUnmount(pauseCheck);
+onBeforeUnmount(() => {
+  pauseCheck();
+  // 清理重试定时器，避免卸载后继续请求
+  if (qrRetryTimer) {
+    clearTimeout(qrRetryTimer);
+    qrRetryTimer = null;
+  }
+});
 </script>
 
 <style lang="scss" scoped>

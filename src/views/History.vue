@@ -53,7 +53,7 @@
       <SongList
         v-if="dataStore.historyList.length > 0"
         :data="dataStore.historyList"
-        :loading="true"
+        :loading="false"
         hiddenCover
         hiddenSize
       />

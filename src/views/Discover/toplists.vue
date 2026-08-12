@@ -27,7 +27,7 @@
           </n-gi>
         </n-grid>
       </div>
-      <div v-else class="official-list">
+      <div v-else-if="loading" class="official-list">
         <n-grid cols="1 600:2 1000:3" x-gap="20" y-gap="20">
           <n-gi v-for="item in 4" :key="item">
             <n-card class="loading">
@@ -39,9 +39,23 @@
           </n-gi>
         </n-grid>
       </div>
+      <!-- 加载失败 -->
+      <n-empty
+        v-else
+        description="排行榜加载失败，请重试"
+        style="margin-top: 60px"
+        size="large"
+      >
+        <template #icon>
+          <SvgIcon name="SearchOff" />
+        </template>
+        <n-button type="primary" secondary strong round @click="getTopPlaylistData">
+          重新加载
+        </n-button>
+      </n-empty>
     </Transition>
     <n-divider style="margin-bottom: 0"> 精选榜 </n-divider>
-    <CoverList :data="topListData.selected" :loading="true" type="playlist" />
+    <CoverList :data="topListData.selected" :loading="loading" type="playlist" />
   </div>
 </template>
 
@@ -53,6 +67,7 @@ import { formatCoverList } from "@/utils/format";
 const router = useRouter();
 
 // 排行榜数据
+const loading = ref<boolean>(true);
 const topListData = ref<{
   official: CoverType[];
   selected: CoverType[];
@@ -63,11 +78,20 @@ const topListData = ref<{
 
 // 获取排行榜数据
 const getTopPlaylistData = async () => {
-  const result = await topPlaylist();
-  // 区分榜单
-  const official = formatCoverList(result.list?.filter((v: any) => v.ToplistType !== undefined));
-  const selected = formatCoverList(result.list?.filter((v: any) => v.ToplistType === undefined));
-  topListData.value = { official, selected };
+  loading.value = true;
+  try {
+    const result = await topPlaylist();
+    // 区分榜单
+    const official = formatCoverList(result.list?.filter((v: any) => v.ToplistType !== undefined));
+    const selected = formatCoverList(result.list?.filter((v: any) => v.ToplistType === undefined));
+    topListData.value = { official, selected };
+  } catch (error) {
+    console.error("获取排行榜数据失败", error);
+    window.$message.error("加载失败，请重试");
+  } finally {
+    // 复位加载状态，避免失败后永久加载
+    loading.value = false;
+  }
 };
 
 onMounted(getTopPlaylistData);

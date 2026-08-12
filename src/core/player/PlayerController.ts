@@ -12,6 +12,7 @@ import { DJ_MODE_KEYWORDS } from "@/utils/meta";
 import lastfmScrobbler from "@/utils/lastfmScrobbler";
 import { calculateProgress } from "@/utils/time";
 import { LyricLine } from "@applemusic-like-lyrics/lyric";
+import { PlaybackStatus } from "@emi";
 import { DebouncedFunc, throttle } from "lodash-es";
 import { checkABLoop, resetABLoop } from "./AbLoopManager";
 import { useAudioManager } from "./AudioManager";
@@ -38,6 +39,8 @@ class PlayerController {
   private currentRequestToken = 0;
   /** 连续跳过计数 */
   private failSkipCount = 0;
+  /** DJ 模式连续跳过计数（用于检测整表命中） */
+  private djSkipCount = 0;
   /** 负责管理播放模式相关的逻辑 */
   private playModeManager = new PlayModeManager();
 
@@ -130,15 +133,28 @@ class PlayerController {
       statusStore.playLoading = false;
       // 初始化或无歌曲时
       if (!statusStore.playStatus && !autoPlay) return;
-      throw new Error("SONG_NOT_FOUND");
+      // 无歌曲可播放：直接提示并停止，不抛错进入重试链
+      window.$message.error("当前无歌曲可播放");
+      return;
     }
 
     // Fuck DJ Mode
     if (this.shouldSkipSong(playSongData)) {
       console.log(`[Fuck DJ] Skipping: ${playSongData.name}`);
-      this.nextOrPrev("next");
+      const dataStore = useDataStore();
+      // 连续跳过数达到列表长度说明整表命中（含单曲列表 playIndex 不变的场景）
+      if (this.djSkipCount >= Math.max(dataStore.playList.length, 1)) {
+        this.djSkipCount = 0;
+        statusStore.playLoading = false;
+        window.$message.warning("列表歌曲均被 DJ 模式过滤，已停止播放");
+        this.pause();
+        return;
+      }
+      this.djSkipCount++;
+      await this.nextOrPrev("next");
       return;
     }
+    this.djSkipCount = 0;
 
     try {
       // 停止当前播放（使用淡出避免爆音）
@@ -237,6 +253,15 @@ class PlayerController {
     } catch (error) {
       if (requestToken === this.currentRequestToken) {
         console.error("❌ 播放初始化失败:", error);
+        // 无歌曲/无音频源错误直接返回，不进入重试链
+        if (
+          error instanceof Error &&
+          (error.message.includes("SONG_NOT_FOUND") ||
+            error.message.includes("AUDIO_SOURCE_EMPTY"))
+        ) {
+          statusStore.playLoading = false;
+          return;
+        }
         this.handlePlaybackError(undefined);
       }
     }
@@ -358,8 +383,8 @@ class PlayerController {
     const musicStore = useMusicStore();
     const settingStore = useSettingStore();
     const songManager = useSongManager();
-    // 记录播放历史 (非电台)
-    if (song.type !== "radio") dataStore.setHistory(song);
+    // 记录播放历史 (非电台)，内部消化错误避免中断播放流程
+    if (song.type !== "radio") dataStore.setHistory(song).catch(() => {});
     // 更新歌曲数据
     if (!song.path || song.type === "streaming") {
       mediaSessionManager.updateMetadata();
@@ -465,7 +490,7 @@ class PlayerController {
       const playTitle = `${name} - ${artist}`;
       // 更新状态
       statusStore.playStatus = true;
-      playerIpc.sendMediaPlayState("Playing");
+      playerIpc.sendMediaPlayState(PlaybackStatus.Playing);
       mediaSessionManager.updatePlaybackStatus(true);
       window.document.title = `${playTitle} | 小熊音乐`;
       // 只有真正播放了才重置重试计数
@@ -501,7 +526,7 @@ class PlayerController {
     // 暂停
     audioManager.addEventListener("pause", () => {
       statusStore.playStatus = false;
-      playerIpc.sendMediaPlayState("Paused");
+      playerIpc.sendMediaPlayState(PlaybackStatus.Paused);
       mediaSessionManager.updatePlaybackStatus(false);
       if (!isElectron) window.document.title = "小熊音乐";
       playerIpc.sendPlayStatus(false);
@@ -671,6 +696,11 @@ class PlayerController {
     // 未超过重试次数 -> 尝试重新获取 URL（可能是过期）
     if (this.retryInfo.count <= this.MAX_RETRY_COUNT) {
       await sleep(1000);
+      // 竞态防护：等待期间用户已切歌或暂停，则放弃本次重试，避免旧 seek 强制播放
+      if (this.retryInfo.songId !== currentSongId || !statusStore.playStatus) {
+        statusStore.playLoading = false;
+        return;
+      }
       if (this.retryInfo.count === 1) {
         statusStore.playLoading = true;
         window.$message.warning("播放异常，正在尝试恢复...");
@@ -732,6 +762,8 @@ class PlayerController {
 
     // 如果已经在播放，直接返回
     if (!audioManager.paused) {
+      // 取消挂起的淡出暂停并恢复播放
+      audioManager.resume();
       statusStore.playStatus = true;
       return;
     }

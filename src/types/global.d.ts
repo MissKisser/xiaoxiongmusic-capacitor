@@ -8,6 +8,17 @@ declare global {
     $notification: NotificationApi;
     $loadingBar: LoadingBarApi;
     $modal: ModalApi;
+    // electron（仅桌面端存在；Capacitor Android 下为 undefined，调用方须以 isElectron 守卫）
+    electron: {
+      ipcRenderer: {
+        invoke: (channel: string, ...args: any[]) => Promise<any>;
+        send: (channel: string, ...args: any[]) => void;
+        sendSync: (channel: string, ...args: any[]) => any;
+        on: (channel: string, listener: (...args: any[]) => void) => void;
+        off: (channel: string, listener: (...args: any[]) => void) => void;
+        removeAllListeners: (channel: string) => void;
+      };
+    };
     // electron
     api: {
       store: {

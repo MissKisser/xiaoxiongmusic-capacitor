@@ -85,7 +85,7 @@
                 播放
               </n-button>
               <n-dropdown
-                :options="currentSong ? getMenuOptions(currentSong) : []"
+                :options="currentSong ? getMenuOptions(currentSong, -1, 0, false, () => {}) : []"
                 trigger="click"
                 placement="bottom-start"
               >
@@ -275,7 +275,7 @@
           <n-empty description="暂无更多信息" style="margin-top: 48px" />
         </div>
       </div>
-      <div v-else class="loading-skeleton" key="skeleton">
+      <div v-else-if="loading" class="loading-skeleton" key="skeleton">
         <div class="header-skeleton">
           <n-skeleton height="204px" width="204px" style="border-radius: 8px" />
           <div class="info-skeleton">
@@ -289,6 +289,17 @@
             <n-skeleton height="150px" style="border-radius: 8px" />
           </n-gi>
         </n-grid>
+      </div>
+      <!-- 加载失败 -->
+      <div v-else class="empty-state" key="error">
+        <n-empty description="加载失败，请重试" size="large">
+          <template #icon>
+            <SvgIcon name="SearchOff" />
+          </template>
+          <n-button type="primary" secondary strong round @click="fetchData()">
+            重新加载
+          </n-button>
+        </n-empty>
       </div>
     </Transition>
   </div>
@@ -319,6 +330,8 @@ const settingStore = useSettingStore();
 const { getMenuOptions } = useSongMenu();
 
 const loading = ref(true);
+// 加载失败状态（用于展示错误空态与重试）
+const loadError = ref<boolean>(false);
 const currentSongId = ref<number>(0);
 const currentSong = ref<SongType | null>(null);
 const viewModel = ref<WikiViewModel | null>(null);
@@ -429,6 +442,7 @@ const fetchData = async (id?: number) => {
   if (!id || id === currentSongId.value) return;
   const token = ++currentRequestToken.value;
   loading.value = true;
+  loadError.value = false;
   currentSongId.value = id;
   viewModel.value = null;
   similarSongsList.value = [];
@@ -466,6 +480,9 @@ const fetchData = async (id?: number) => {
   } catch (error) {
     console.error("Fetch wiki failed", error);
     window.$message.error("加载信息失败");
+    // 标记加载失败并重置歌曲 ID，允许用户重试
+    loadError.value = true;
+    currentSongId.value = 0;
   } finally {
     if (token === currentRequestToken.value) {
       loading.value = false;

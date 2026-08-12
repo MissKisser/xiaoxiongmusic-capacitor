@@ -42,8 +42,8 @@
         </n-h3>
       </n-flex>
       <!-- 列表 -->
-      <ArtistList v-if="item.type === 'artist'" :data="item.list" :loading="true" />
-      <CoverList v-else :data="item.list" :type="item.type" :loading="true" />
+      <ArtistList v-if="item.type === 'artist'" :data="item.list" :loading="loading" />
+      <CoverList v-else :data="item.list" :type="item.type" :loading="loading" />
     </div>
   </div>
 </template>
@@ -110,6 +110,7 @@ const likeSongsCover = computed(() => {
 });
 
 // 推荐数据
+const loading = ref<boolean>(true);
 const recData = ref<RecDataType>({
   playlist: {
     name: isLogin() ? "专属歌单" : "推荐歌单",
@@ -222,6 +223,9 @@ const getAllRecData = async () => {
   } catch (error) {
     window.$message.error("个性化推荐获取出错");
     console.error("Error getting personalized data:", error);
+  } finally {
+    // 复位加载状态，避免失败后永久加载
+    loading.value = false;
   }
 };
 

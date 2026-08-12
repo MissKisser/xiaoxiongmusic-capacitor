@@ -214,6 +214,7 @@ function looksLikeMetadata(text: string, softRegexes: RegExp[]): boolean {
 
 /**
  * 扫描头部，寻找正文开始的位置
+ * （逐行处理结果仅保留一条汇总日志，见 stripLyricMetadata 末尾，避免每行 console.log 刷屏）
  */
 function findHeaderCutoff(
   lines: readonly LyricLine[],
@@ -223,8 +224,6 @@ function findHeaderCutoff(
   limit: number,
 ): number {
   let lastValidMetadataIndex = -1;
-
-  console.groupCollapsed(`[LyricStripper] ⬇️ 开始头部扫描 (Limit: ${limit})`);
 
   for (let i = 0; i < limit; i++) {
     if (i >= lines.length) break;
@@ -238,12 +237,6 @@ function findHeaderCutoff(
     const strict = isStrictMatch(text, keywords, regexes);
     const weak = looksLikeMetadata(text, softRegexes);
 
-    let status = "❌ NONE";
-    if (strict) status = "✅ STRICT";
-    else if (weak) status = "⚠️ WEAK";
-
-    console.log(`Line [${i}]: "${text}" | Result: ${status}`);
-
     if (!strict && !weak) {
       break;
     }
@@ -252,13 +245,13 @@ function findHeaderCutoff(
       lastValidMetadataIndex = i;
     }
   }
-  console.groupEnd();
 
   return lastValidMetadataIndex + 1;
 }
 
 /**
  * 扫描尾部，寻找正文结束的位置
+ * （逐行处理结果仅保留一条汇总日志，见 stripLyricMetadata 末尾，避免每行 console.log 刷屏）
  */
 function findFooterCutoff(
   lines: readonly LyricLine[],
@@ -273,8 +266,6 @@ function findFooterCutoff(
   const scanEnd = Math.max(startIndex, lines.length - limit);
   let firstValidFooterIndex = lines.length;
 
-  console.groupCollapsed(`[LyricStripper] ⬆️ 开始尾部扫描 (Limit: ${limit})`);
-
   for (let i = lines.length - 1; i >= scanEnd; i--) {
     const text = getLineText(lines[i]);
 
@@ -285,12 +276,6 @@ function findFooterCutoff(
     const strict = isStrictMatch(text, keywords, regexes);
     const weak = looksLikeMetadata(text, softRegexes);
 
-    let status = "❌ NONE";
-    if (strict) status = "✅ STRICT";
-    else if (weak) status = "⚠️ WEAK";
-
-    console.log(`Line [${i}]: "${text}" | Result: ${status}`);
-
     if (!strict && !weak) {
       break;
     }
@@ -299,7 +284,6 @@ function findFooterCutoff(
       firstValidFooterIndex = i;
     }
   }
-  console.groupEnd();
 
   return firstValidFooterIndex;
 }

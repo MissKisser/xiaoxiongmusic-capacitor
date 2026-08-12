@@ -1,6 +1,7 @@
 import { DropdownOption } from "naive-ui";
 import { SongType } from "@/types/main";
 import { useStatusStore, useDataStore, useMusicStore, useSettingStore } from "@/stores";
+import { isElectron } from "@/utils/env";
 import { useDownloadManager } from "@/core/resource/DownloadManager";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { renderIcon, copyData } from "@/utils/helper";
@@ -43,6 +44,11 @@ export const useSongMenu = () => {
       positiveText: "删除",
       negativeText: "取消",
       onPositiveClick: async () => {
+        // 非 Electron 环境不支持删除本地文件
+        if (!isElectron) {
+          window.$message.error("当前平台不支持删除本地文件");
+          return;
+        }
         const result = await window.electron.ipcRenderer.invoke("delete-file", song.path);
         if (result) {
           emit("removeSong", [song.id]);
@@ -313,7 +319,14 @@ export const useSongMenu = () => {
         label: "打开歌曲所在目录",
         show: isLocal,
         props: {
-          onClick: () => window.electron.ipcRenderer.send("open-folder", song.path),
+          onClick: () => {
+            // 非 Electron 环境不支持打开本地目录
+            if (!isElectron) {
+              window.$message.warning("当前平台不支持打开本地目录");
+              return;
+            }
+            window.electron.ipcRenderer.send("open-folder", song.path);
+          },
         },
         icon: renderIcon("SnippetFolder"),
       },

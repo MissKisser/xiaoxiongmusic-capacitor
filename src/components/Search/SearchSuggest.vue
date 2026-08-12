@@ -40,8 +40,8 @@
           >
             <div v-for="(item, index) in searchSuggestData.order" :key="index" class="suggest">
               <div class="suggest-type">
-                <SvgIcon :name="searchSuggestionsType[item].icon" />
-                <n-text>{{ searchSuggestionsType[item].name }}</n-text>
+                <SvgIcon :name="searchSuggestionsType[item as keyof typeof searchSuggestionsType]?.icon" />
+                <n-text>{{ searchSuggestionsType[item as keyof typeof searchSuggestionsType]?.name }}</n-text>
               </div>
               <div
                 v-for="(suggestItem, suggestIndex) in searchSuggestData[item]"
@@ -108,10 +108,17 @@ const searchSuggestionsType = {
   },
 };
 
+// 搜索建议请求序号，用于丢弃过期响应（防止竞态）
+let suggestSeq = 0;
+
 // 获取搜索建议
 const getSearchSuggest = async (keywords: string) => {
+  // 记录请求序号
+  const seq = ++suggestSeq;
   searchSuggestData.value = {};
   const result = await searchSuggest(keywords);
+  // 响应已过期则丢弃
+  if (seq !== suggestSeq) return;
   searchSuggestData.value = result.result;
   // 计算高度
   nextTick(calcSearchSuggestHeights);

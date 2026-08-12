@@ -82,6 +82,11 @@ export const useListDataCache = () => {
         await cacheManager.set("list-data", key, jsonStr);
       } else {
         memoryCache.set(key, jsonStr);
+        // 限制内存缓存条数，防止无上限缓存完整 JSON 字符串导致内存持续增长（按插入顺序淘汰最旧项）
+        if (memoryCache.size > 20) {
+          const oldestKey = memoryCache.keys().next().value;
+          if (oldestKey) memoryCache.delete(oldestKey);
+        }
       }
       console.log(`✅ List cache saved: ${key}`);
     } catch (error) {

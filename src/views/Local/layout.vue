@@ -205,6 +205,7 @@
 import type { SongType } from "@/types/main";
 import type { DropdownOption, MessageReactive } from "naive-ui";
 import { useLocalStore, useSettingStore } from "@/stores";
+import { isElectron } from "@/utils/env";
 import { useMobile } from "@/composables/useMobile";
 import { formatSongsList } from "@/utils/format";
 import { debounce } from "lodash-es";
@@ -419,6 +420,8 @@ interface SyncCompleteData {
 // 获取全部路径歌曲（流式接收）
 const getAllLocalMusic = debounce(
   async (showTip: boolean = false) => {
+    // 非 Electron 环境不支持本地音乐
+    if (!isElectron) return;
     // 获取路径
     const allPath = await getMusicFolder();
     if (!allPath || !allPath.length) {
@@ -561,7 +564,8 @@ const listSearch = debounce((val: string) => {
   filteredSearchResult.value = fuzzySearch(val, getFilteredData());
 }, 300);
 
-localEventBus.on(() => getAllLocalMusic());
+// 本地歌曲事件监听（on 返回注销函数，卸载时清理）
+const offLocalEventBus = localEventBus.on(() => getAllLocalMusic());
 
 // 本地目录变化
 watch(
@@ -593,6 +597,8 @@ watch(
 );
 
 onMounted(() => {
+  // 非 Electron 环境不支持本地音乐
+  if (!isElectron) return;
   // 监听本地音乐同步进度
   const progressHandler = (_event: unknown, payload: { current: number; total: number }) => {
     if (!loading.value) return;
@@ -609,6 +615,10 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  // 注销本地歌曲事件监听
+  offLocalEventBus();
+  // 非 Electron 环境无需清理 IPC 监听
+  if (!isElectron) return;
   // 清理所有相关监听器
   window.electron.ipcRenderer.removeAllListeners("music-sync-progress");
   window.electron.ipcRenderer.removeAllListeners("music-sync-tracks-batch");

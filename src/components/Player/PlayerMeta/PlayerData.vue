@@ -227,6 +227,8 @@ const loadQualities = async (isPreload = false) => {
 
   try {
     const res = await songQuality(songId);
+    // 响应时歌曲已切换，丢弃过期结果
+    if (musicStore.playSong.id !== songId) return;
     if (res.data) {
       const levels = getSongLevelsData(songLevelData, res.data);
       // 如果当前播放的是被隐藏的音质，尝试切换到最高可用音质
@@ -243,6 +245,8 @@ const loadQualities = async (isPreload = false) => {
     }
   } catch (error) {
     console.error(`获取音质详情失败${isPreload ? " (预加载)" : ""}:`, error);
+    // 请求失败时清空音质列表，避免残留过期数据
+    availableQualities.value = [];
     if (!isPreload) {
       window.$message.error("获取音质信息失败");
     }
@@ -273,12 +277,22 @@ const handleQualitySelect = async (key: string) => {
   const item = availableQualities.value.find((q) => q.level === key);
   if (!item) return;
 
+  // 记录原音质，用于切换失败时回滚
+  const previousLevel = settingStore.songLevel;
   // 更新设置中的音质
   settingStore.songLevel = key as typeof settingStore.songLevel;
 
   // 切换音质，保持当前进度，不重新加载歌词
   const playerController = usePlayerController();
-  await playerController.switchQuality(statusStore.currentTime);
+  try {
+    await playerController.switchQuality(statusStore.currentTime);
+  } catch (error) {
+    // 切换失败，回滚音质设置并提示
+    console.error("音质切换失败:", error);
+    settingStore.songLevel = previousLevel;
+    window.$message.error("音质切换失败");
+    return;
+  }
 
   // 获取实际切换后的音质项
   const actualItem = availableQualities.value.find(

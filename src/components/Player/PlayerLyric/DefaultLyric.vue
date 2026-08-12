@@ -172,6 +172,78 @@ const currentLyricData = computed(() => {
   return isYrcMode.value ? musicStore.songLyric.yrcData : musicStore.songLyric.lrcData;
 });
 
+/** 歌词行索引游标（歌词按 startTime 升序，播放中索引单调递增，避免每帧全量 findIndex） */
+let lyricCursorIndex = -1;
+/** 游标对应的歌词数组（歌词数据变化时重置游标） */
+let lyricCursorLyrics: readonly LyricLine[] | null = null;
+
+/**
+ * 游标探测：查找最后一个 startTime <= seek 的行索引
+ * 从上次索引向两侧小范围探测，正常播放时仅需常数次比较
+ * @param lyrics 歌词行数组（按 startTime 升序）
+ * @param seek 当前时间（毫秒）
+ * @returns 行索引；无匹配返回 -1
+ */
+const findLastLineIndex = (lyrics: readonly LyricLine[], seek: number): number => {
+  if (lyrics.length === 0) return -1;
+  // 歌词数据变化时重置游标
+  if (lyricCursorLyrics !== lyrics) {
+    lyricCursorLyrics = lyrics;
+    lyricCursorIndex = 0;
+  }
+  let i = lyricCursorIndex;
+  if (i < 0 || i >= lyrics.length) i = 0;
+  // 向后探测（播放推进）
+  while (i < lyrics.length - 1 && (lyrics[i + 1].startTime || 0) <= seek) {
+    i++;
+  }
+  // 向前探测（拖动进度条回退）
+  while (i > 0 && (lyrics[i].startTime || 0) > seek) {
+    i--;
+  }
+  if ((lyrics[i].startTime || 0) > seek) return -1;
+  lyricCursorIndex = i;
+  return i;
+};
+
+/** 逐字歌词活跃行扫描状态（记录上一帧活跃范围起点，缩小逐帧扫描区间） */
+let yrcScanState: {
+  lyrics: readonly LyricLine[] | null;
+  lastSeek: number;
+  rangeStart: number;
+} | null = null;
+
+/**
+ * 扫描逐字歌词活跃行（start <= seek < end）
+ * 播放中从上一帧活跃范围起点扫描；进度回退（拖动进度条）时从头扫描保证正确性
+ * @param lyrics 逐字歌词行数组（按 startTime 升序）
+ * @param seek 当前时间（毫秒）
+ * @returns 活跃行索引列表（升序）
+ */
+const scanYrcActiveLines = (lyrics: readonly LyricLine[], seek: number): number[] => {
+  // 歌词数据变化时重置扫描状态
+  if (!yrcScanState || yrcScanState.lyrics !== lyrics) {
+    yrcScanState = { lyrics, lastSeek: seek, rangeStart: 0 };
+  }
+  const anchor = findLastLineIndex(lyrics, seek);
+  if (anchor === -1) return [];
+  // 进度回退时无法复用上一帧范围，从头扫描
+  const scanStart = seek < yrcScanState.lastSeek ? 0 : yrcScanState.rangeStart;
+  yrcScanState.lastSeek = seek;
+  const activeCandidates: number[] = [];
+  for (let i = scanStart; i <= anchor; i++) {
+    const line = lyrics[i];
+    const start = line.startTime || 0;
+    const end = line.endTime ?? Infinity;
+    if (seek >= start && seek < end) {
+      activeCandidates.push(i);
+    }
+  }
+  // 记录本次活跃范围起点（无活跃行时从 anchor 后开始，下一帧仅扫描新进入范围的行）
+  yrcScanState.rangeStart = activeCandidates[0] ?? anchor + 1;
+  return activeCandidates;
+};
+
 /** 处理后的歌词项类型 */
 type ProcessedLyricItem =
   | { type: "lyric"; originalIndex: number; data: LyricLine }
@@ -248,36 +320,27 @@ const activeLineIndices = computed<number[]>(() => {
   const lyrics = currentLyricData.value;
   if (!lyrics || lyrics.length === 0) return [];
   const currentSeek = props.currentTime;
-  const activeCandidates: number[] = [];
   // 逐字歌词模式
   if (isYrcMode.value) {
-    for (let i = 0; i < lyrics.length; i++) {
-      const line = lyrics[i];
-      const start = line.startTime || 0;
-      const end = line.endTime ?? Infinity;
-      // 检查当前时间是否在该行的时间范围内
-      if (currentSeek >= start && currentSeek < end) {
-        activeCandidates.push(i);
-      }
-    }
+    // 从上一帧活跃范围起点扫描（游标探测），避免每帧全量扫描
+    const activeCandidates = scanYrcActiveLines(lyrics, currentSeek);
     // 最多保留3行
     if (activeCandidates.length > 3) {
       return activeCandidates.slice(-3);
     }
     // 如果没有活跃行，找最近的上一行（用于间奏等情况）
     if (activeCandidates.length === 0 && currentSeek > 0) {
-      const next = lyrics.findIndex((v) => (v.startTime || 0) > currentSeek);
-      if (next === -1) return [lyrics.length - 1];
-      if (next > 0) return [next - 1];
+      const anchor = findLastLineIndex(lyrics, currentSeek);
+      if (anchor === -1) return [];
+      return [anchor];
     }
     return activeCandidates;
   }
-  // 普通歌词模式：找到下一行之前的行
-  const playSeek = currentSeek + 300; // 提前量
-  const idx = lyrics.findIndex((v) => (v.startTime || 0) > playSeek);
-  if (idx === -1) return [lyrics.length - 1];
-  if (idx > 0) return [idx - 1];
-  return [];
+  // 普通歌词模式：找到下一行之前的行（带 300ms 提前量）
+  const playSeek = currentSeek + 300;
+  const anchor = findLastLineIndex(lyrics, playSeek);
+  if (anchor === -1) return [];
+  return [anchor];
 });
 
 /** 计算滚动目标索引 */
@@ -287,29 +350,22 @@ const scrollTargetIndex = computed<number>(() => {
   const currentSeek = props.currentTime;
   // 逐字歌词模式
   if (isYrcMode.value) {
-    // 找当前时间范围内的行
-    for (let i = 0; i < lyrics.length; i++) {
-      const line = lyrics[i];
-      const start = line.startTime || 0;
-      const end = line.endTime ?? Infinity;
-      if (currentSeek >= start && currentSeek < end) {
-        return i;
-      }
-    }
-    // 没有活跃行，找最近的上一行
+    // 活跃行取扫描结果中的第一个（与 activeLineIndices 共享同一扫描状态）
+    const activeCandidates = scanYrcActiveLines(lyrics, currentSeek);
+    if (activeCandidates.length > 0) return activeCandidates[0];
+    // 没有活跃行，找最近的上一行（间奏等场景）
     if (currentSeek > 0) {
-      const next = lyrics.findIndex((v) => (v.startTime || 0) > currentSeek);
-      if (next === -1) return lyrics.length - 1;
-      if (next > 0) return next - 1;
+      const anchor = findLastLineIndex(lyrics, currentSeek);
+      if (anchor === -1) return -1;
+      return anchor;
     }
     return -1;
   }
-  // 普通歌词模式
+  // 普通歌词模式（带 300ms 提前量）
   const playSeek = currentSeek + 300;
-  const idx = lyrics.findIndex((v) => (v.startTime || 0) > playSeek);
-  if (idx === -1) return lyrics.length - 1;
-  if (idx > 0) return idx - 1;
-  return -1;
+  const anchor = findLastLineIndex(lyrics, playSeek);
+  if (anchor === -1) return -1;
+  return anchor;
 });
 
 /** 首个高亮行索引 */
@@ -441,6 +497,9 @@ const lrcAllLeave = () => {
 
 type CssVars = Record<`--${string}`, string>;
 
+/** 非激活行共享的空样式对象（避免每帧为每个歌词字重复创建对象） */
+const EMPTY_YRC_VARS: CssVars = {};
+
 /** 逐字歌词淡入淡出因子 */
 const YRC_DIM_ALPHA = 0.3;
 /** 逐字歌词淡入淡出时间 */
@@ -472,7 +531,7 @@ const getYrcVars = (wordData: LyricWord, lyricIndex: number): CssVars => {
   const fadeFactor = getYrcFadeFactor(lyricIndex);
   // 判断是否显示
   const currentLine = musicStore.songLyric.yrcData[lyricIndex];
-  if (!isYrcLineOn(currentLine, lyricIndex)) return {};
+  if (!isYrcLineOn(currentLine, lyricIndex)) return EMPTY_YRC_VARS;
   // 计算进度
   const duration = wordData.endTime - wordData.startTime;
   const safeDuration = Math.max(duration, 1);

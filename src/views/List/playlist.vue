@@ -324,32 +324,42 @@ const handleOnlinePlaylist = async (id: number, getList: boolean, refresh: boole
   }
 
   // 获取歌单详情
-  const detail = await playlistDetail(id);
-  // 检查是否仍然是当前请求的歌单
-  if (currentRequestId.value !== id) return;
-  setDetailData(formatCoverList(detail.playlist)[0]);
-  const count = detailData.value?.count || 0;
-  // 不需要获取列表或无歌曲
-  if (!getList || count === 0) {
-    setLoading(false);
-    return;
-  }
-  // 如果已登录且歌曲数量少于 800，直接加载所有歌曲
-  if (isLogin() === 1 && count === detail.privileges?.length && count < 800) {
-    const ids = detail.privileges.map((song: any) => song.id as number);
-    const result = await songDetail(ids);
+  try {
+    const detail = await playlistDetail(id);
     // 检查是否仍然是当前请求的歌单
     if (currentRequestId.value !== id) return;
-    const songs = formatSongsList(result.songs);
-    setListData(songs);
-    // 保存缓存
-    saveCache("playlist", id, detailData.value!, songs);
-  } else {
-    await getPlaylistAllSongs(id, count, refresh);
+    setDetailData(formatCoverList(detail.playlist)[0]);
+    const count = detailData.value?.count || 0;
+    // 不需要获取列表或无歌曲
+    if (!getList || count === 0) {
+      setLoading(false);
+      return;
+    }
+    // 如果已登录且歌曲数量少于 800，直接加载所有歌曲
+    // playlistDetail 配置了 noCookie 去除 privileges，改用 trackIds 判断快速路径可用性
+    if (isLogin() === 1 && count === detail.playlist?.trackIds?.length && count < 800) {
+      const ids = detail.privileges.map((song: any) => song.id as number);
+      const result = await songDetail(ids);
+      // 检查是否仍然是当前请求的歌单
+      if (currentRequestId.value !== id) return;
+      const songs = formatSongsList(result.songs);
+      setListData(songs);
+      // 保存缓存
+      saveCache("playlist", id, detailData.value!, songs);
+    } else {
+      await getPlaylistAllSongs(id, count, refresh);
+    }
+    // 检查是否仍然是当前请求的歌单
+    if (currentRequestId.value !== id) return;
+  } catch (error) {
+    console.error("获取歌单详情失败", error);
+    window.$message.error("加载失败，请重试");
+    // 关闭加载提示
+    loadingMsgShow(false);
+  } finally {
+    // 仅当前请求有效时复位加载状态，避免影响新请求
+    if (currentRequestId.value === id) setLoading(false);
   }
-  // 检查是否仍然是当前请求的歌单
-  if (currentRequestId.value !== id) return;
-  setLoading(false);
 };
 
 // 后台检查更新

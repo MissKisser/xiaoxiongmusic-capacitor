@@ -201,33 +201,47 @@ const getPlaylistData = async (id: number, getList: boolean, refresh: boolean) =
   // 加载缓存
   loadLikedCache();
   // 获取歌单详情
-  const detail = await playlistDetail(id);
-  // 检查是否仍然是当前请求的歌单
-  if (currentRequestId.value !== id) return;
-  setDetailData(formatCoverList(detail.playlist)[0]);
-  // 不需要获取列表或无歌曲
-  if (!getList || detailData.value?.count === 0) {
-    setLoading(false);
-    return;
-  }
-  // 如果已登录且歌曲数量少于 800，直接加载所有歌曲
-  if (isLogin() === 1 && (detailData.value?.count as number) < 800) {
-    const ids: number[] = detail.privileges.map((song: any) => song.id as number);
-    const result = await songDetail(ids);
+  try {
+    const detail = await playlistDetail(id);
     // 检查是否仍然是当前请求的歌单
     if (currentRequestId.value !== id) return;
-    // 直接批量详情返回时也进行一次按 id 去重
-    setListData(uniqBy(formatSongsList(result.songs), "id"));
-  } else {
-    await getPlaylistAllSongs(id, detailData.value?.count || 0, refresh);
+    setDetailData(formatCoverList(detail.playlist)[0]);
+    // 不需要获取列表或无歌曲
+    if (!getList || detailData.value?.count === 0) {
+      setLoading(false);
+      return;
+    }
+    // 如果已登录且歌曲数量少于 800，直接加载所有歌曲
+    // playlistDetail 配置了 noCookie 去除 privileges，需校验其存在性，缺失时走全量拉取分支
+    if (
+      isLogin() === 1 &&
+      (detailData.value?.count as number) < 800 &&
+      Array.isArray(detail.privileges)
+    ) {
+      const ids: number[] = detail.privileges.map((song: any) => song.id as number);
+      const result = await songDetail(ids);
+      // 检查是否仍然是当前请求的歌单
+      if (currentRequestId.value !== id) return;
+      // 直接批量详情返回时也进行一次按 id 去重
+      setListData(uniqBy(formatSongsList(result.songs), "id"));
+    } else {
+      await getPlaylistAllSongs(id, detailData.value?.count || 0, refresh);
+    }
+    // 检查是否仍然是当前请求的歌单
+    if (currentRequestId.value !== id) return;
+    // 更新我喜欢
+    if (detailData.value) {
+      dataStore.setLikeSongsList(detailData.value, listData.value);
+    }
+  } catch (error) {
+    console.error("获取我喜欢歌单失败", error);
+    window.$message.error("加载失败，请重试");
+    // 关闭加载提示并复位加载状态
+    loadingMsgShow(false);
+  } finally {
+    // 仅当前请求有效时复位加载状态，避免影响新请求
+    if (currentRequestId.value === id) setLoading(false);
   }
-  // 检查是否仍然是当前请求的歌单
-  if (currentRequestId.value !== id) return;
-  // 更新我喜欢
-  if (detailData.value) {
-    dataStore.setLikeSongsList(detailData.value, listData.value);
-  }
-  setLoading(false);
 };
 
 // 加载缓存
