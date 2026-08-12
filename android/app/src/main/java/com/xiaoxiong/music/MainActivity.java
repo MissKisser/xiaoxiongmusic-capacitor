@@ -72,11 +72,11 @@ public class MainActivity extends BridgeActivity {
             if (!currentVersion.equals(lastVersion) && !currentVersion.isEmpty()) {
                 Log.d("MainActivity", "📦 检测到版本更新，开始清除 WebView 缓存...");
 
-                // 清除应用缓存目录
+                // 清除应用缓存目录（跳过 audio_cache，保留本地音频代理的音频缓存）
                 File cacheDir = getCacheDir();
                 if (cacheDir != null && cacheDir.exists()) {
-                    deleteRecursive(cacheDir);
-                    Log.d("MainActivity", "✅ 应用缓存目录已清除");
+                    deleteRecursiveSkip(cacheDir, "audio_cache");
+                    Log.d("MainActivity", "✅ 应用缓存目录已清除（保留音频缓存）");
                 }
 
                 // 清除 WebView 缓存目录（保留用户数据）
@@ -133,6 +133,29 @@ public class MainActivity extends BridgeActivity {
     }
 
     /**
+     * 递归删除目录内容，跳过指定名称的子目录（如 audio_cache 音频缓存）
+     */
+    private void deleteRecursiveSkip(File file, String skipDirName) {
+        if (file.isDirectory()) {
+            File[] children = file.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    // 跳过需要保留的目录
+                    if (child.isDirectory() && skipDirName.equals(child.getName())) {
+                        Log.d("MainActivity", "🔒 保留目录: " + child.getName());
+                        continue;
+                    }
+                    deleteRecursiveSkip(child, skipDirName);
+                }
+            }
+        }
+        // 不删除目录本身，只清空内容
+        if (!file.isDirectory()) {
+            file.delete();
+        }
+    }
+
+    /**
      * 安全递归删除，保留指定的用户数据目录
      */
     private void deleteRecursiveSafe(File file, Set<String> preserveDirs) {
@@ -156,22 +179,6 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
-    public void onResume() {
-        super.onResume();
-        // 应用恢复时，如果正在播放，获取 WakeLock
-        // 注意：WakeLock 的实际管理应该由播放状态控制
-        // 这里只是确保应用在前台时能够保持播放
-    }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        // 应用进入后台时，不释放 WakeLock
-        // 这样可以确保后台播放和熄屏播放正常工作
-        // WakeLock 会在播放停止或应用销毁时释放
-    }
-
-    @Override
     public void onDestroy() {
         super.onDestroy();
         // 销毁时释放 WakeLock
@@ -191,7 +198,7 @@ public class MainActivity extends BridgeActivity {
                 wakeLock.setReferenceCounted(false);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e("MainActivity", "❌ WakeLock 初始化失败", e);
         }
     }
 
@@ -204,7 +211,7 @@ public class MainActivity extends BridgeActivity {
                 wakeLock.acquire(10 * 60 * 1000L /* 10 minutes */);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e("MainActivity", "❌ 获取 WakeLock 失败", e);
         }
     }
 
@@ -217,7 +224,7 @@ public class MainActivity extends BridgeActivity {
                 wakeLock.release();
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e("MainActivity", "❌ 释放 WakeLock 失败", e);
         }
     }
 

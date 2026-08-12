@@ -99,11 +99,11 @@ public class WebViewCachePlugin extends Plugin {
             context.deleteDatabase("webview.db");
             context.deleteDatabase("webviewCache.db");
 
-            // 清除应用缓存目录
+            // 清除应用缓存目录（跳过 audio_cache，保留本地音频代理的音频缓存）
             File cacheDir = context.getCacheDir();
             if (cacheDir != null && cacheDir.exists()) {
-                deleteRecursive(cacheDir);
-                Log.d(TAG, "应用缓存目录已清除: " + cacheDir.getAbsolutePath());
+                deleteRecursiveSkip(cacheDir, "audio_cache");
+                Log.d(TAG, "应用缓存目录已清除（保留音频缓存）: " + cacheDir.getAbsolutePath());
             }
 
             // 清除 WebView 缓存目录（保留用户数据）
@@ -141,8 +141,8 @@ public class WebViewCachePlugin extends Plugin {
 
             boolean cleared = false;
 
-            // 版本发生变化，清除缓存
-            if (!currentVersion.equals(lastVersion)) {
+            // 版本发生变化，清除缓存（当前版本获取失败返回空串时不触发，避免误删缓存）
+            if (!currentVersion.equals(lastVersion) && !currentVersion.isEmpty()) {
                 Log.d(TAG, "检测到版本更新，开始清除缓存...");
 
                 // 执行缓存清除
@@ -155,10 +155,10 @@ public class WebViewCachePlugin extends Plugin {
                     }
                 }
 
-                // 清除缓存目录
+                // 清除缓存目录（跳过 audio_cache，保留本地音频代理的音频缓存）
                 File cacheDir = context.getCacheDir();
                 if (cacheDir != null && cacheDir.exists()) {
-                    deleteRecursive(cacheDir);
+                    deleteRecursiveSkip(cacheDir, "audio_cache");
                 }
 
                 // 清除 WebView 缓存目录（保留用户数据）
@@ -246,6 +246,29 @@ public class WebViewCachePlugin extends Plugin {
             if (children != null) {
                 for (File child : children) {
                     deleteRecursive(child);
+                }
+            }
+        }
+        // 不删除目录本身，只清空内容，避免影响应用正常运行
+        if (!file.isDirectory()) {
+            file.delete();
+        }
+    }
+
+    /**
+     * 递归删除目录内容，跳过指定名称的子目录（如 audio_cache 音频缓存）
+     */
+    private void deleteRecursiveSkip(File file, String skipDirName) {
+        if (file.isDirectory()) {
+            File[] children = file.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    // 跳过需要保留的目录
+                    if (child.isDirectory() && skipDirName.equals(child.getName())) {
+                        Log.d(TAG, "保留目录: " + child.getName());
+                        continue;
+                    }
+                    deleteRecursiveSkip(child, skipDirName);
                 }
             }
         }
