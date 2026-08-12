@@ -5,7 +5,6 @@
     "src/**/*.vue"
   ],
   "compilerOptions": {
-    "composite": true,
     "esModuleInterop": true,
     "moduleResolution": "bundler",
     "maxNodeModuleJsDepth": 2,
