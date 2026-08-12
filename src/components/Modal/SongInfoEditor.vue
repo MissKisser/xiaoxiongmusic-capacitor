@@ -125,8 +125,24 @@
 <script setup lang="ts">
 import type { SongType } from "@/types/main";
 import type { FormInst, FormRules } from "naive-ui";
-import type { ICommonTagsResult, IFormat } from "music-metadata";
+// music-metadata 为 Electron 桌面端依赖，移动端不安装，此处用最小本地类型替代
+interface MetadataCommonTags {
+  title?: string;
+  artist?: string;
+  album?: string;
+  comment?: Array<{ text?: string }>;
+  picture?: Array<{ data?: Uint8Array; format?: string }>;
+  [key: string]: unknown;
+}
+interface MetadataFormat {
+  codec?: string;
+  duration?: number;
+  bitrate?: number;
+  sampleRate?: number;
+  [key: string]: unknown;
+}
 import { useMusicStore, useDataStore } from "@/stores";
+import { isElectron } from "@/utils/env";
 import { textRule } from "@/utils/rules";
 import { copyData } from "@/utils/helper";
 import { matchSong, songLyric } from "@/api/song";
@@ -190,8 +206,8 @@ const getSongInfo = async () => {
   const infoData: {
     fileName: string;
     fileSize: number;
-    common: ICommonTagsResult;
-    format: IFormat;
+    common: MetadataCommonTags;
+    format: MetadataFormat;
     md5: string;
     lyric?: string;
   } = await window.electron.ipcRenderer.invoke("get-music-metadata", path);
@@ -282,6 +298,11 @@ const onlineMatch = debounce(
 
 // 修改封面
 const changeCover = async () => {
+  // 非 Electron 环境不支持更换封面
+  if (!isElectron) {
+    window.$message.warning("当前平台不支持更换封面");
+    return;
+  }
   const newPath = await window.electron.ipcRenderer.invoke("choose-image");
   if (!newPath) return;
   coverData.value = `file://${newPath}`;
@@ -295,7 +316,8 @@ const updatePlaySong = (metadata: InfoFormType) => {
     artists: metadata.artist,
     album: metadata.album,
     alia: metadata.alia,
-    cover: coverData.value || "",
+    // 使用已归一化的封面路径而非 blob URL（blob URL 会话级失效）
+    cover: metadata.cover || "",
   };
   // 是否为当前播放
   if (musicStore.playSong?.id === props.song.id) {
@@ -326,7 +348,11 @@ const saveSongInfo = debounce(async (song: SongType) => {
             ? coverData.value.replace(/^file:\/\//, "")
             : coverData.value,
     };
-    console.log(song.path, metadata);
+    // 非 Electron 环境不支持保存歌曲信息
+    if (!isElectron) {
+      window.$message.error("当前平台不支持编辑歌曲信息");
+      return;
+    }
     await window.electron.ipcRenderer.invoke("set-music-metadata", song.path, metadata);
     window.$message.success("歌曲信息修改成功");
     // 修改音乐信息
@@ -338,7 +364,14 @@ const saveSongInfo = debounce(async (song: SongType) => {
   }
 }, 300);
 
-onMounted(getSongInfo);
+onMounted(async () => {
+  // 仅 Electron 环境支持编辑歌曲信息
+  if (isElectron) {
+    await getSongInfo();
+  } else {
+    window.$message.warning("当前平台不支持编辑歌曲信息");
+  }
+});
 </script>
 
 <style lang="scss" scoped>

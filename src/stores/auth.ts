@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import api from '@/utils/api';
+import { mask } from '@/utils/mask';
 
 // 生成设备 ID (持久化存储)
 const getDeviceId = (): string => {
@@ -76,7 +77,16 @@ export const useAuthStore = defineStore('auth', {
                 }
             } catch (error: any) {
                 console.error('CheckAuth Error:', error);
-                // 关键修复：网络/服务器错误不应等同于"未授权"
+                // 服务端明确拒绝（401 未授权 / 403 封禁）：属业务性拒绝，不是网络错误
+                // 此时应展示授权码输入框，而非"网络异常"重试视图
+                const status = error.response?.status;
+                if (status === 401 || status === 403) {
+                    this.networkError = false;
+                    this.isAuthorized = false;
+                    this.errorMessage = error.response.data?.message || '授权验证失败';
+                    return false;
+                }
+                // 网络/服务器错误不应等同于"未授权"
                 // 保留持久化的 isAuthorized（上次成功状态作为兜底），
                 // 避免瞬态错误触发 GlobalAuthModal 弹窗
                 this.networkError = true;
@@ -97,7 +107,7 @@ export const useAuthStore = defineStore('auth', {
             this.errorMessage = null;
             this.networkError = false;
 
-            console.log('AppAuth: 开始验证授权码', code, this.deviceId);
+            console.log('AppAuth: 开始验证授权码', mask(code), this.deviceId);
 
             try {
                 const response = await api.post('/auth/verify', {
@@ -105,8 +115,6 @@ export const useAuthStore = defineStore('auth', {
                     deviceId: this.deviceId,
                     platform: 'android',
                 });
-
-                console.log('AppAuth: 验证响应', response.data);
 
                 if (response.data.success) {
                     this.isAuthorized = true;
@@ -118,6 +126,13 @@ export const useAuthStore = defineStore('auth', {
                 }
             } catch (error: any) {
                 console.error('AppAuth: 验证出错', error);
+                // 服务端明确拒绝（401 授权码无效 / 403 封禁）：展示输入框内联错误，可重新输入
+                const status = error.response?.status;
+                if (status === 401 || status === 403) {
+                    this.networkError = false;
+                    this.errorMessage = error.response.data?.message || '授权码验证失败';
+                    return { success: false, message: this.errorMessage || '未知错误' };
+                }
                 // 网络错误不改变 isAuthorized，仅标记 networkError 让 UI 切换到重试视图
                 this.networkError = true;
                 if (error.response) {

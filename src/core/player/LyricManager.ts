@@ -337,7 +337,7 @@ class LyricManager {
     };
     // 解析主歌词
     const qrcLines = parseQRCContent(qrcContent);
-    let result = qrcLines.map((qrcLine) => {
+    let result: LyricLine[] = qrcLines.map((qrcLine) => {
       return {
         words: qrcLine.words.map((word) => ({
           ...word,
@@ -1046,7 +1046,10 @@ class LyricManager {
         // 排除内容
         lyricData = this.handleLyricExclude(lyricData);
       }
-      console.log("最终歌词数据", lyricData);
+      // 仅开发环境输出完整歌词数据，避免每次切歌都打印大对象
+      if (import.meta.env.DEV) {
+        console.log("最终歌词数据", lyricData);
+      }
       this.setFinalLyric(lyricData, req);
     } catch (error) {
       console.error("❌ 处理歌词失败:", error);

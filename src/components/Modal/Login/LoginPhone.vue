@@ -122,23 +122,37 @@ const getCountryListData = async () => {
 // 获取验证码
 const getCaptcha = async (e: MouseEvent) => {
   e.preventDefault();
-  // 是否输入
-  await phoneFormRef.value?.validate(
-    (errors) => errors,
-    (rule) => rule?.key === "phone",
-  );
+  // 校验手机号（校验失败时静默返回，不发送验证码）
+  try {
+    await phoneFormRef.value?.validate(
+      (errors) => errors,
+      (rule) => rule?.key === "phone",
+    );
+  } catch {
+    return;
+  }
   // 发送验证码
   captchaDisabled.value = true;
-  const result = await sentCaptcha(
-    phoneFormData.value.phone as number,
-    phoneFormData.value.country as number,
-  );
-  if (result.code === 200) {
-    resumeTime();
-    window.$message.success("验证码发送成功");
-  } else {
-    captchaDisabled.value = false;
+  // 是否发送成功（成功后由倒计时控制按钮状态）
+  let sent = false;
+  try {
+    const result = await sentCaptcha(
+      phoneFormData.value.phone as number,
+      phoneFormData.value.country as number,
+    );
+    if (result.code === 200) {
+      resumeTime();
+      window.$message.success("验证码发送成功");
+      sent = true;
+    } else {
+      window.$message.error("验证码发送失败，请重试");
+    }
+  } catch (error) {
+    console.error("验证码发送失败：", error);
     window.$message.error("验证码发送失败，请重试");
+  } finally {
+    // 发送失败时恢复按钮状态，避免按钮永久禁用
+    if (!sent) captchaDisabled.value = false;
   }
 };
 
@@ -163,36 +177,45 @@ const { pause: pauseTime, resume: resumeTime } = useIntervalFn(
 // 登录
 const login = debounce(async (e: MouseEvent) => {
   e.preventDefault();
-  // 验证输入
-  await phoneFormRef.value?.validate();
-  // 验证验证码
-  const captchaResult = await verifyCaptcha(
-    phoneFormData.value.phone as number,
-    phoneFormData.value.captcha as number,
-    phoneFormData.value.country as number,
-  );
-  if (captchaResult.code !== 200) {
-    window.$message.error("验证码错误，请重试");
+  // 验证输入（校验失败时静默返回，不提交）
+  try {
+    await phoneFormRef.value?.validate();
+  } catch {
     return;
   }
-  // 登录
-  const loginResult = await loginPhone(
-    phoneFormData.value.phone as number,
-    phoneFormData.value.captcha as number,
-    phoneFormData.value.country as number,
-  );
-  if (loginResult.code !== 200) {
+  try {
+    // 验证验证码
+    const captchaResult = await verifyCaptcha(
+      phoneFormData.value.phone as number,
+      phoneFormData.value.captcha as number,
+      phoneFormData.value.country as number,
+    );
+    if (captchaResult.code !== 200) {
+      window.$message.error("验证码错误，请重试");
+      return;
+    }
+    // 登录
+    const loginResult = await loginPhone(
+      phoneFormData.value.phone as number,
+      phoneFormData.value.captcha as number,
+      phoneFormData.value.country as number,
+    );
+    if (loginResult.code !== 200) {
+      window.$message.error("登录失败，请重试");
+      return;
+    }
+    // 是否含有 MUSIC_U
+    if (loginResult.cookie && loginResult.cookie.includes("MUSIC_U")) {
+      // 去除 HTTPOnly
+      loginResult.cookie = loginResult.cookie.replaceAll(" HTTPOnly", "");
+      // 储存登录信息
+      emit("saveLogin", loginResult, "phone");
+    } else {
+      window.$message.error("登录出错，请重试");
+    }
+  } catch (error) {
+    console.error("登录失败：", error);
     window.$message.error("登录失败，请重试");
-    return;
-  }
-  // 是否含有 MUSIC_U
-  if (loginResult.cookie && loginResult.cookie.includes("MUSIC_U")) {
-    // 去除 HTTPOnly
-    loginResult.cookie = loginResult.cookie.replaceAll(" HTTPOnly", "");
-    // 储存登录信息
-    emit("saveLogin", loginResult, "phone");
-  } else {
-    window.$message.error("登录出错，请重试");
   }
 }, 300);
 

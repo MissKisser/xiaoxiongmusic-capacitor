@@ -2,6 +2,7 @@ import { heartRateList } from "@/api/playlist";
 import { useDataStore, useMusicStore, useStatusStore } from "@/stores";
 import { type SongType } from "@/types/main";
 import { RepeatModeType, ShuffleModeType } from "@/types/shared";
+import { RepeatMode } from "@emi";
 import { isLogin } from "@/utils/auth";
 import { isElectron } from "@/utils/env";
 import { formatSongsList } from "@/utils/format";
@@ -286,10 +287,10 @@ export class PlayModeManager {
       const shuffle = statusStore.shuffleMode !== "off";
       const repeat =
         statusStore.repeatMode === "list"
-          ? "List"
+          ? RepeatMode.All
           : statusStore.repeatMode === "one"
-            ? "Track"
-            : "None";
+            ? RepeatMode.One
+            : RepeatMode.Off;
 
       playerIpc.sendMediaPlayMode(shuffle, repeat);
     }

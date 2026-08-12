@@ -45,7 +45,7 @@ const capacitorAdapter = async (config: AxiosRequestConfig): Promise<AxiosRespon
     status: response.status,
     statusText: response.status.toString(),
     headers,
-    config,
+    config: config as any,
     request: {}
   };
 };
@@ -65,11 +65,17 @@ const server: AxiosInstance = axios.create({
 axiosRetry(server, {
   // 重试次数
   retries: 3,
-  // 重试条件：网络错误 / 5xx（默认幂等判定保留），额外覆盖 401
+  // 重试条件：仅网络错误与幂等请求的 401/5xx。
   // 401 通常是 cookie 临时未就绪（冷启动竞态）或登录态过期，
-  // 重试一次能给 cookie 同步留出时间；POST 不受影响（默认只重试幂等方法）
-  retryCondition: (error) =>
-    axiosRetry.isNetworkOrIdempotentRequestError(error) || error.response?.status === 401,
+  // 重试一次能给 cookie 同步留出时间；POST 等非幂等请求不重试（避免重复提交）
+  retryCondition: (error) => {
+    if (axiosRetry.isNetworkError(error)) return true;
+    if (axiosRetry.isIdempotentRequestError(error)) {
+      const status = error.response?.status;
+      if (status === 401 || (status ?? 0) >= 500) return true;
+    }
+    return false;
+  },
   // 指数退避
   retryDelay: axiosRetry.exponentialDelay,
   // 重试时重置超时计时器
@@ -154,9 +160,10 @@ server.interceptors.request.use(
         params: { ...request.params },
         headers: { ...request.headers }
       };
-      // 隐藏敏感信息
+      // 隐藏敏感信息（Cookie 与 params.cookie 均为完整登录凭证）
       if (snapshot.headers['Cookie']) snapshot.headers['Cookie'] = '***';
       if (snapshot.headers['cookie']) snapshot.headers['cookie'] = '***';
+      if (snapshot.params.cookie) snapshot.params.cookie = '***';
 
       console.log(`🚀 [Request Snapshot]`, JSON.stringify(snapshot));
     }
@@ -227,13 +234,16 @@ const request = async <T = any>(config: AxiosRequestConfig): Promise<T> => {
   try {
     const response = await server.request(config);
     if (isCapacitor) {
-      console.log(`📡 [Request Success] URL: ${config.url} | Status: ${response.status} | Data Keys: ${Object.keys(response.data || {}).join(', ')} | Data Preview: ${JSON.stringify(response.data).substring(0, 200)}`);
+      // 只打印响应摘要，避免全量序列化大响应体（歌单/歌词可达数 MB）阻塞主线程
+      console.log(`📡 [Request Success] URL: ${config.url} | Status: ${response.status} | Data Keys: ${Object.keys(response.data || {}).join(', ')}`);
     }
     // 返回请求数据
     return response.data as T;
   } catch (error) {
     if (isCapacitor) {
-      console.error(`📡 [Request Error] URL: ${config.url} | Error: ${JSON.stringify(error)}`);
+      // 只打印错误摘要，避免序列化整个 AxiosError（含完整 Cookie 头等敏感信息）
+      const status = (error as AxiosError).response?.status;
+      console.error(`📡 [Request Error] URL: ${config.url} | Status: ${status} | Msg: ${(error as Error).message}`);
     }
     throw error;
   }

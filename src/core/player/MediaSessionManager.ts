@@ -2,7 +2,7 @@ import { useMusicStore, useSettingStore, useStatusStore } from "@/stores";
 import { isElectron } from "@/utils/env";
 import { getPlaySongData } from "@/utils/format";
 import { msToS } from "@/utils/time";
-import { SystemMediaEvent } from "@emi";
+import { SystemMediaEvent, PlaybackStatus, RepeatMode } from "@emi";
 import axios from "axios";
 import { throttle } from "lodash-es";
 import { usePlayerController } from "./PlayerController";
@@ -47,12 +47,12 @@ class MediaSessionManager {
         break;
       case "Pause":
         player.pause();
-        sendMediaPlayState("Paused");
+        sendMediaPlayState(PlaybackStatus.Paused);
         break;
       case "Stop":
         player.pause();
         player.setSeek(0);
-        sendMediaPlayState("Paused");
+        sendMediaPlayState(PlaybackStatus.Paused);
         break;
       case "NextSong":
         player.nextOrPrev("next");
@@ -94,10 +94,10 @@ class MediaSessionManager {
       const shuffle = statusStore.shuffleMode !== "off";
       const repeat =
         statusStore.repeatMode === "list"
-          ? "List"
+          ? RepeatMode.All
           : statusStore.repeatMode === "one"
-            ? "Track"
-            : "None";
+            ? RepeatMode.One
+            : RepeatMode.Off;
       sendMediaPlayMode(shuffle, repeat);
 
       player.syncMediaPlayMode();
@@ -106,6 +106,7 @@ class MediaSessionManager {
       if (settingStore.discordRpc.enabled) {
         enableDiscordRpc();
         updateDiscordConfig({
+          enabled: true,
           showWhenPaused: settingStore.discordRpc.showWhenPaused,
           displayMode: settingStore.discordRpc.displayMode,
         });
@@ -295,7 +296,7 @@ class MediaSessionManager {
   public updatePlaybackStatus(isPlaying: boolean) {
     // 发送到原生插件
     if (this.shouldUseNativeMedia()) {
-      sendMediaPlayState(isPlaying ? "Playing" : "Paused");
+      sendMediaPlayState(isPlaying ? PlaybackStatus.Playing : PlaybackStatus.Paused);
     }
   }
 

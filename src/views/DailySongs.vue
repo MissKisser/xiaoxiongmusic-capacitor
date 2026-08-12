@@ -39,7 +39,7 @@
     <!-- 列表 -->
     <SongList
       :data="musicStore.dailySongsData.list"
-      :loading="true"
+      :loading="false"
       height="auto"
       isDailyRecommend
       disabledSort

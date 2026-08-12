@@ -45,14 +45,14 @@
       <n-h3 class="title" prefix="bar">
         <n-text class="name">热门推荐</n-text>
       </n-h3>
-      <CoverList :data="radioHotData" :loading="true" type="radio" />
+      <CoverList :data="radioHotData" :loading="loading" type="radio" />
       <!-- 分类推荐 -->
       <template v-for="(item, index) in radioCatRecData" :key="index">
         <n-h3 class="title" prefix="bar">
           <n-text class="name">{{ item.name }}</n-text>
           <SvgIcon :size="26" name="Right" />
         </n-h3>
-        <CoverList :data="item.radio || []" :loading="true" type="radio" />
+        <CoverList :data="item.radio || []" :loading="loading" type="radio" />
       </template>
     </div>
   </div>
@@ -76,6 +76,7 @@ const router = useRouter();
 const gridCollapsed = ref<boolean>(true);
 
 // 播客数据
+const loading = ref<boolean>(true);
 const radioTypeData = ref<RadioType[]>([]);
 const radioHotData = ref<CoverType[]>([]);
 const radioCatRecData = ref<RadioType[]>([]);
@@ -88,7 +89,7 @@ const getRadioType = async () => {
       time: 0,
       storage: "localStorage",
     });
-    radioTypeData.value = result.categories.map(({ name, id }) => ({ name, id }));
+    radioTypeData.value = result.categories.map(({ name, id }: { name: string; id: number }) => ({ name, id }));
   } catch (error) {
     console.error("Error getting radio cat list:", error);
     window.$message.error("分类获取失败，请重试");
@@ -108,6 +109,9 @@ const getRecRadioData = async () => {
   } catch (error) {
     console.error("Error getting rec radio:", error);
     window.$message.error("获取推荐电台出现错误");
+  } finally {
+    // 复位加载状态，避免失败后永久加载
+    loading.value = false;
   }
 };
 

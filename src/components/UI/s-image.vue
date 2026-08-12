@@ -22,6 +22,25 @@
   </div>
 </template>
 
+<script lang="ts">
+// ---- 共享 IntersectionObserver 单例（模块级，所有图片实例共用） ----
+// 列表页存在数百个图片实例，若每个实例独立创建 observer 开销过大，
+// 这里共享一个 observer，回调按 entry.target 分发到注册的实例回调集合
+const sharedObserver =
+  typeof IntersectionObserver !== "undefined"
+    ? new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          // 按目标元素分发到注册的实例监听回调
+          observerTargets.get(entry.target)?.forEach((listener) => {
+            listener(entry.isIntersecting);
+          });
+        });
+      })
+    : null;
+/** 观察目标 -> 该目标上的实例监听回调集合 */
+const observerTargets = new Map<Element, Set<(visible: boolean) => void>>();
+</script>
+
 <script setup lang="ts">
 const props = withDefaults(
   defineProps<{
@@ -71,8 +90,56 @@ const lastShowState = ref<boolean | null>(null);
 const loadToken = ref<number>(0);
 const currentToken = ref<number>(0);
 
+// ---- 共享 IntersectionObserver 单例 ----
+// 共享 observer 与注册表定义在模块级（见上方 <script> 块），实例内只负责注册/注销
+
 // 是否可视
-const isCanLook = useElementVisibility(imgContainer);
+const isCanLook = ref<boolean>(false);
+/** 当前观察中的容器元素 */
+let observedEl: Element | null = null;
+/** 当前实例的可视状态监听回调 */
+let observedListener: ((visible: boolean) => void) | null = null;
+
+/**
+ * 将当前容器元素注册到共享 observer
+ * 注册前先释放旧目标（根节点 :key="src" 会在换图时重建元素，需同步迁移观察）
+ * @param el 容器元素
+ */
+const registerObserver = (el: Element | undefined) => {
+  // 释放旧目标
+  if (observedEl && observedListener) {
+    const listeners = observerTargets.get(observedEl);
+    if (listeners) {
+      listeners.delete(observedListener);
+      if (listeners.size === 0) {
+        observerTargets.delete(observedEl);
+        sharedObserver?.unobserve(observedEl);
+      }
+    }
+  }
+  observedEl = null;
+  observedListener = null;
+  if (!el) return;
+  // 不支持 IntersectionObserver 的环境视为始终可视，保证图片正常加载
+  if (!sharedObserver) {
+    isCanLook.value = true;
+    return;
+  }
+  let listeners = observerTargets.get(el);
+  if (!listeners) {
+    listeners = new Set();
+    observerTargets.set(el, listeners);
+    sharedObserver.observe(el);
+  }
+  observedListener = (visible: boolean) => {
+    isCanLook.value = visible;
+  };
+  observedEl = el;
+  listeners.add(observedListener);
+};
+
+// 容器元素变化时（:key="src" 重建元素）重新注册到共享 observer
+watch(imgContainer, (el) => registerObserver(el), { flush: "post" });
 
 // 图片加载完成
 const imageLoaded = (e: Event) => {
@@ -155,6 +222,8 @@ onUnmounted(() => {
   } catch {
     /* empty */
   }
+  // 从共享 observer 注销当前目标
+  registerObserver(undefined);
   imgSrc.value = undefined;
   imgRef.value = undefined;
   imgContainer.value = undefined;

@@ -51,12 +51,12 @@ export const getCookie = (key: string) => {
   // 优先从 localStorage 影子库获取（Capacitor 环境更可靠）
   const localValue = localStorage.getItem(`cookie-${key}`);
   if (localValue) {
-    console.log(`🍪 [getCookie] 从 localStorage 获取 ${key}: ${localValue.slice(0, 20)}...`);
+    console.log(`🍪 [getCookie] 从 localStorage 获取 ${key}（长度 ${localValue.length}）`);
     return localValue;
   }
   const jsValue = Cookies.get(key);
   if (jsValue) {
-    console.log(`🍪 [getCookie] 从 js-cookie 获取 ${key}: ${jsValue.slice(0, 20)}...`);
+    console.log(`🍪 [getCookie] 从 js-cookie 获取 ${key}（长度 ${jsValue.length}）`);
   }
   return jsValue;
 };
@@ -82,7 +82,7 @@ export const setCookies = (cookieValue: string) => {
   }
 
   console.log(`🍪 [setCookies] 原始 cookie 长度: ${cookieValue.length}`);
-  console.log(`🍪 [setCookies] 原始 cookie 预览: ${cookieValue.slice(0, 200)}...`);
+  // 不打印 cookie 内容（含 MUSIC_U 完整登录凭证）
 
   // URL解码整理
   let decodedCookie = cookieValue;
@@ -128,9 +128,9 @@ export const setCookies = (cookieValue: string) => {
     // 确保是有效的键值对
     if (!name || !value || name.length < 2) return;
 
-    // 打印关键调试日志
+    // 打印关键调试日志（只输出键名与长度，不输出值）
     const isKeyName = keyNames.some(k => name.toUpperCase().includes(k.toUpperCase()));
-    console.log(`🍪 [setCookies] ${isKeyName ? '⭐ 关键' : '普通'}凭证: ${name}=${value.slice(0, 15)}...`);
+    console.log(`🍪 [setCookies] ${isKeyName ? '⭐ 关键' : '普通'}凭证: ${name}（长度 ${value.length}）`);
 
     // A. 写入 Webview 运行时 Cookie
     document.cookie = `${name}=${value}; ${expires}; path=/; SameSite=Lax`;

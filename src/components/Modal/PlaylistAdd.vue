@@ -135,21 +135,31 @@ const addToOnlinePlaylist = debounce(
       window.$message.warning("该登录模式暂不支持该操作");
       return;
     }
-    loadingMsg.value = window.$message.loading("正在添加歌曲至歌单", { duration: 0 });
     const ids = props.data.map((item) => item.id).filter((item) => item !== 0);
-    const result = await playlistTracks(id, ids);
-    if (loadingMsg.value) loadingMsg.value.destroy();
-    if (result.status === 200) {
-      if (result.body?.code !== 200) {
-        window.$message.error(result.body?.message || "添加失败，请重试");
-        return;
+    // 无有效歌曲 id 时直接提示返回
+    if (ids.length === 0) {
+      window.$message.warning("没有可添加的歌曲");
+      return;
+    }
+    loadingMsg.value = window.$message.loading("正在添加歌曲至歌单", { duration: 0 });
+    try {
+      const result = await playlistTracks(id, ids);
+      // 服务端透传网易云响应体（{code: 200}），以 code 字段判定结果
+      if (result?.code === 200) {
+        emit("close");
+        window.$message.success("添加歌曲至歌单成功");
+        if (index === 0) await updateUserLikeSongs();
+        await updateUserLikePlaylist();
+      } else {
+        window.$message.error(result?.msg || result?.message || "添加失败，请重试");
       }
-      emit("close");
-      window.$message.success("添加歌曲至歌单成功");
-      if (index === 0) await updateUserLikeSongs();
-      await updateUserLikePlaylist();
-    } else {
-      window.$message.error(result?.message || "添加失败，请重试");
+    } catch (error) {
+      // 网络异常等错误处理
+      console.error("❌ 添加歌曲至歌单失败:", error);
+      window.$message.error("添加失败，请重试");
+    } finally {
+      // 销毁加载提示
+      if (loadingMsg.value) loadingMsg.value.destroy();
     }
   },
   500,

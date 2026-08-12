@@ -70,6 +70,7 @@
 <script setup lang="ts">
 import { useStatusStore, useMusicStore } from "@/stores";
 import { usePlayerController } from "@/core/player/PlayerController";
+import { isCapacitor } from "@/utils/env";
 
 const statusStore = useStatusStore();
 const musicStore = useMusicStore();
@@ -208,24 +209,21 @@ const startCountdown = () => {
 
 // 关闭应用
 const closeApp = () => {
-  // 停止播放
-  player.playOrPause();
+  // 只暂停，不再 playOrPause 切换（避免 playStatus=false 时重新拉起播放）
+  player.pause();
 
   // 重置定时器状态
   stopTimer();
 
-  // 尝试关闭应用（移动端）
-  if (window.navigator && 'app' in window.navigator) {
-    // Capacitor 环境
-    try {
-      (window.navigator as any).app.exitApp();
-    } catch (err) {
-      console.warn("无法关闭应用:", err);
-    }
+  // 原生环境通过 Capacitor 退出应用（Capacitor 8 不再提供 navigator.app）
+  if (isCapacitor) {
+    import("@capacitor/app")
+      .then(({ App }) => App.exitApp())
+      .catch((e) => console.warn("退出应用失败:", e));
+  } else {
+    // Web 环境下只能停止播放
+    window.$message?.success("定时结束，已停止播放");
   }
-
-  // Web环境下只能停止播放
-  window.$message?.success("定时结束，已停止播放");
 };
 
 // 格式化剩余时间

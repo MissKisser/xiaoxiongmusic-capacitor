@@ -1,5 +1,6 @@
 import { cloneDeep } from "lodash-es";
 import { defineStore } from "pinia";
+import { isElectron } from "@/utils/env";
 
 type ShortcutType = {
   name: string;
@@ -88,6 +89,8 @@ export const useShortcutStore = defineStore("shortcut", {
   actions: {
     // 注册全部全局快捷键
     async registerAllShortcuts() {
+      // 非 Electron 环境不支持全局快捷键
+      if (!isElectron) return;
       if (!this.globalOpen) return;
       const result = await window.electron.ipcRenderer.invoke(
         "register-all-shortcut",

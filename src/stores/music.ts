@@ -135,9 +135,10 @@ export const useMusicStore = defineStore("music", {
       this.songLyric.lyricAuthors = authors;
     },
   },
-  // 持久化
+  // 持久化（白名单只保留跨会话恢复所需字段，避免把完整歌词/FM 列表写入 localStorage）
   persist: {
     key: "music-store",
     storage: localStorage,
+    pick: ["playSong", "playPlaylistId", "dailySongsData"],
   },
 });

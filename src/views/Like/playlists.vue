@@ -14,7 +14,7 @@
       </n-tag>
     </n-flex>
     <Transition name="fade" mode="out-in">
-      <CoverList :key="plTypeChoose" :data="listData" :loading="true" type="playlist" />
+      <CoverList :key="plTypeChoose" :data="listData" :loading="false" type="playlist" />
     </Transition>
   </div>
 </template>

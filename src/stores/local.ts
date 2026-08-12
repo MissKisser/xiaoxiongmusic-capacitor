@@ -134,7 +134,9 @@ const createLocalStore = () => {
   // 保存本地歌单列表到存储
   const saveLocalPlaylists = async () => {
     try {
-      await localDB.setItem("local-playlists", cloneDeep(localPlaylists.value));
+      // 直接写入原始数组：IndexedDB 在 put 时同步深拷贝快照，无需 cloneDeep 全量深拷贝
+      // （歌单含 base64 封面，深拷贝整表开销大；写入后的变更不会影响已存储的快照）
+      await localDB.setItem("local-playlists", localPlaylists.value);
     } catch (error) {
       console.error("Error saving local playlists:", error);
       throw error;

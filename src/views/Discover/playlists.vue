@@ -129,20 +129,27 @@ const getAllCatlistPlaylist = async () => {
   const before = playlistData.value?.at(-1)?.updateTime ?? undefined;
   // 获取数据
   loading.value = true;
-  const result = await allCatlistPlaylist(
-    catName.value,
-    50,
-    playlistOffset.value,
-    catHqType.value === "hq" ? true : false,
-    before,
-  );
-  // 是否还有
-  playlistCount.value = result?.total;
-  hasMore.value = result.more || result?.total > playlistOffset.value + 50;
-  // 处理数据
-  const listData = formatCoverList(result.playlists);
-  playlistData.value = playlistData.value?.concat(listData);
-  loading.value = false;
+  try {
+    const result = await allCatlistPlaylist(
+      catName.value,
+      50,
+      playlistOffset.value,
+      catHqType.value === "hq" ? true : false,
+      before,
+    );
+    // 是否还有
+    playlistCount.value = result?.total;
+    hasMore.value = result.more || result?.total > playlistOffset.value + 50;
+    // 处理数据
+    const listData = formatCoverList(result.playlists);
+    playlistData.value = playlistData.value?.concat(listData);
+  } catch (error) {
+    console.error("获取歌单数据失败", error);
+    window.$message.error("加载失败，请重试");
+  } finally {
+    // 复位加载状态，避免失败后永久加载
+    loading.value = false;
+  }
 };
 
 // 加载更多
@@ -154,6 +161,8 @@ const loadMore = () => {
 // 分类切换
 const changeCatName = (cat: string, hq: string = "false") => {
   catChangeShow.value = false;
+  // 切换分类时重置分页偏移，避免新分类前 N 页缺失
+  playlistOffset.value = 0;
   router.push({
     name: "discover-playlists",
     query: { cat, hq },
@@ -166,6 +175,8 @@ onBeforeRouteUpdate((to) => {
   catName.value = (to.query?.cat as string) || "全部歌单";
   catHqType.value = (to.query?.hq as string) === "true" ? "hq" : "normal";
   playlistData.value = [];
+  // 重置分页偏移，避免沿用上一分类的翻页位置
+  playlistOffset.value = 0;
   // 获取歌单
   getAllCatlistPlaylist();
 });

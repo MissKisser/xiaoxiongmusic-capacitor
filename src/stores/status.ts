@@ -335,15 +335,13 @@ export const useStatusStore = defineStore("status", {
       });
     },
   },
-  // 持久化
+  // 持久化（排除每秒高频变化的 duration/progress，仅保留 currentTime 用于恢复上次播放进度）
   persist: {
     key: "status-store",
     storage: localStorage,
     pick: [
       "menuCollapsed",
       "currentTime",
-      "duration",
-      "progress",
       "currentTimeOffsetMap",
       "pureLyricMode",
       "playIndex",

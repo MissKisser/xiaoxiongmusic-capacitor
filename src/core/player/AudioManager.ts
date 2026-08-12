@@ -112,8 +112,8 @@ class AudioManager extends TypedEventTarget<AudioEventMap> implements IPlaybackE
   /**
    * 暂停音频
    */
-  public pause(options?: PauseOptions): void {
-    this.engine.pause(options);
+  public pause(options?: PauseOptions): Promise<void> {
+    return this.engine.pause(options);
   }
 
   /**

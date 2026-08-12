@@ -244,9 +244,9 @@ const setLandscapeOrientation = async () => {
   isLandscape.value = true;
   
   try {
-    // 尝试使用 Screen Orientation API
-    if (screen.orientation && screen.orientation.lock) {
-      await screen.orientation.lock("landscape");
+    // 尝试使用 Screen Orientation API（lock 为部分浏览器扩展 API，类型层面需断言）
+    if (screen.orientation && (screen.orientation as any).lock) {
+      await (screen.orientation as any).lock("landscape");
     } else if ((screen as any).lockOrientation) {
       (screen as any).lockOrientation("landscape");
     } else if ((screen as any).mozLockOrientation) {

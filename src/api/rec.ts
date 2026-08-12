@@ -49,7 +49,15 @@ export const radarPlaylist = async () => {
     });
   });
   const result = await Promise.allSettled(allRadar);
-  return result.map((res: any) => res?.value.playlist);
+  // 失败的请求保留 null 占位（下游 formatCoverList 会 filter(Boolean) 过滤），
+  // 避免单个请求失败导致整个雷达区域加载失败
+  return result.map((res: PromiseSettledResult<any>) => {
+    if (res.status === "rejected") {
+      console.warn("[rec] 雷达歌单详情请求失败：", res.reason);
+      return null;
+    }
+    return res.value?.playlist ?? null;
+  });
 };
 
 /**

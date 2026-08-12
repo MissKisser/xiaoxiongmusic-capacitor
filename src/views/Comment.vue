@@ -35,7 +35,8 @@ const songId = computed(() => {
   if (typeof id === 'string') {
     return parseInt(id);
   }
-  return id as number;
+  // 路由参数可能为 string[]，取首项
+  return Array.isArray(id) ? Number(id[0] ?? 0) : Number(id);
 });
 
 const songType = computed<0 | 1 | 7 | 2 | 3 | 4 | 5 | 6>(() => {

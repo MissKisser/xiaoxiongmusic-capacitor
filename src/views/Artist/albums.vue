@@ -40,6 +40,9 @@ const getArtistAllAlbums = async () => {
     loading.value = false;
   } catch (error) {
     console.error("Error getting artist all albums:", error);
+    window.$message.error("加载失败，请重试");
+    // 复位加载状态，避免失败后永久加载
+    loading.value = false;
   }
 };
 

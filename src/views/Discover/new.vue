@@ -79,24 +79,31 @@ const newAlbumData = ref<CoverType[]>([]);
 const getAllNewData = async () => {
   // 获取数据
   loading.value = true;
-  // 新碟上架
-  if (newTypeChoose.value === 0) {
-    const area: AreaKey = newAreaNames[newAreaChoose.value]?.key || "ALL";
-    const result = await newAlbumsAll(area, 50, newOffset.value);
-    // 是否还有
-    hasMore.value = result.total > newOffset.value + 50;
-    // 处理数据
-    const albumData = formatCoverList(result.albums);
-    newAlbumData.value = newAlbumData.value.concat(albumData);
+  try {
+    // 新碟上架
+    if (newTypeChoose.value === 0) {
+      const area: AreaKey = newAreaNames[newAreaChoose.value]?.key || "ALL";
+      const result = await newAlbumsAll(area, 50, newOffset.value);
+      // 是否还有
+      hasMore.value = result.total > newOffset.value + 50;
+      // 处理数据
+      const albumData = formatCoverList(result.albums);
+      newAlbumData.value = newAlbumData.value.concat(albumData);
+    }
+    // 新歌速递
+    else if (newTypeChoose.value === 1) {
+      const area = newAreaNames[newAreaChoose.value]?.num || 0;
+      const result = await newSongs(area);
+      // 处理数据
+      newSongData.value = formatSongsList(result.data);
+    }
+  } catch (error) {
+    console.error("获取最新音乐数据失败", error);
+    window.$message.error("加载失败，请重试");
+  } finally {
+    // 复位加载状态，避免失败后永久加载
+    loading.value = false;
   }
-  // 新歌速递
-  else if (newTypeChoose.value === 1) {
-    const area = newAreaNames[newAreaChoose.value]?.num || 0;
-    const result = await newSongs(area);
-    // 处理数据
-    newSongData.value = formatSongsList(result.data);
-  }
-  loading.value = false;
 };
 
 // 参数变化

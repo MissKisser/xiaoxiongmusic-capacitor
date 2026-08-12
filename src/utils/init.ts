@@ -159,7 +159,7 @@ const keyDownEvent = debounce((event: KeyboardEvent) => {
   const isAlt = event.altKey;
   // 循环注册快捷键
   for (const shortcutKey in shortcutStore.shortcutList) {
-    const shortcut = shortcutStore.shortcutList[shortcutKey];
+    const shortcut = shortcutStore.shortcutList[shortcutKey as keyof typeof shortcutStore.shortcutList];
     const shortcutParts = shortcut.shortcut.split("+");
     // 标志位
     let match = true;
@@ -224,8 +224,14 @@ const keyDownEvent = debounce((event: KeyboardEvent) => {
 
 // 版本输出
 const printVersion = async () => {
-  log.success(`🚀 ${packageJson.version}`, packageJson.productName);
-  log.info(`👤 ${packageJson.author}`, packageJson.github);
+  const pkg = packageJson as {
+    version?: string;
+    productName?: string;
+    author?: string;
+    github?: string;
+  };
+  log.success(`🚀 ${pkg.version}`, pkg.productName ?? "");
+  log.info(`👤 ${pkg.author ?? ""}`, pkg.github ?? "");
 };
 
 export default init;

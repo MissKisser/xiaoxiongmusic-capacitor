@@ -396,15 +396,12 @@ export const deleteSongs = async (pid: number, ids: number[], callback?: () => v
       negativeText: "取消",
       onPositiveClick: async () => {
         const result = await playlistTracks(pid, ids, "del");
-        if (result.status === 200) {
-          if (result.body?.code !== 200) {
-            window.$message.error(result.body?.message || "删除歌曲失败，请重试");
-            return;
-          }
+        // 服务端透传网易云响应体（{code: 200}），以 code 字段判定结果
+        if (result?.code === 200) {
           if (isFunction(callback)) callback();
           window.$message.success("删除成功");
         } else {
-          window.$message.error(result?.message || "删除歌曲失败，请重试");
+          window.$message.error(result?.msg || result?.message || "删除歌曲失败，请重试");
         }
       },
     });

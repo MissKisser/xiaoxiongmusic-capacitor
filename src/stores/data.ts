@@ -145,7 +145,8 @@ export const useDataStore = defineStore("data", {
                 "downloadingSongs",
               ].includes(key)
             ) {
-              this[key] = data ? markRaw(data) : [];
+              // key 为运行时字符串键，断言以支持动态索引 store 状态
+              (this as any)[key] = data ? markRaw(data) : [];
             } else if (key === "likeSongsList" && data) {
               // 特殊处理嵌套对象中的 data
               const listData = data as ListState["likeSongsList"];
@@ -154,7 +155,7 @@ export const useDataStore = defineStore("data", {
                 data: markRaw(listData.data || []),
               };
             } else {
-              this[key] = data || [];
+              (this as any)[key] = data || [];
             }
           }),
         );
@@ -163,7 +164,8 @@ export const useDataStore = defineStore("data", {
         await Promise.all(
           userDataKeys.map(async (key) => {
             const data = await userDB.getItem(key);
-            this.userLikeData[key] = data;
+            // key 为运行时字符串键，断言以支持动态索引
+            (this.userLikeData as any)[key] = data;
           }),
         );
       } catch (error) {
@@ -266,18 +268,16 @@ export const useDataStore = defineStore("data", {
      */
     async setHistory(song: SongType) {
       try {
-        let historyList: SongType[] = (await musicDB.getItem("historyList")) || [];
-        if (!Array.isArray(historyList)) historyList = [];
-        // 过滤旧的同名歌曲，把新的放到第一位
-        const updatedList = [song, ...historyList.filter((item) => item.id !== song.id)];
+        // 以内存态为数据源，先更新内存再落盘，避免并发读-改-写竞态（快速切歌时丢失历史）
+        const historyList = Array.isArray(this.historyList) ? [...this.historyList] : [];
+        const updated = [song, ...historyList.filter((item) => item.id !== song.id)];
         // 最多 500 首
-        if (updatedList.length > 500) updatedList.splice(500);
-        // 存储
-        await musicDB.setItem("historyList", cloneDeep(toRaw(updatedList)));
-        this.historyList = markRaw(updatedList);
+        if (updated.length > 500) updated.splice(500);
+        this.historyList = markRaw(updated);
+        await musicDB.setItem("historyList", cloneDeep(toRaw(updated)));
       } catch (error) {
+        // 持久化失败不影响内存态与播放流程
         console.error("Error updating history:", error);
-        throw error;
       }
     },
     /**

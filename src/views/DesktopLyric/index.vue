@@ -142,6 +142,7 @@
 <script setup lang="ts">
 import { LyricLine, LyricWord } from "@applemusic-like-lyrics/lyric";
 import { LyricConfig, LyricData, RenderLine } from "@/types/desktop-lyric";
+import { isElectron } from "@/utils/env";
 import defaultDesktopLyricConfig from "@/assets/data/lyricConfig";
 
 // 桌面歌词数据
@@ -708,54 +709,70 @@ const tempToggleLyricLock = (isLock: boolean) => {
   window.electron.ipcRenderer.send("toggle-desktop-lyric-lock", isLock, true);
 };
 
+/**
+ * 接收歌词数据（IPC 监听处理，保存为具名函数以便卸载时移除）
+ * @param _event IPC 事件
+ * @param data 歌词数据
+ */
+const handleLyricDataUpdate = (
+  _event: unknown,
+  data: LyricData & { sendTimestamp?: number },
+) => {
+  Object.assign(lyricData, data);
+  // 更新锚点：以传入的 currentTime + songOffset 建立毫秒级基准，并重置帧时间
+  if (typeof lyricData.currentTime === "number") {
+    const offset = Number(lyricData.songOffset ?? 0);
+    let newBaseMs = Math.floor(lyricData.currentTime + offset);
+    // 补偿传输延迟
+    if (typeof data.sendTimestamp === "number") {
+      const ipcDelay = performance.now() - data.sendTimestamp;
+      // 正延迟才补偿
+      if (ipcDelay > 0 && ipcDelay < 1000) {
+        newBaseMs += ipcDelay;
+      }
+    }
+    // 阈值检测：只有当新时间与当前插值时间差距超过阈值时才重置锚点
+    // 这样可以避免在正常播放时频繁重置导致的微小抖动
+    const SYNC_THRESHOLD = 300; // 300ms 阈值
+    const drift = Math.abs(newBaseMs - playSeekMs.value);
+    if (drift > SYNC_THRESHOLD) {
+      baseMs = newBaseMs;
+      anchorTick = performance.now();
+    }
+  }
+  // 按播放状态节能：暂停时暂停 RAF，播放时恢复 RAF
+  if (typeof lyricData.playStatus === "boolean") {
+    if (lyricData.playStatus) {
+      resumeSeek();
+    } else {
+      // 重置锚点到当前毫秒游标，避免因暂停后时间推进造成误差
+      baseMs = playSeekMs.value;
+      anchorTick = performance.now();
+      pauseSeek();
+    }
+  }
+};
+
+/**
+ * 接收歌词配置（IPC 监听处理，保存为具名函数以便卸载时移除）
+ * @param _event IPC 事件
+ * @param config 歌词配置
+ */
+const handleLyricOptionUpdate = (_event: unknown, config: LyricConfig) => {
+  Object.assign(lyricConfig, config);
+  // 根据文字大小改变一次高度
+  const height = fontSizeToHeight(config.fontSize);
+  if (height) pushWindowHeight(height);
+  // 是否锁定
+  sendToMain("toggle-desktop-lyric-lock", config.isLock);
+};
+
 onMounted(() => {
-  // 接收歌词数据
-  window.electron.ipcRenderer.on(
-    "update-desktop-lyric-data",
-    (_event, data: LyricData & { sendTimestamp?: number }) => {
-      Object.assign(lyricData, data);
-      // 更新锚点：以传入的 currentTime + songOffset 建立毫秒级基准，并重置帧时间
-      if (typeof lyricData.currentTime === "number") {
-        const offset = Number(lyricData.songOffset ?? 0);
-        let newBaseMs = Math.floor(lyricData.currentTime + offset);
-        // 补偿传输延迟
-        if (typeof data.sendTimestamp === "number") {
-          const ipcDelay = performance.now() - data.sendTimestamp;
-          // 正延迟才补偿
-          if (ipcDelay > 0 && ipcDelay < 1000) {
-            newBaseMs += ipcDelay;
-          }
-        }
-        // 阈值检测：只有当新时间与当前插值时间差距超过阈值时才重置锚点
-        // 这样可以避免在正常播放时频繁重置导致的微小抖动
-        const SYNC_THRESHOLD = 300; // 300ms 阈值
-        const drift = Math.abs(newBaseMs - playSeekMs.value);
-        if (drift > SYNC_THRESHOLD) {
-          baseMs = newBaseMs;
-          anchorTick = performance.now();
-        }
-      }
-      // 按播放状态节能：暂停时暂停 RAF，播放时恢复 RAF
-      if (typeof lyricData.playStatus === "boolean") {
-        if (lyricData.playStatus) {
-          resumeSeek();
-        } else {
-          // 重置锚点到当前毫秒游标，避免因暂停后时间推进造成误差
-          baseMs = playSeekMs.value;
-          anchorTick = performance.now();
-          pauseSeek();
-        }
-      }
-    },
-  );
-  window.electron.ipcRenderer.on("update-desktop-lyric-option", (_event, config: LyricConfig) => {
-    Object.assign(lyricConfig, config);
-    // 根据文字大小改变一次高度
-    const height = fontSizeToHeight(config.fontSize);
-    if (height) pushWindowHeight(height);
-    // 是否锁定
-    sendToMain("toggle-desktop-lyric-lock", config.isLock);
-  });
+  // 非 Electron 环境不支持桌面歌词，防止 Android 白屏
+  if (!isElectron) return;
+  // 注册 IPC 监听（接收歌词数据与配置）
+  window.electron.ipcRenderer.on("update-desktop-lyric-data", handleLyricDataUpdate);
+  window.electron.ipcRenderer.on("update-desktop-lyric-option", handleLyricOptionUpdate);
   // 请求歌词数据及配置
   window.electron.ipcRenderer.send("request-desktop-lyric-data");
   window.electron.ipcRenderer.invoke("request-desktop-lyric-option");
@@ -783,6 +800,12 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  // 非 Electron 环境无需清理 IPC 监听
+  if (isElectron) {
+    // 移除 IPC 监听
+    window.electron.ipcRenderer.off("update-desktop-lyric-data", handleLyricDataUpdate);
+    window.electron.ipcRenderer.off("update-desktop-lyric-option", handleLyricOptionUpdate);
+  }
   // 关闭 RAF
   pauseSeek();
   // 解绑事件

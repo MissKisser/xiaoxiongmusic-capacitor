@@ -229,11 +229,12 @@ export class MpvPlayer extends EventTarget implements IPlaybackEngine {
     window.electron.ipcRenderer.send("mpv-resume");
   }
 
-  public pause(options?: PauseOptions): void {
+  public pause(options?: PauseOptions): Promise<void> {
     // MPV 不支持渐入渐出，忽略 options
     void options;
 
     window.electron.ipcRenderer.send("mpv-pause");
+    return Promise.resolve();
   }
 
   public stop(): void {

@@ -24,6 +24,19 @@ export enum SongUnlockServer {
   GEQUBAO = "gequbao",
 }
 
+/**
+ * URL 日志脱敏：只保留协议、域名与路径，隐藏 query 中的签名/token 参数
+ * 解析失败时回退为截断输出
+ */
+const sanitizeUrlForLog = (url: string): string => {
+  try {
+    const u = new URL(url);
+    return `${u.origin}${u.pathname}`;
+  } catch {
+    return url.length > 80 ? `${url.substring(0, 80)}...` : url;
+  }
+};
+
 /** 歌曲播放地址信息 */
 export type AudioSource = {
   /** 歌曲id */
@@ -306,7 +319,7 @@ class SongManager {
           // Electron 端：直接使用原始 URL（MPV 不受浏览器限制）
           const unlockUrl = this.processUrlForWeb(originalUrl, songId);
           if (!isElectron) {
-            console.log(`[UNLOCK] [${songId}] Web 端处理后的 URL:`, unlockUrl ? unlockUrl.substring(0, 100) : "null/undefined");
+            console.log(`[UNLOCK] [${songId}] Web 端处理后的 URL:`, unlockUrl ? sanitizeUrlForLog(unlockUrl) : "null/undefined");
           }
 
           const finalUnlockUrl = unlockUrl || undefined;
@@ -323,12 +336,12 @@ class SongManager {
             quality = QualityType.SQ;
           }
 
-          // 调试信息：显示使用的解锁源
+          // 调试信息：显示使用的解锁源（URL 脱敏，只保留域名与路径，隐藏签名参数）
           console.log(`[UNLOCK] [${songId}] 解锁成功！`);
           console.log(`[UNLOCK] [${songId}] 解锁源: ${sourceName} (${server})`);
           console.log(`[UNLOCK] [${songId}] 音质: ${quality}`);
-          console.log(`[UNLOCK] [${songId}] 原始 URL: ${originalUrl.substring(0, 80)}${originalUrl.length > 80 ? '...' : ''}`);
-          console.log(`[UNLOCK] [${songId}] 最终返回 URL: ${finalUnlockUrl ? finalUnlockUrl.substring(0, 80) + (finalUnlockUrl.length > 80 ? '...' : '') : 'null/undefined'}`);
+          console.log(`[UNLOCK] [${songId}] 原始 URL: ${sanitizeUrlForLog(originalUrl)}`);
+          console.log(`[UNLOCK] [${songId}] 最终返回 URL: ${sanitizeUrlForLog(finalUnlockUrl || "")}`);
           console.log(`[UNLOCK] [${songId}] 最终返回 URL 长度: ${finalUnlockUrl ? finalUnlockUrl.length : 0}`);
 
           // 验证 URL 格式

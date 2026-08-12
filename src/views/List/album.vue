@@ -205,22 +205,28 @@ const getAlbumDetail = async (id: number, refresh: boolean = false) => {
     resetData(true);
   }
   // 获取专辑详情
-  const detail = await albumDetail(id);
-  // 检查是否仍然是当前请求的专辑
-  if (currentRequestId.value !== id) return;
-  setDetailData(formatCoverList(detail.album)[0]);
-  // 获取专辑歌曲
-  const ids: number[] = detail.songs.map((song: any) => song.id as number);
-  const result = await songDetail(ids);
-  // 再次检查是否仍然是当前请求的专辑
-  if (currentRequestId.value !== id) return;
-  const songs = formatSongsList(result.songs);
-  setListData(songs);
+  try {
+    const detail = await albumDetail(id);
+    // 检查是否仍然是当前请求的专辑
+    if (currentRequestId.value !== id) return;
+    setDetailData(formatCoverList(detail.album)[0]);
+    // 获取专辑歌曲
+    const ids: number[] = detail.songs.map((song: any) => song.id as number);
+    const result = await songDetail(ids);
+    // 再次检查是否仍然是当前请求的专辑
+    if (currentRequestId.value !== id) return;
+    const songs = formatSongsList(result.songs);
+    setListData(songs);
 
-  // 保存缓存
-  saveCache("album", id, detailData.value!, songs);
-
-  setLoading(false);
+    // 保存缓存
+    saveCache("album", id, detailData.value!, songs);
+  } catch (error) {
+    console.error("获取专辑详情失败", error);
+    window.$message.error("加载失败，请重试");
+  } finally {
+    // 仅当前请求有效时复位加载状态，避免影响新请求
+    if (currentRequestId.value === id) setLoading(false);
+  }
 };
 
 // 后台检查更新
