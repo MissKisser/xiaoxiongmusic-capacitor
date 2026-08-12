@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- external-path 收紧为 lyric-poster/：歌词海报导出分享目录（见 src/utils/lyric/posterExport.ts），
+     避免以 path="." 暴露整个外部存储根目录 -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <external-path name="my_images" path="." />
+    <external-path name="my_images" path="lyric-poster/" />
     <cache-path name="my_cache_images" path="." />
 </paths>

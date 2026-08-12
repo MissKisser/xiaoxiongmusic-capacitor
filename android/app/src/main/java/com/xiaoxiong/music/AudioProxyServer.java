@@ -6,12 +6,12 @@ import android.util.Log;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLDecoder;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -36,13 +36,15 @@ public class AudioProxyServer extends NanoHTTPD {
 
     private final Context context;
     private File cacheDir;
-    private boolean cacheEnabled = true;
-    private long maxCacheSize = 500L * 1024 * 1024; // 默认 500MB
+    // volatile：供后台下载线程/主线程并发读写，保证可见性
+    private volatile boolean cacheEnabled = true;
+    private volatile long maxCacheSize = 500L * 1024 * 1024; // 默认 500MB
     // 缓存策略: "all" = 缓存所有播放的歌曲, "complete" = 只缓存播放完的歌曲
-    private String cacheStrategy = "all";
+    private volatile String cacheStrategy = "all";
 
     public AudioProxyServer(Context context) {
-        super(PORT);
+        // 仅绑定本机回环地址，防止同网段设备把本应用当作开放代理（SSRF / 任意文件读取）
+        super("127.0.0.1", PORT);
         this.context = context;
         this.cacheDir = new File(context.getCacheDir(), "audio_cache");
         if (!cacheDir.exists()) {
@@ -194,10 +196,24 @@ public class AudioProxyServer extends NanoHTTPD {
             return response;
         }
 
+        // 注意：getParms() 已对参数做一次 URL 解码，此处不再二次解码，
+        // 否则含 "+" / "%" 字面量的音频 URL 会被破坏
+
+        // 协议白名单：仅允许代理 http/https，防止 file:// 等本地协议被 SSRF 读取
         try {
-            targetUrl = URLDecoder.decode(targetUrl, "UTF-8");
+            URL parsedUrl = new URL(targetUrl);
+            String protocol = parsedUrl.getProtocol();
+            if (!"http".equals(protocol) && !"https".equals(protocol)) {
+                Response response = newFixedLengthResponse(Response.Status.FORBIDDEN, "text/plain",
+                        "Only http/https protocol is allowed");
+                addCorsHeaders(response);
+                return response;
+            }
         } catch (Exception e) {
-            // 忽略
+            Response response = newFixedLengthResponse(Response.Status.BAD_REQUEST, "text/plain",
+                    "Invalid URL");
+            addCorsHeaders(response);
+            return response;
         }
 
         try {
@@ -208,7 +224,7 @@ public class AudioProxyServer extends NanoHTTPD {
             boolean isRangeFromStart = false;
             if (hasRange) {
                 String rv = rangeHeader.replace("bytes=", "").trim();
-                isRangeFromStart = rv.equals("0-") || rv.equals("0-");
+                isRangeFromStart = rv.equals("0-");
             }
             // 真正的部分 Range（seek）：有明确的起始偏移（非 0）
             boolean isPartialRange = hasRange && !isRangeFromStart;
@@ -312,113 +328,161 @@ public class AudioProxyServer extends NanoHTTPD {
      */
     private Response proxyAndCache(IHTTPSession session, String targetUrl, File cacheFile) throws IOException {
         // 缓存模式：不转发 Range 头给远端，确保获取完整文件（200 而非 206）
-        HttpURLConnection connection = (HttpURLConnection) new URL(targetUrl).openConnection();
-        connection.setConnectTimeout(CONNECT_TIMEOUT);
-        connection.setReadTimeout(READ_TIMEOUT);
-        connection.setRequestProperty("User-Agent",
-                "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+        HttpURLConnection connection = null;
+        boolean streamHandedOff = false;
         try {
-            URL url = new URL(targetUrl);
-            connection.setRequestProperty("Referer", url.getProtocol() + "://" + url.getHost() + "/");
-        } catch (Exception e) {
-            /* 忽略 */ }
-        connection.connect();
+            connection = (HttpURLConnection) new URL(targetUrl).openConnection();
+            connection.setConnectTimeout(CONNECT_TIMEOUT);
+            connection.setReadTimeout(READ_TIMEOUT);
+            connection.setRequestProperty("User-Agent",
+                    "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+            try {
+                URL url = new URL(targetUrl);
+                connection.setRequestProperty("Referer", url.getProtocol() + "://" + url.getHost() + "/");
+            } catch (Exception e) {
+                /* 忽略 */ }
+            connection.connect();
 
-        int responseCode = connection.getResponseCode();
-        if (responseCode != 200) {
-            InputStream is = connection.getInputStream();
-            String ct = connection.getContentType();
-            if (ct == null)
-                ct = "audio/mpeg";
-            Response resp = newChunkedResponse(Response.Status.lookup(responseCode), ct, is);
-            addCorsHeaders(resp);
-            return resp;
-        }
+            int responseCode = connection.getResponseCode();
+            if (responseCode != 200) {
+                // 4xx/5xx 的错误体在 getErrorStream()，直接 getInputStream() 会抛 FileNotFoundException
+                InputStream is = responseCode >= 400 ? connection.getErrorStream() : connection.getInputStream();
+                String ct = connection.getContentType();
+                if (ct == null)
+                    ct = "audio/mpeg";
+                Response.IStatus status = Response.Status.lookup(responseCode);
+                if (status == null)
+                    status = Response.Status.INTERNAL_ERROR;
+                Response resp;
+                if (is == null) {
+                    // 上游未返回错误体时，回退为纯文本错误信息
+                    resp = newFixedLengthResponse(status, "text/plain", "Upstream error: " + responseCode);
+                } else {
+                    resp = newChunkedResponse(status, ct, new ConnectionInputStream(connection, is));
+                    streamHandedOff = true;
+                }
+                addCorsHeaders(resp);
+                return resp;
+            }
 
-        InputStream inputStream = connection.getInputStream();
-        String contentType = connection.getContentType();
-        if (contentType == null)
-            contentType = "audio/mpeg";
-        long contentLength = connection.getContentLengthLong();
+            // 包装输入流：流关闭时同时断开连接，防止连接泄漏
+            InputStream inputStream = new ConnectionInputStream(connection, connection.getInputStream());
+            String contentType = connection.getContentType();
+            if (contentType == null)
+                contentType = "audio/mpeg";
+            long contentLength = connection.getContentLengthLong();
 
-        File tempFile = new File(cacheDir, cacheFile.getName() + ".tmp");
-        FileOutputStream cacheOut;
-        try {
-            cacheOut = new FileOutputStream(tempFile);
-        } catch (Exception e) {
-            Log.e(TAG, "Cannot create cache temp file", e);
+            File tempFile = new File(cacheDir, cacheFile.getName() + ".tmp");
+            FileOutputStream cacheOut;
+            try {
+                cacheOut = new FileOutputStream(tempFile);
+            } catch (Exception e) {
+                Log.e(TAG, "Cannot create cache temp file", e);
+                if (contentLength > 0) {
+                    Response response = newFixedLengthResponse(Response.Status.OK, contentType, inputStream, contentLength);
+                    addCorsHeaders(response);
+                    streamHandedOff = true;
+                    return response;
+                } else {
+                    Response response = newChunkedResponse(Response.Status.OK, contentType, inputStream);
+                    addCorsHeaders(response);
+                    streamHandedOff = true;
+                    return response;
+                }
+            }
+
+            // 传入缓存策略：是否在客户端断开时继续后台下载
+            boolean cacheAll = "all".equals(this.cacheStrategy);
+            TeeInputStream teeStream = new TeeInputStream(inputStream, cacheOut, tempFile, cacheFile, contentLength,
+                    cacheAll, this);
+
+            Response response;
             if (contentLength > 0) {
-                Response response = newFixedLengthResponse(Response.Status.OK, contentType, inputStream, contentLength);
-                addCorsHeaders(response);
-                return response;
+                response = newFixedLengthResponse(Response.Status.OK, contentType, teeStream, contentLength);
             } else {
-                Response response = newChunkedResponse(Response.Status.OK, contentType, inputStream);
-                addCorsHeaders(response);
-                return response;
+                response = newChunkedResponse(Response.Status.OK, contentType, teeStream);
+            }
+
+            addCorsHeaders(response);
+            response.addHeader("Accept-Ranges", "bytes");
+            response.addHeader("X-Cache", "MISS");
+            streamHandedOff = true;
+            return response;
+        } finally {
+            // 流已交给响应对象时，由流关闭时断开连接（NanoHTTPD 发送完响应后会自动 close）；
+            // 异常路径则直接断开，避免连接泄漏
+            if (!streamHandedOff && connection != null) {
+                connection.disconnect();
             }
         }
-
-        // 传入缓存策略：是否在客户端断开时继续后台下载
-        boolean cacheAll = "all".equals(this.cacheStrategy);
-        TeeInputStream teeStream = new TeeInputStream(inputStream, cacheOut, tempFile, cacheFile, contentLength,
-                cacheAll, this);
-
-        Response response;
-        if (contentLength > 0) {
-            response = newFixedLengthResponse(Response.Status.OK, contentType, teeStream, contentLength);
-        } else {
-            response = newChunkedResponse(Response.Status.OK, contentType, teeStream);
-        }
-
-        addCorsHeaders(response);
-        response.addHeader("Accept-Ranges", "bytes");
-        response.addHeader("X-Cache", "MISS");
-        return response;
     }
 
     /**
      * 直接代理音频流（无缓存）
      */
     private Response proxyAudioStream(IHTTPSession session, String targetUrl) throws IOException {
-        HttpURLConnection connection = createConnection(session, targetUrl);
-        connection.connect();
+        HttpURLConnection connection = null;
+        boolean streamHandedOff = false;
+        try {
+            connection = createConnection(session, targetUrl);
+            connection.connect();
 
-        int responseCode = connection.getResponseCode();
-        InputStream inputStream = connection.getInputStream();
+            int responseCode = connection.getResponseCode();
+            // 4xx/5xx 的错误体在 getErrorStream()，直接 getInputStream() 会抛 FileNotFoundException
+            InputStream inputStream = responseCode >= 400
+                    ? connection.getErrorStream()
+                    : connection.getInputStream();
 
-        Response.IStatus status;
-        if (responseCode == 206) {
-            status = Response.Status.PARTIAL_CONTENT;
-        } else if (responseCode == 200) {
-            status = Response.Status.OK;
-        } else {
-            status = Response.Status.lookup(responseCode);
-            if (status == null)
-                status = Response.Status.INTERNAL_ERROR;
+            Response.IStatus status;
+            if (responseCode == 206) {
+                status = Response.Status.PARTIAL_CONTENT;
+            } else if (responseCode == 200) {
+                status = Response.Status.OK;
+            } else {
+                status = Response.Status.lookup(responseCode);
+                if (status == null)
+                    status = Response.Status.INTERNAL_ERROR;
+            }
+
+            Response response;
+            if (inputStream == null) {
+                // 上游未返回错误体时，回退为纯文本错误信息
+                response = newFixedLengthResponse(status, "text/plain", "Upstream error: " + responseCode);
+                addCorsHeaders(response);
+                return response;
+            }
+            // 包装输入流：流关闭时同时断开连接，防止连接泄漏
+            inputStream = new ConnectionInputStream(connection, inputStream);
+
+            String contentType = connection.getContentType();
+            if (contentType == null)
+                contentType = "audio/mpeg";
+            long contentLength = connection.getContentLengthLong();
+
+            if (contentLength > 0) {
+                response = newFixedLengthResponse(status, contentType, inputStream, contentLength);
+            } else {
+                response = newChunkedResponse(status, contentType, inputStream);
+            }
+
+            addCorsHeaders(response);
+
+            String contentRange = connection.getHeaderField("Content-Range");
+            if (contentRange != null)
+                response.addHeader("Content-Range", contentRange);
+            String acceptRanges = connection.getHeaderField("Accept-Ranges");
+            if (acceptRanges != null)
+                response.addHeader("Accept-Ranges", acceptRanges);
+
+            streamHandedOff = true;
+            return response;
+        } finally {
+            // 流已交给响应对象时，由流关闭时断开连接（NanoHTTPD 发送完响应后会自动 close）；
+            // 异常路径则直接断开，避免连接泄漏
+            if (!streamHandedOff && connection != null) {
+                connection.disconnect();
+            }
         }
-
-        String contentType = connection.getContentType();
-        if (contentType == null)
-            contentType = "audio/mpeg";
-        long contentLength = connection.getContentLengthLong();
-
-        Response response;
-        if (contentLength > 0) {
-            response = newFixedLengthResponse(status, contentType, inputStream, contentLength);
-        } else {
-            response = newChunkedResponse(status, contentType, inputStream);
-        }
-
-        addCorsHeaders(response);
-
-        String contentRange = connection.getHeaderField("Content-Range");
-        if (contentRange != null)
-            response.addHeader("Content-Range", contentRange);
-        String acceptRanges = connection.getHeaderField("Accept-Ranges");
-        if (acceptRanges != null)
-            response.addHeader("Accept-Ranges", acceptRanges);
-
-        return response;
     }
 
     private HttpURLConnection createConnection(IHTTPSession session, String targetUrl) throws IOException {
@@ -493,6 +557,28 @@ public class AudioProxyServer extends NanoHTTPD {
             return sb.toString();
         } catch (Exception e) {
             return String.valueOf(input.hashCode());
+        }
+    }
+
+    /**
+     * 包装输入流：流关闭时同时断开底层 HttpURLConnection，防止连接泄漏。
+     * 依赖 NanoHTTPD 在响应发送完毕后调用 close() 来释放连接。
+     */
+    private static class ConnectionInputStream extends FilterInputStream {
+        private final HttpURLConnection connection;
+
+        ConnectionInputStream(HttpURLConnection connection, InputStream in) {
+            super(in);
+            this.connection = connection;
+        }
+
+        @Override
+        public void close() throws IOException {
+            try {
+                super.close();
+            } finally {
+                connection.disconnect();
+            }
         }
     }
 

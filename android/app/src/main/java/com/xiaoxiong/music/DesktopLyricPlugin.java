@@ -77,8 +77,14 @@ public class DesktopLyricPlugin extends Plugin {
         }
 
         runOnMain(() -> {
-            ensureOverlay().show();
-            resolveSuccess(call);
+            try {
+                ensureOverlay().show();
+                resolveSuccess(call);
+            } catch (Exception e) {
+                // addView 等操作失败时拒绝回调，避免主线程崩溃或 Promise 永久挂起
+                Log.e(TAG, "悬浮窗显示失败", e);
+                call.reject("悬浮窗显示失败: " + e.getMessage());
+            }
         });
     }
 
@@ -93,6 +99,10 @@ public class DesktopLyricPlugin extends Plugin {
     @PluginMethod
     public void updateLyric(PluginCall call) {
         JSObject data = call.getData();
+        if (data == null) {
+            call.reject("歌词数据为空");
+            return;
+        }
         runOnMain(() -> {
             ensureOverlay().updateLyric(data);
             resolveSuccess(call);
@@ -102,6 +112,10 @@ public class DesktopLyricPlugin extends Plugin {
     @PluginMethod
     public void updateConfig(PluginCall call) {
         JSObject config = call.getData();
+        if (config == null) {
+            call.reject("配置数据为空");
+            return;
+        }
         runOnMain(() -> {
             ensureOverlay().updateConfig(config);
             resolveSuccess(call);

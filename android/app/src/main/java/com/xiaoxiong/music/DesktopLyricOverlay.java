@@ -493,6 +493,15 @@ class DesktopLyricOverlay {
         layoutParams.gravity = Gravity.TOP | Gravity.START;
         layoutParams.x = prefs.getInt(KEY_X, defaultX);
         layoutParams.y = prefs.getInt(KEY_Y, dp(96));
+        // 无条件校验持久化坐标是否在屏幕范围内（不受 limitBounds 开关限制），
+        // 防止屏幕分辨率变化后坐标越界导致悬浮窗"丢失"（超界时回落默认居中位置）
+        int screenHeight = context.getResources().getDisplayMetrics().heightPixels;
+        int maxX = Math.max(0, screenWidth - width);
+        int maxY = Math.max(0, screenHeight - dp(96));
+        if (layoutParams.x < 0 || layoutParams.x > maxX || layoutParams.y < 0 || layoutParams.y > maxY) {
+            layoutParams.x = defaultX;
+            layoutParams.y = dp(96);
+        }
     }
 
     private int windowType() {

@@ -122,6 +122,9 @@ public class MusicService extends Service {
                 case ACTION_CLEAR_SLEEP_TIMER:
                     handleClearSleepTimer();
                     break;
+                default:
+                    Log.w(TAG, "未知的 Service 操作: " + action);
+                    break;
             }
         }
 
@@ -311,6 +314,8 @@ public class MusicService extends Service {
             Log.d(TAG, "✅ startForeground SUCCESS");
         } catch (Exception e) {
             Log.e(TAG, "❌ Failed to start foreground", e);
+            // 前台服务启动失败时立即停止服务，避免在 Android 14+ 上后台裸跑（会被系统判定为违规）
+            stopSelf();
         }
     }
 
@@ -342,7 +347,8 @@ public class MusicService extends Service {
                 createAction(R.drawable.ic_lyrics, "词", MusicControlReceiver.ACTION_TOGGLE_DESKTOP_LYRIC);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.mipmap.ic_launcher)
+                // 小图标必须使用纯 alpha 的白色剪影图标，不能用彩色启动图标（会显示为白色方块）
+                .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(currentTitle)
                 .setContentText(currentArtist)
                 .setSubText(currentAlbum)
@@ -375,13 +381,35 @@ public class MusicService extends Service {
 
     private void loadCoverAsync(final String url) {
         new Thread(() -> {
+            HttpURLConnection c = null;
+            InputStream i = null;
             try {
                 URL u = new URL(url);
-                HttpURLConnection c = (HttpURLConnection) u.openConnection();
+                c = (HttpURLConnection) u.openConnection();
+                // 设置超时，避免网络异常时后台线程长时间挂起
+                c.setConnectTimeout(10000);
+                c.setReadTimeout(15000);
                 c.setDoInput(true);
                 c.connect();
-                InputStream i = c.getInputStream();
-                Bitmap bitmap = BitmapFactory.decodeStream(i);
+
+                // 先读取边界信息计算采样率，避免全尺寸解码占用过多内存
+                BitmapFactory.Options bounds = new BitmapFactory.Options();
+                bounds.inJustDecodeBounds = true;
+                i = c.getInputStream();
+                BitmapFactory.decodeStream(i, null, bounds);
+
+                // 计算采样率：图片最长边不超过 512px（通知栏大图足够清晰）
+                int sampleSize = 1;
+                int maxEdge = Math.max(bounds.outWidth, bounds.outHeight);
+                while (maxEdge / sampleSize > 512) {
+                    sampleSize *= 2;
+                }
+
+                i.close();
+                i = c.getInputStream();
+                BitmapFactory.Options opts = new BitmapFactory.Options();
+                opts.inSampleSize = sampleSize;
+                Bitmap bitmap = BitmapFactory.decodeStream(i, null, opts);
                 if (bitmap != null) {
                     coverBitmap = bitmap;
                     updateNotification();
@@ -389,6 +417,13 @@ public class MusicService extends Service {
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Failed to load cover", e);
+            } finally {
+                // 先关闭流再断开连接，确保资源完整释放
+                try {
+                    if (i != null) i.close();
+                } catch (Exception ignored) {
+                    /* 忽略 */ }
+                if (c != null) c.disconnect();
             }
         }).start();
     }
