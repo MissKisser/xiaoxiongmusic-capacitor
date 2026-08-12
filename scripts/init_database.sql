@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS devices (
   name VARCHAR(100),
   first_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_active_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  -- 唯一约束：同一设备仅一条记录；同一授权码同一平台仅一台设备（与 server/db.ts 保持一致）
+  UNIQUE KEY uq_device_id (device_id),
+  UNIQUE KEY uq_code_platform (auth_code_id, platform),
   FOREIGN KEY (auth_code_id) REFERENCES auth_codes(id) ON DELETE SET NULL
 );
 
@@ -50,7 +53,9 @@ CREATE TABLE IF NOT EXISTS app_versions (
   apk_url VARCHAR(255) NOT NULL,
   description TEXT,
   is_force BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  -- 并发发布防重（与 server/routes/version.ts 的 409 处理配套）
+  UNIQUE KEY uq_platform_build (platform, build_number)
 );
 
 -- 5. 操作日志表
@@ -70,13 +75,16 @@ CREATE TABLE IF NOT EXISTS daily_stats (
 );
 
 -- =====================================================
--- 插入管理员账户
--- 用户名: Hackerdallas
--- 密码: 220529@Xjt
+-- 管理员账号初始化说明（安全合规）
+-- 安全要求：凭据不得写入仓库。管理员账号由部署方在服务器上按环境变量
+-- （ADMIN_USERNAME / ADMIN_PASSWORD）创建，或执行下述语句（在服务器本地执行，
+-- 密码哈希由 `bcrypt` 现场生成，切勿使用固定哈希）：
+--   INSERT INTO admin_users (username, password)
+--   VALUES ('<部署用户名>', '<现场生成的 bcrypt 哈希>')
+--   ON DUPLICATE KEY UPDATE password = VALUES(password);
+-- 注意：旧版脚本曾内置固定账号与重置逻辑，若生产库中存在该账号，请立即
+-- 修改密码并确保服务端 JWT_SECRET / DB_PASSWORD 已显式配置。
 -- =====================================================
-INSERT INTO admin_users (username, password) VALUES 
-  ('Hackerdallas', '$2b$10$hdyqiw0j8LMEl49sSbu5t.yccc3qY0yNwKB1sKCDaDPfA9NkV4hb2')
-ON DUPLICATE KEY UPDATE password = '$2b$10$hdyqiw0j8LMEl49sSbu5t.yccc3qY0yNwKB1sKCDaDPfA9NkV4hb2';
 
 -- 完成提示
-SELECT '✅ 数据库初始化完成！管理员账户已创建。' AS message;
+SELECT '✅ 数据库初始化完成！管理员账号请按安全说明手动创建。' AS message;
