@@ -32,6 +32,7 @@ keystore.properties
 Mobile.zip
 tmp/
 releases/
+release/
 
 # 开发工作文件（会话记录、任务进度等）
 .superpowers/
