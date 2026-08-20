@@ -773,6 +773,8 @@ class DesktopLyricOverlay {
                     dragging = true;
                     layoutParams.x = startX + deltaX;
                     layoutParams.y = startY + deltaY;
+                    // 限制边界开启时拖拽全程整窗保持在屏幕内；关闭时可自由拖到任意位置，
+                    // 若超出屏幕边界由松手回弹兜底
                     if (limitBounds) clampToScreen();
                     updateWindowIfChanged();
                 }
@@ -780,7 +782,10 @@ class DesktopLyricOverlay {
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
                 if (dragging) {
-                    if (limitBounds) clampToScreen();
+                    // 松手回弹：浮窗若未完整处于屏幕内（被拖出边界），自动回到完整可见的水平位置
+                    clampToScreen();
+                    // 立即重绘窗口位置，避免坐标只在内存生效、屏幕上仍滞留在界外
+                    updateWindowIfChanged();
                     prefs.edit()
                             .putInt(KEY_X, layoutParams.x)
                             .putInt(KEY_Y, layoutParams.y)
@@ -803,8 +808,12 @@ class DesktopLyricOverlay {
         unlockHandler.postDelayed(hideUnlockRunnable, 3000);
     }
 
+    /**
+     * 将浮窗完整钳制到屏幕可视范围内（松手回弹、旋转校正等场景统一使用），
+     * 保证浮窗始终处于完整可见的水平位置，不会因越界而无法找回。
+     */
     private void clampToScreen() {
-        if (!limitBounds || layoutParams == null) return;
+        if (layoutParams == null) return;
         int screenWidth = context.getResources().getDisplayMetrics().widthPixels;
         int screenHeight = context.getResources().getDisplayMetrics().heightPixels;
         int viewHeight = layoutParams.height > 0 ? layoutParams.height : dp(96);
@@ -831,7 +840,6 @@ class DesktopLyricOverlay {
         int maxY = Math.max(0, screenHeight - viewHeight);
         layoutParams.x = clamp(layoutParams.x, 0, maxX);
         layoutParams.y = clamp(layoutParams.y, 0, maxY);
-        if (limitBounds) clampToScreen();
         try {
             updateWindowIfChanged();
         } catch (Exception ignored) {
