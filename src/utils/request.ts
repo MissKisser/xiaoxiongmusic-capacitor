@@ -4,6 +4,7 @@ import { useSettingStore } from "@/stores";
 import { getCookie } from "./cookie";
 import axiosRetry from "axios-retry";
 import { CapacitorHttp, HttpResponse } from "@capacitor/core";
+import { localNcmRequest } from "./netease";
 
 // 全局地址配置
 // 开发环境：使用相对路径，通过 Vite 代理转发到远程服务器
@@ -232,6 +233,16 @@ server.interceptors.response.use(
 // 请求
 const request = async <T = any>(config: AxiosRequestConfig): Promise<T> => {
   try {
+    // Capacitor 端无条件走本地 API:纯 JS 签名直连网易云,不经 music.viaxv.top。
+    // 失败自动回退到下方服务器链路(try-catch)。
+    if (isCapacitor) {
+      try {
+        return await localNcmRequest<T>(config);
+      } catch (e) {
+        console.warn(`🌐 [LocalApi] 本地请求失败,回退服务器: ${config.url} |`, (e as Error).message);
+        // 落到下方 server.request 走服务器链路
+      }
+    }
     const response = await server.request(config);
     if (isCapacitor) {
       // 只打印响应摘要，避免全量序列化大响应体（歌单/歌词可达数 MB）阻塞主线程

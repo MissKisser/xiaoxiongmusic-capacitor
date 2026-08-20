@@ -28,6 +28,11 @@ keystore.properties
 # 调试与测试产物
 .playwright-mcp/
 
+# 项目临时/备份文件（非源码，不提交）
+Mobile.zip
+tmp/
+releases/
+
 # 开发工作文件（会话记录、任务进度等）
 .superpowers/
 .zcode/
@@ -43,6 +48,7 @@ docs/
 CHANGELOG.md
 AGENTS.md
 CLAUDE.md
+LOCAL_API_NOTES.md
 .agents/
 .omc/
 .omx/
