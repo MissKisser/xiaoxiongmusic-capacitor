@@ -178,7 +178,7 @@ const resetBackground = () => {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--n-color);
+    background: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 5%));
 
     .preview-img {
       max-width: 60%;

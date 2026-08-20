@@ -109,7 +109,7 @@ const formatTime = (ms: number | null): string => {
 
   .point-card {
     padding: 16px;
-    background-color: var(--n-color);
+    background-color: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 5%));
     border-radius: 12px;
     display: flex;
     flex-direction: column;
@@ -133,7 +133,7 @@ const formatTime = (ms: number | null): string => {
   justify-content: space-between;
   align-items: center;
   padding: 16px;
-  background-color: var(--n-color);
+  background-color: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 5%));
   border-radius: 12px;
 
   .enable-title {

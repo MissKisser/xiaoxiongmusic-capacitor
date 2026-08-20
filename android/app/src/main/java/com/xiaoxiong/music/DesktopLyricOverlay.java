@@ -1,8 +1,12 @@
 package com.xiaoxiong.music;
 
+import android.animation.ArgbEvaluator;
+import android.animation.ValueAnimator;
+import android.content.ComponentCallbacks;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.Typeface;
@@ -12,6 +16,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -37,6 +42,7 @@ class DesktopLyricOverlay {
     }
 
     private static final String PREFS_NAME = "desktop_lyric_overlay";
+    private static final String TAG = "DesktopLyricOverlay";
     private static final String KEY_X = "x";
     private static final String KEY_Y = "y";
     /** 颜色预设：{已播放色, 未播放色} */
@@ -52,7 +58,7 @@ class DesktopLyricOverlay {
     private final SharedPreferences prefs;
     private final Callback callback;
 
-    private LinearLayout rootView;
+    private FrameLayout rootView;
     private LinearLayout lyricArea;
     private LinearLayout controlBar;
     private LinearLayout actionBar;
@@ -61,13 +67,38 @@ class DesktopLyricOverlay {
     private TextView primaryView;
     private TextView secondaryView;
     private ImageView playPauseButton;
-    /** 锁定状态下的解锁按钮（歌词正上方，透明锁图标，3 秒自动隐藏） */
+    /** 锁定状态下的解锁按钮（overlay 叠放在歌词正上方居中，3 秒自动隐藏） */
     private ImageView unlockButton;
     /** 解锁按钮自动隐藏定时器 */
     private final Handler unlockHandler = new Handler(Looper.getMainLooper());
     private final Runnable hideUnlockRunnable = () -> {
         if (unlockButton != null) unlockButton.setVisibility(View.GONE);
     };
+    /** 上一次屏幕方向，用于检测横竖屏切换 */
+    private int lastOrientation = Configuration.ORIENTATION_UNDEFINED;
+    /** 屏幕方向变化监听：横竖屏切换时校正浮窗位置，避免越界/偏差 */
+    private final ComponentCallbacks rotationCallbacks = new ComponentCallbacks() {
+        @Override
+        public void onConfigurationChanged(Configuration newConfig) {
+            if (newConfig.orientation != lastOrientation) {
+                lastOrientation = newConfig.orientation;
+                revalidatePositionForRotation();
+            }
+        }
+
+        @Override
+        public void onLowMemory() {
+        }
+    };
+    /** 浮窗背景（持久 drawable，配合渐变动画避免瞬变闪烁） */
+    private GradientDrawable backgroundDrawable;
+    private int currentBackgroundColor = Color.TRANSPARENT;
+    private ValueAnimator backgroundAnimator;
+    /** 上次应用的窗口参数缓存：参数不变时跳过 updateViewLayout，避免回声触发 resize 弹跳 */
+    private int lastWindowWidth = -1;
+    private int lastWindowHeight = -1;
+    private int lastWindowX = -1;
+    private int lastWindowY = -1;
     private final FrameLayout[] colorPresetContainers = new FrameLayout[COLOR_PRESETS.length];
     private WindowManager.LayoutParams layoutParams;
 
@@ -110,11 +141,17 @@ class DesktopLyricOverlay {
         ensureLayoutParams();
         windowManager.addView(rootView, layoutParams);
         showing = true;
+        lastOrientation = context.getResources().getConfiguration().orientation;
+        context.getApplicationContext().registerComponentCallbacks(rotationCallbacks);
         applyConfig();
     }
 
     void hide() {
         if (!showing || rootView == null) return;
+        context.getApplicationContext().unregisterComponentCallbacks(rotationCallbacks);
+        if (backgroundAnimator != null) {
+            backgroundAnimator.cancel();
+        }
         windowManager.removeView(rootView);
         showing = false;
         controlsVisible = false;
@@ -144,7 +181,8 @@ class DesktopLyricOverlay {
         setTextIfChanged(titleView, titleText);
         setTextIfChanged(primaryView, primary);
         setTextIfChanged(secondaryView, secondary);
-        secondaryView.setVisibility(secondary.isEmpty() ? View.GONE : View.VISIBLE);
+        // 副歌词行恒占位（空文本保留空白行），保证歌词区高度恒定
+        secondaryView.setVisibility(View.VISIBLE);
         updateInfoVisibility();
         updateControlBarVisibility();
     }
@@ -173,14 +211,19 @@ class DesktopLyricOverlay {
             controlsVisible = false;
             toolsPanelVisible = false;
         }
-        applyConfig();
+        updateControlBarVisibility();
+        // 窗口尺寸恒定，仅切换可见性与背景，无 updateViewLayout
+        int targetBackgroundColor = (!locked && controlsVisible)
+                ? parseColor(backgroundMaskColor, 0x99000000) : Color.TRANSPARENT;
+        if (targetBackgroundColor != currentBackgroundColor) {
+            animateBackgroundColor(targetBackgroundColor);
+        }
     }
 
     private void ensureView() {
         if (rootView != null) return;
 
-        rootView = new LinearLayout(context);
-        rootView.setOrientation(LinearLayout.VERTICAL);
+        rootView = new FrameLayout(context);
         rootView.setPadding(dp(12), dp(10), dp(12), dp(10));
 
         lyricArea = new LinearLayout(context);
@@ -193,6 +236,7 @@ class DesktopLyricOverlay {
         titleView.setTextColor(Color.WHITE);
         titleView.setTextSize(12);
         titleView.setAlpha(0.78f);
+        titleView.setIncludeFontPadding(false);
         titleView.setPadding(0, 0, 0, dp(4));
 
         primaryView = createLyricTextView();
@@ -213,11 +257,32 @@ class DesktopLyricOverlay {
 
         controlBar = createControlBar();
 
-        // 锁定状态下的解锁按钮：歌词正上方，透明锁图标，点击解锁
+        // 歌词区固定在浮窗底部：工具栏/解锁按钮显隐均不改变歌词位置
+        FrameLayout.LayoutParams lyricParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+        );
+        lyricParams.gravity = Gravity.BOTTOM;
+        rootView.addView(lyricArea, lyricParams);
+
+        // 工具栏 overlay 叠放在浮窗顶部（窗口高度恒定预留，显隐不触发 resize）
+        FrameLayout.LayoutParams controlParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+        );
+        controlParams.gravity = Gravity.TOP;
+        rootView.addView(controlBar, controlParams);
+
+        // 锁定状态下的解锁按钮：与工具栏同一高度、水平居中（锁定时工具栏隐藏，按钮占据其位置）
         unlockButton = new ImageView(context);
         unlockButton.setImageResource(R.drawable.ic_lock);
-        unlockButton.setBackground(null);
-        unlockButton.setPadding(dp(10), dp(6), dp(10), dp(6));
+        // 半透明深灰圆底 + 白色图标，保证浅色/复杂背景下清晰可见
+        unlockButton.setColorFilter(Color.WHITE);
+        GradientDrawable unlockBackground = new GradientDrawable();
+        unlockBackground.setShape(GradientDrawable.OVAL);
+        unlockBackground.setColor(0x59000000);
+        unlockButton.setBackground(unlockBackground);
+        unlockButton.setScaleType(ImageView.ScaleType.CENTER);
         unlockButton.setVisibility(View.GONE);
         unlockButton.setContentDescription("解锁歌词");
         unlockButton.setOnClickListener(v -> {
@@ -227,18 +292,11 @@ class DesktopLyricOverlay {
             unlockButton.setVisibility(View.GONE);
         });
 
-        rootView.addView(unlockButton, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
-        rootView.addView(controlBar, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
-        rootView.addView(lyricArea, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
+        FrameLayout.LayoutParams unlockParams = new FrameLayout.LayoutParams(dp(30), dp(30));
+        unlockParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        unlockParams.topMargin = dp(2);
+        rootView.addView(unlockButton, unlockParams);
+        Log.d(TAG, "ensureView: fixed-height overlay layout");
     }
 
     private TextView createLyricTextView() {
@@ -289,14 +347,14 @@ class DesktopLyricOverlay {
         actionBar.addView(createIconView(R.drawable.ic_palette, this::toggleToolsPanel));
         actionBar.addView(createDivider());
         actionBar.addView(createIconView(R.drawable.ic_lock, () -> {
-            int beforeInset = getPrimaryTopInset(controlsVisible, toolsPanelVisible);
             locked = true;
             controlsVisible = false;
             toolsPanelVisible = false;
-            int afterInset = getPrimaryTopInset(controlsVisible, toolsPanelVisible);
-            keepPrimaryPosition(beforeInset, afterInset);
+            updateControlBarVisibility();
+            if (currentBackgroundColor != Color.TRANSPARENT) {
+                animateBackgroundColor(Color.TRANSPARENT);
+            }
             notifyConfigChanged();
-            applyConfig();
             showToast("桌面歌词已锁定");
         }));
         actionBar.addView(createIconView(R.drawable.ic_close, () -> {
@@ -434,24 +492,19 @@ class DesktopLyricOverlay {
     }
 
     private void applyColorPreset(String primary, String secondary) {
-        int beforeInset = getPrimaryTopInset(controlsVisible, toolsPanelVisible);
         playedColor = primary;
         unplayedColor = secondary;
         shadowColor = "rgba(0, 0, 0, 0.65)";
         toolsPanelVisible = false;
-        int afterInset = getPrimaryTopInset(controlsVisible, toolsPanelVisible);
-        keepPrimaryPosition(beforeInset, afterInset);
+        updateControlBarVisibility();
         notifyConfigChanged();
         applyConfig();
         showToast("已切换桌面歌词颜色");
     }
 
     private void toggleToolsPanel() {
-        int beforeInset = getPrimaryTopInset(controlsVisible, toolsPanelVisible);
         toolsPanelVisible = !toolsPanelVisible;
-        int afterInset = getPrimaryTopInset(controlsVisible, toolsPanelVisible);
-        keepPrimaryPosition(beforeInset, afterInset);
-        applyConfig();
+        updateControlBarVisibility();
     }
 
     private void notifyControlAction(String action) {
@@ -502,6 +555,7 @@ class DesktopLyricOverlay {
             layoutParams.x = defaultX;
             layoutParams.y = dp(96);
         }
+        applyFixedSize();
     }
 
     private int windowType() {
@@ -522,15 +576,22 @@ class DesktopLyricOverlay {
     private void applyConfig() {
         ensureView();
         ensureLayoutParams();
+        applyFixedSize();
 
         if (locked) controlsVisible = false;
         layoutParams.flags = baseFlags();
 
-        GradientDrawable background = new GradientDrawable();
-        background.setCornerRadius(dp(8));
-        int backgroundColor = controlsVisible ? parseColor(backgroundMaskColor, 0x99000000) : Color.TRANSPARENT;
-        background.setColor(backgroundColor);
-        rootView.setBackground(background);
+        int targetBackgroundColor = controlsVisible ? parseColor(backgroundMaskColor, 0x99000000) : Color.TRANSPARENT;
+        if (backgroundDrawable == null) {
+            backgroundDrawable = new GradientDrawable();
+            backgroundDrawable.setCornerRadius(dp(8));
+        }
+        if (targetBackgroundColor == currentBackgroundColor) {
+            backgroundDrawable.setColor(targetBackgroundColor);
+        } else {
+            animateBackgroundColor(targetBackgroundColor);
+        }
+        rootView.setBackground(backgroundDrawable);
 
         int primaryColor = parseColor(playedColor, Color.WHITE);
         int secondaryColor = parseColor(unplayedColor, Color.LTGRAY);
@@ -555,8 +616,45 @@ class DesktopLyricOverlay {
 
         if (showing) {
             clampToScreen();
-            windowManager.updateViewLayout(rootView, layoutParams);
+            updateWindowIfChanged();
         }
+    }
+
+    /**
+     * 背景色渐变过渡，避免工具栏显隐时背景瞬变闪烁。
+     * 频繁点击先取消旧动画，从当前实际色平滑过渡到目标色。
+     */
+    private void animateBackgroundColor(int targetColor) {
+        if (backgroundAnimator != null) {
+            backgroundAnimator.cancel();
+        }
+        int from = currentBackgroundColor;
+        Log.d(TAG, "animateBackgroundColor " + from + "->" + targetColor);
+        backgroundAnimator = ValueAnimator.ofArgb(from, targetColor);
+        backgroundAnimator.setDuration(150);
+        backgroundAnimator.setEvaluator(new ArgbEvaluator());
+        backgroundAnimator.addUpdateListener(animation -> {
+            currentBackgroundColor = (int) animation.getAnimatedValue();
+            if (backgroundDrawable != null) {
+                backgroundDrawable.setColor(currentBackgroundColor);
+            }
+        });
+        backgroundAnimator.start();
+    }
+
+    /**
+     * 仅当窗口参数实际变化时才 updateViewLayout。
+     * web 配置回声等重复调用若参数未变则直接跳过，避免无谓 resize 引发弹跳。
+     */
+    private void updateWindowIfChanged() {
+        if (!showing || layoutParams == null) return;
+        if (layoutParams.width == lastWindowWidth && layoutParams.height == lastWindowHeight
+                && layoutParams.x == lastWindowX && layoutParams.y == lastWindowY) return;
+        windowManager.updateViewLayout(rootView, layoutParams);
+        lastWindowWidth = layoutParams.width;
+        lastWindowHeight = layoutParams.height;
+        lastWindowX = layoutParams.x;
+        lastWindowY = layoutParams.y;
     }
 
     private void applyGravity() {
@@ -581,7 +679,8 @@ class DesktopLyricOverlay {
 
     private void updateInfoVisibility() {
         if (titleView == null) return;
-        boolean showInfo = (alwaysShowPlayInfo || controlsVisible) && titleText != null && !titleText.isEmpty();
+        // 恒定显示策略：不随工具栏显隐变化，保证歌词区高度稳定
+        boolean showInfo = alwaysShowPlayInfo && titleText != null && !titleText.isEmpty();
         titleView.setVisibility(showInfo ? View.VISIBLE : View.GONE);
     }
 
@@ -601,29 +700,36 @@ class DesktopLyricOverlay {
      * 工具栏保持显示，不自动收缩；再次点击歌词区域时收缩。
      */
     private void setControlsVisible(boolean visible) {
-        int beforeInset = getPrimaryTopInset(controlsVisible, toolsPanelVisible);
         controlsVisible = !locked && visible;
         if (!controlsVisible) toolsPanelVisible = false;
-        int afterInset = getPrimaryTopInset(controlsVisible, toolsPanelVisible);
-        keepPrimaryPosition(beforeInset, afterInset);
-        applyConfig();
+        updateControlBarVisibility();
+        // 窗口尺寸/位置恒定：仅切换 overlay 可见性与背景渐变，不触发 updateViewLayout
+        int targetBackgroundColor = controlsVisible
+                ? parseColor(backgroundMaskColor, 0x99000000) : Color.TRANSPARENT;
+        if (targetBackgroundColor != currentBackgroundColor) {
+            animateBackgroundColor(targetBackgroundColor);
+        }
+        Log.d(TAG, "setControlsVisible visible=" + controlsVisible + " fixed-size");
     }
 
-    private int getPrimaryTopInset(boolean controlsVisible, boolean toolsPanelVisible) {
+    /**
+     * 浮窗恒定高度：顶部工具栏（含展开面板）+ 底部歌词区。
+     * 窗口尺寸保持恒定，工具栏/解锁按钮显隐仅切换 overlay 可见性，
+     * 避免 WindowManager resize 触发 BLAST 缓冲拉伸的"弹跳"视觉效果。
+     */
+    private void applyFixedSize() {
         ensureView();
         ensureLayoutParams();
-
-        int inset = rootView.getPaddingTop();
-        if (!locked && controlsVisible) {
-            inset += measureViewHeight(actionBar);
-            if (toolsPanelVisible) inset += measureViewHeight(toolsPanel) + dp(4);
+        // 仅预留 actionBar 与歌词区的小间隔；toolsPanel 展开时向下叠放覆盖（FrameLayout），不再预留其高度
+        int controlBarHeight = measureViewHeight(actionBar) + dp(4);
+        int lyricHeight = dp(6);
+        if (alwaysShowPlayInfo && titleText != null && !titleText.isEmpty()) {
+            lyricHeight += measureViewHeight(titleView);
         }
-        if (shouldShowInfo(controlsVisible)) inset += measureViewHeight(titleView);
-        return inset;
-    }
-
-    private boolean shouldShowInfo(boolean controlsVisible) {
-        return (alwaysShowPlayInfo || controlsVisible) && titleText != null && !titleText.isEmpty();
+        lyricHeight += measureViewHeight(primaryView) + measureViewHeight(secondaryView);
+        layoutParams.height = rootView.getPaddingTop() + rootView.getPaddingBottom()
+                + controlBarHeight + lyricHeight;
+        Log.d(TAG, "applyFixedSize control=" + controlBarHeight + " lyric=" + lyricHeight + " total=" + layoutParams.height);
     }
 
     private int measureViewHeight(View view) {
@@ -642,13 +748,9 @@ class DesktopLyricOverlay {
         return view.getMeasuredHeight();
     }
 
-    private void keepPrimaryPosition(int beforeInset, int afterInset) {
-        ensureLayoutParams();
-        layoutParams.y -= afterInset - beforeInset;
-    }
-
     private boolean handleLyricTouch(View view, MotionEvent event) {
         if (layoutParams == null) return false;
+        Log.d(TAG, "handleLyricTouch action=" + event.getAction() + " locked=" + locked);
         // 锁定时：点击/拖动歌词唤出解锁按钮，不响应拖动、不切换控制栏
         if (locked) {
             if (event.getAction() == MotionEvent.ACTION_DOWN) {
@@ -672,7 +774,7 @@ class DesktopLyricOverlay {
                     layoutParams.x = startX + deltaX;
                     layoutParams.y = startY + deltaY;
                     if (limitBounds) clampToScreen();
-                    if (showing) windowManager.updateViewLayout(rootView, layoutParams);
+                    updateWindowIfChanged();
                 }
                 return true;
             case MotionEvent.ACTION_UP:
@@ -695,6 +797,7 @@ class DesktopLyricOverlay {
     /** 显示解锁按钮（歌词正上方），3 秒后自动隐藏 */
     private void showUnlockButton() {
         if (unlockButton == null) return;
+        Log.d(TAG, "showUnlockButton");
         unlockButton.setVisibility(View.VISIBLE);
         unlockHandler.removeCallbacks(hideUnlockRunnable);
         unlockHandler.postDelayed(hideUnlockRunnable, 3000);
@@ -704,11 +807,39 @@ class DesktopLyricOverlay {
         if (!limitBounds || layoutParams == null) return;
         int screenWidth = context.getResources().getDisplayMetrics().widthPixels;
         int screenHeight = context.getResources().getDisplayMetrics().heightPixels;
-        int viewHeight = rootView == null || rootView.getHeight() <= 0 ? dp(96) : rootView.getHeight();
+        int viewHeight = layoutParams.height > 0 ? layoutParams.height : dp(96);
         int maxX = Math.max(0, screenWidth - layoutParams.width);
         int maxY = Math.max(0, screenHeight - viewHeight);
         layoutParams.x = clamp(layoutParams.x, 0, maxX);
         layoutParams.y = clamp(layoutParams.y, 0, maxY);
+    }
+
+    /**
+     * 横竖屏切换后校正浮窗位置：更新宽度、clamp 坐标到新屏幕范围，
+     * 确保整个浮窗（含歌词）不超出边界、位置不偏差。
+     */
+    private void revalidatePositionForRotation() {
+        if (layoutParams == null || !showing || rootView == null) return;
+        Log.d(TAG, "revalidatePositionForRotation");
+        int screenWidth = context.getResources().getDisplayMetrics().widthPixels;
+        int screenHeight = context.getResources().getDisplayMetrics().heightPixels;
+        int newWidth = Math.round(screenWidth * 0.92f);
+        layoutParams.width = newWidth;
+        applyFixedSize();
+        int viewHeight = layoutParams.height;
+        int maxX = Math.max(0, screenWidth - newWidth);
+        int maxY = Math.max(0, screenHeight - viewHeight);
+        layoutParams.x = clamp(layoutParams.x, 0, maxX);
+        layoutParams.y = clamp(layoutParams.y, 0, maxY);
+        if (limitBounds) clampToScreen();
+        try {
+            updateWindowIfChanged();
+        } catch (Exception ignored) {
+        }
+        prefs.edit()
+                .putInt(KEY_X, layoutParams.x)
+                .putInt(KEY_Y, layoutParams.y)
+                .apply();
     }
 
     private int parseColor(String value, int fallback) {

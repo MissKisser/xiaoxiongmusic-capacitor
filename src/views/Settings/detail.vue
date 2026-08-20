@@ -2,7 +2,7 @@
   <div class="settings-detail">
     <!-- 顶部返回栏 -->
     <div class="detail-header">
-      <div class="back-btn" @click="router.back()">
+      <div class="settings-back-btn" @click="router.back()">
         <SvgIcon name="NavigateBefore" :size="24" />
       </div>
       <n-text class="detail-title">{{ currentTitle }}</n-text>
@@ -13,7 +13,7 @@
       <div
         v-for="item in submenuItems"
         :key="item.item"
-        class="submenu-row"
+        class="settings-menu-row compact"
         @click="goTo(item.item)"
       >
         <div class="row-icon">
@@ -94,21 +94,7 @@ const goTo = (item: string) => {
     padding: 16px 0;
     margin-bottom: 4px;
 
-    .back-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background-color: var(--n-color);
-      cursor: pointer;
-      transition: background-color 0.2s;
-
-      &:active {
-        background-color: rgba(var(--primary), 0.15);
-      }
-    }
+    // 返回按钮样式统一在全局 .settings-back-btn（main.scss）
 
     .detail-title {
       font-size: 22px;
@@ -116,58 +102,11 @@ const goTo = (item: string) => {
     }
   }
 
+  // 菜单行样式统一在全局 .settings-menu-row（main.scss）
   .submenu-list {
     display: flex;
     flex-direction: column;
     gap: 10px;
-
-    .submenu-row {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 14px 16px;
-      border-radius: 12px;
-      background-color: var(--n-color);
-      cursor: pointer;
-      transition: background-color 0.2s;
-
-      &:active {
-        background-color: rgba(var(--primary), 0.1);
-      }
-
-      .row-icon {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 36px;
-        height: 36px;
-        border-radius: 10px;
-        background-color: rgba(var(--primary), 0.12);
-        color: rgb(var(--primary));
-        flex-shrink: 0;
-      }
-
-      .row-info {
-        flex: 1;
-        min-width: 0;
-
-        .row-title {
-          font-size: 16px;
-          font-weight: 500;
-        }
-
-        .row-desc {
-          font-size: 12px;
-          opacity: 0.55;
-          margin-top: 2px;
-        }
-      }
-
-      .row-arrow {
-        opacity: 0.4;
-        flex-shrink: 0;
-      }
-    }
   }
 
   @media (max-width: 768px) {

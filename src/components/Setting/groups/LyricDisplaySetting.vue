@@ -321,7 +321,7 @@ const tranFontSizeTitle = computed(() =>
   .warning {
     border-radius: 8px;
     font-size: 16px;
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 6%));
     margin-bottom: 4px;
   }
 }

@@ -11,7 +11,7 @@
       <div
         v-for="item in menuItems"
         :key="item.type"
-        class="settings-row"
+        class="settings-menu-row"
         @click="goTo(item.type)"
       >
         <div class="row-icon">
@@ -83,58 +83,11 @@ const goTo = (type: string) => {
     }
   }
 
+  // 菜单行样式统一在全局 .settings-menu-row（main.scss）
   .settings-list {
     display: flex;
     flex-direction: column;
     gap: 10px;
-
-    .settings-row {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 16px 18px;
-      border-radius: 12px;
-      background-color: var(--n-color);
-      cursor: pointer;
-      transition: background-color 0.2s;
-
-      &:active {
-        background-color: rgba(var(--primary), 0.1);
-      }
-
-      .row-icon {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
-        background-color: rgba(var(--primary), 0.12);
-        color: rgb(var(--primary));
-        flex-shrink: 0;
-      }
-
-      .row-info {
-        flex: 1;
-        min-width: 0;
-
-        .row-title {
-          font-size: 16px;
-          font-weight: 500;
-        }
-
-        .row-desc {
-          font-size: 12px;
-          opacity: 0.55;
-          margin-top: 2px;
-        }
-      }
-
-      .row-arrow {
-        opacity: 0.4;
-        flex-shrink: 0;
-      }
-    }
   }
 
   @media (max-width: 768px) {

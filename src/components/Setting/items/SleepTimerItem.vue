@@ -271,7 +271,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  background-color: var(--n-color);
+  background-color: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 5%));
   border-radius: 12px;
 
   .switch-label {
@@ -311,7 +311,7 @@ onBeforeUnmount(() => {
 
 .wait-song-end {
   padding: 16px 20px;
-  background-color: var(--n-color);
+  background-color: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 5%));
   border-radius: 12px;
 
   :deep(.n-checkbox) {
