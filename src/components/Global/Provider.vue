@@ -25,6 +25,13 @@
   </n-config-provider>
 </template>
 
+<style lang="scss">
+// 全局隐藏顶部加载进度条（Naive loading-bar），避免路由切换时顶部条干扰
+.n-loading-bar-container {
+  display: none !important;
+}
+</style>
+
 <script setup lang="ts">
 import {
   zhCN,

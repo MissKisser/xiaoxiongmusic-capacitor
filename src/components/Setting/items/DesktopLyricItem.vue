@@ -1,5 +1,5 @@
 <template>
-  <n-flex vertical :size="12">
+  <n-flex vertical :size="12" class="desktop-lyric-settings">
     <div class="setting-row">
       <div class="label">
         <div class="title">开启桌面歌词</div>
@@ -14,8 +14,8 @@
 
     <div class="setting-row">
       <div class="label">
-        <div class="title">锁定穿透</div>
-        <div class="desc">锁定后不可拖动，点击会穿透到底层应用</div>
+        <div class="title">锁定歌词</div>
+        <div class="desc">锁定后不可拖动，点击歌词会显示解锁按钮</div>
       </div>
       <n-switch
         v-model:value="desktopLyricConfig.isLock"
@@ -130,6 +130,7 @@
           :style="{ '--preset-color': preset.playedColor }"
           @click="applyColorPreset(preset)"
         >
+          <span class="dot" />
           {{ preset.name }}
         </button>
       </div>
@@ -301,7 +302,7 @@ watch(
   min-height: 58px;
   padding: 12px 14px;
   border-radius: 10px;
-  background-color: rgba(var(--primary), 0.06);
+  background-color: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 5%));
 
   &.vertical {
     align-items: stretch;
@@ -338,14 +339,43 @@ watch(
 }
 
 .preset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: none;
   border-radius: 8px;
-  color: var(--color);
-  background:
-    linear-gradient(90deg, var(--preset-color), rgba(255, 255, 255, 0.18)),
-    rgba(var(--primary), 0.08);
   font-size: 13px;
   font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+  background-color: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 10%));
+  transition: background-color 0.2s;
+
+  &:active {
+    background-color: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 18%));
+  }
+
+  .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: var(--preset-color);
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 10%);
+  }
+}
+</style>
+
+<style lang="scss">
+.desktop-lyric-settings {
+  // 按钮统一纯色背景（与设置页歌词设置一致，跟随主题），
+  // 排除 primary/error 等彩色类型与 secondary/tertiary 半透明模式
+  .n-button:not(.n-button--primary-type):not(.n-button--error-type):not(.n-button--warning-type):not(.n-button--info-type):not(.n-button--success-type):not(.n-button--secondary):not(.n-button--tertiary) {
+    --n-color: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 10%));
+    --n-color-hover: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 16%));
+    --n-color-pressed: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 22%));
+    --n-color-focus: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 16%));
+  }
 }
 </style>

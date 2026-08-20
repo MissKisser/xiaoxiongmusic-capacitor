@@ -135,7 +135,7 @@ watch(
 
 .rate-slider-wrapper {
   padding: 20px;
-  background-color: var(--n-color);
+  background-color: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 5%));
   border-radius: 12px;
 
   .slider-labels {

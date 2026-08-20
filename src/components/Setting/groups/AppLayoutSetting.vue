@@ -56,37 +56,43 @@
               问候语、每日推荐、我喜欢的音乐、私人FM 统一缩放，拖动时实时预览首页
             </n-text>
           </div>
-          <n-slider
-            :value="settingStore.homeCardScale"
-            :min="60"
-            :max="100"
-            :step="5"
-            class="card-slider"
-            :format-tooltip="(v: number) => v + '%'"
-            @update:value="handleCardScaleChange"
-            @dragstart="startPreview"
-            @dragend="endPreview"
-          />
+          <div class="slider-row">
+            <n-slider
+              :value="settingStore.homeCardScale"
+              :min="60"
+              :max="100"
+              :step="1"
+              class="card-slider"
+              :format-tooltip="(v: number) => v + '%'"
+              @update:value="handleCardScaleChange"
+              @dragstart="startPreview"
+              @dragend="endPreview"
+            />
+            <span class="slider-value">{{ settingStore.homeCardScale }}%</span>
+          </div>
         </n-card>
 
         <!-- 顶栏高度 -->
         <n-h3 prefix="bar"> 顶栏高度 </n-h3>
-        <n-card class="set-item">
+        <n-card class="set-item nav-card">
           <div class="label">
             <n-text class="name">菜单栏高度</n-text>
             <n-text class="tip" :depth="3">
               拖动滑块实时调整顶部导航栏高度（当前 {{ settingStore.navHeight }}px）
             </n-text>
           </div>
-          <n-slider
-            :value="settingStore.navHeight"
-            :min="50"
-            :max="70"
-            :step="1"
-            class="nav-slider"
-            :format-tooltip="(v: number) => v + 'px'"
-            @update:value="handleNavHeightChange"
-          />
+          <div class="slider-row">
+            <n-slider
+              :value="settingStore.navHeight"
+              :min="50"
+              :max="70"
+              :step="1"
+              class="nav-slider"
+              :format-tooltip="(v: number) => v + 'px'"
+              @update:value="handleNavHeightChange"
+            />
+            <span class="slider-value">{{ settingStore.navHeight }}px</span>
+          </div>
         </n-card>
       </div>
     </div>
@@ -173,7 +179,7 @@ const handleNavHeightChange = (value: number) => {
       margin: 0 auto;
       padding-bottom: 40px;
     }
-    // 拖动预览中：仅保留滑块所在卡片与滑块
+    // 拖动预览中：其他卡片淡出，滑块卡片也透明只留滑块本身
     &.previewing {
       .set-list {
         > *:not(.preview-card) {
@@ -182,18 +188,14 @@ const handleNavHeightChange = (value: number) => {
         }
       }
       .preview-card {
-        background-color: transparent;
-        box-shadow: none;
-        border-color: transparent;
-        :deep(.n-card__content) {
-          justify-content: center;
-        }
+        background-color: transparent !important;
+        box-shadow: none !important;
+        border-color: transparent !important;
         .label {
-          display: none; // 隐藏文字，只留滑块
+          opacity: 0;
         }
-        :deep(.card-slider) {
-          width: 80%;
-          max-width: 320px;
+        .slider-value {
+          opacity: 0;
         }
       }
     }
@@ -205,9 +207,34 @@ const handleNavHeightChange = (value: number) => {
       min-width: 64px;
     }
   }
-  .card-slider,
-  .nav-slider {
-    width: min(50vw, 260px);
+  // 滑块卡片：描述在上、滑块在下从左到右满宽（窄屏不被挤压，宽度恒定避免拖动跳转）
+  .preview-card,
+  .nav-card {
+    :deep(.n-card__content) {
+      flex-direction: column !important;
+      align-items: stretch !important;
+      gap: 12px;
+    }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+    }
+    .card-slider,
+    .nav-slider {
+      flex: 1;
+      min-width: 0;
+    }
+    .slider-value {
+      flex-shrink: 0;
+      font-size: 14px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      min-width: 48px;
+      text-align: right;
+      transition: opacity 0.2s;
+    }
   }
 }
 </style>

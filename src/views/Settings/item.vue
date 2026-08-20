@@ -2,7 +2,7 @@
   <div class="settings-item-page">
     <!-- 顶部返回栏 -->
     <div class="item-header">
-      <div class="back-btn" @click="router.back()">
+      <div class="settings-back-btn" @click="router.back()">
         <SvgIcon name="NavigateBefore" :size="24" />
       </div>
       <n-text class="item-title">{{ itemTitle }}</n-text>
@@ -93,21 +93,7 @@ const itemTitle = computed(() => titles[item.value] || "设置");
     padding: 16px 0;
     margin-bottom: 4px;
 
-    .back-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background-color: var(--n-color);
-      cursor: pointer;
-      transition: background-color 0.2s;
-
-      &:active {
-        background-color: rgba(var(--primary), 0.15);
-      }
-    }
+    // 返回按钮样式统一在全局 .settings-back-btn（main.scss）
 
     .item-title {
       font-size: 22px;
