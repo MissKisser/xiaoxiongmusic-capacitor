@@ -15,7 +15,7 @@
     <div class="setting-row">
       <div class="label">
         <div class="title">锁定歌词</div>
-        <div class="desc">锁定后不可拖动，点击歌词会显示解锁按钮</div>
+        <div class="desc">锁定后周围区域穿透不挡操作，点歌词唤出解锁按钮</div>
       </div>
       <n-switch
         v-model:value="desktopLyricConfig.isLock"

@@ -67,13 +67,29 @@ class DesktopLyricOverlay {
     private TextView primaryView;
     private TextView secondaryView;
     private ImageView playPauseButton;
-    /** 锁定状态下的解锁按钮（overlay 叠放在歌词正上方居中，3 秒自动隐藏） */
+    /** 锁定状态下的解锁按钮（独立小浮窗，点击歌词唤出、3 秒自动隐藏） */
     private ImageView unlockButton;
+    /** 解锁按钮独立小浮窗容器与参数：窗口矩形仅按钮尺寸，四周透明区域可穿透触摸 */
+    private FrameLayout unlockRootView;
+    private WindowManager.LayoutParams unlockLayoutParams;
+    private boolean unlockAdded = false;
+    /** 解锁按钮钉住的屏幕坐标（主窗口顶部预留带内居中，与原窗口内位置一致） */
+    private int unlockPinX = 0;
+    private int unlockPinY = 0;
+    /**
+     * 歌词交互浮窗（锁定态）：主窗口整窗穿透后，仅覆盖歌词区的透明触摸层，
+     * 保证锁定时歌词部分仍可点击（唤出解锁按钮），周围透明区域继续穿透。
+     */
+    private FrameLayout lyricTouchRootView;
+    private WindowManager.LayoutParams lyricTouchLayoutParams;
+    private boolean lyricTouchAdded = false;
+    /** 最近一次计算的工具栏预留高度与歌词区高度，用于定位歌词交互浮窗 */
+    private int lastControlBarHeight = 0;
+    private int lastLyricHeight = 0;
     /** 解锁按钮自动隐藏定时器 */
     private final Handler unlockHandler = new Handler(Looper.getMainLooper());
-    private final Runnable hideUnlockRunnable = () -> {
-        if (unlockButton != null) unlockButton.setVisibility(View.GONE);
-    };
+    /** 解锁按钮自动隐藏任务：移除独立浮窗（在构造函数中初始化，避免引用未赋值的 windowManager） */
+    private Runnable hideUnlockRunnable;
     /** 上一次屏幕方向，用于检测横竖屏切换 */
     private int lastOrientation = Configuration.ORIENTATION_UNDEFINED;
     /** 屏幕方向变化监听：横竖屏切换时校正浮窗位置，避免越界/偏差 */
@@ -130,6 +146,15 @@ class DesktopLyricOverlay {
         this.windowManager = (WindowManager) this.context.getSystemService(Context.WINDOW_SERVICE);
         this.prefs = this.context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         this.callback = callback;
+        this.hideUnlockRunnable = () -> {
+            if (unlockAdded && unlockRootView != null) {
+                try {
+                    windowManager.removeView(unlockRootView);
+                } catch (Exception ignored) {
+                }
+                unlockAdded = false;
+            }
+        };
     }
 
     void show() {
@@ -144,6 +169,11 @@ class DesktopLyricOverlay {
         lastOrientation = context.getResources().getConfiguration().orientation;
         context.getApplicationContext().registerComponentCallbacks(rotationCallbacks);
         applyConfig();
+        // 恢复显示时若处于锁定态：整窗穿透 + 歌词交互浮窗（解锁按钮等点击歌词唤出）
+        if (locked) {
+            applyTouchPassThrough();
+            addLyricTouchFloat();
+        }
     }
 
     void hide() {
@@ -152,13 +182,13 @@ class DesktopLyricOverlay {
         if (backgroundAnimator != null) {
             backgroundAnimator.cancel();
         }
+        unlockHandler.removeCallbacks(hideUnlockRunnable);
+        hideUnlockRunnable.run();
+        removeLyricTouchFloat();
         windowManager.removeView(rootView);
         showing = false;
         controlsVisible = false;
         toolsPanelVisible = false;
-        // 清理解锁按钮状态，避免重新显示时残留
-        if (unlockButton != null) unlockButton.setVisibility(View.GONE);
-        unlockHandler.removeCallbacks(hideUnlockRunnable);
     }
 
     boolean isShowing() {
@@ -188,7 +218,8 @@ class DesktopLyricOverlay {
     }
 
     void updateConfig(JSObject config) {
-        locked = config.optBoolean("isLock", locked);
+        // locked 由 setLocked 统一管理，此处不修改，
+        // 以保证 setLocked 能识别状态变化并执行主窗口 resize 与解锁浮窗联动
         playedColor = config.optString("playedColor", playedColor);
         unplayedColor = config.optString("unplayedColor", unplayedColor);
         shadowColor = config.optString("shadowColor", shadowColor);
@@ -206,13 +237,25 @@ class DesktopLyricOverlay {
     }
 
     void setLocked(boolean locked) {
+        boolean changed = this.locked != locked;
         this.locked = locked;
         if (locked) {
             controlsVisible = false;
             toolsPanelVisible = false;
         }
         updateControlBarVisibility();
-        // 窗口尺寸恒定，仅切换可见性与背景，无 updateViewLayout
+        if (changed && showing && layoutParams != null) {
+            // 锁定：主窗口整窗穿透 + 歌词交互浮窗（仅歌词区可点，唤出解锁按钮）；
+            // 解锁：恢复主窗口可触摸，移除交互浮窗与解锁按钮
+            applyTouchPassThrough();
+            if (locked) {
+                addLyricTouchFloat();
+            } else {
+                unlockHandler.removeCallbacks(hideUnlockRunnable);
+                hideUnlockRunnable.run();
+                removeLyricTouchFloat();
+            }
+        }
         int targetBackgroundColor = (!locked && controlsVisible)
                 ? parseColor(backgroundMaskColor, 0x99000000) : Color.TRANSPARENT;
         if (targetBackgroundColor != currentBackgroundColor) {
@@ -257,7 +300,7 @@ class DesktopLyricOverlay {
 
         controlBar = createControlBar();
 
-        // 歌词区固定在浮窗底部：工具栏/解锁按钮显隐均不改变歌词位置
+        // 歌词区固定在浮窗底部：工具栏显隐均不改变歌词位置
         FrameLayout.LayoutParams lyricParams = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT
@@ -273,7 +316,20 @@ class DesktopLyricOverlay {
         controlParams.gravity = Gravity.TOP;
         rootView.addView(controlBar, controlParams);
 
-        // 锁定状态下的解锁按钮：与工具栏同一高度、水平居中（锁定时工具栏隐藏，按钮占据其位置）
+        // 解锁按钮为独立小浮窗：锁定时主窗口整窗穿透，解锁按钮独立于主窗口之外，仍可点击；
+        // 歌词交互浮窗（仅覆盖歌词区）保证锁定时歌词可点，周围区域继续穿透
+        ensureUnlockView();
+        ensureLyricTouchView();
+        Log.d(TAG, "ensureView: fixed-height overlay layout");
+    }
+
+    /**
+     * 构建解锁按钮独立浮窗容器（仅 30x30dp），锁定时 addView 显示、隐藏时 removeView，
+     * 窗口矩形极小故其四周不拦截下层应用触摸。
+     */
+    private void ensureUnlockView() {
+        if (unlockRootView != null) return;
+        unlockRootView = new FrameLayout(context);
         unlockButton = new ImageView(context);
         unlockButton.setImageResource(R.drawable.ic_lock);
         // 半透明深灰圆底 + 白色图标，保证浅色/复杂背景下清晰可见
@@ -283,20 +339,13 @@ class DesktopLyricOverlay {
         unlockBackground.setColor(0x59000000);
         unlockButton.setBackground(unlockBackground);
         unlockButton.setScaleType(ImageView.ScaleType.CENTER);
-        unlockButton.setVisibility(View.GONE);
         unlockButton.setContentDescription("解锁歌词");
         unlockButton.setOnClickListener(v -> {
-            // 点击解锁并同步前端锁定状态
+            // 点击解锁：setLocked(false) 会移除解锁按钮浮窗并恢复主窗口可触摸
             setLocked(false);
             notifyConfigChanged();
-            unlockButton.setVisibility(View.GONE);
         });
-
-        FrameLayout.LayoutParams unlockParams = new FrameLayout.LayoutParams(dp(30), dp(30));
-        unlockParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-        unlockParams.topMargin = dp(2);
-        rootView.addView(unlockButton, unlockParams);
-        Log.d(TAG, "ensureView: fixed-height overlay layout");
+        unlockRootView.addView(unlockButton, new FrameLayout.LayoutParams(dp(30), dp(30)));
     }
 
     private TextView createLyricTextView() {
@@ -347,13 +396,7 @@ class DesktopLyricOverlay {
         actionBar.addView(createIconView(R.drawable.ic_palette, this::toggleToolsPanel));
         actionBar.addView(createDivider());
         actionBar.addView(createIconView(R.drawable.ic_lock, () -> {
-            locked = true;
-            controlsVisible = false;
-            toolsPanelVisible = false;
-            updateControlBarVisibility();
-            if (currentBackgroundColor != Color.TRANSPARENT) {
-                animateBackgroundColor(Color.TRANSPARENT);
-            }
+            setLocked(true);
             notifyConfigChanged();
             showToast("桌面歌词已锁定");
         }));
@@ -579,7 +622,7 @@ class DesktopLyricOverlay {
         applyFixedSize();
 
         if (locked) controlsVisible = false;
-        layoutParams.flags = baseFlags();
+        // 穿透 flags 由 applyTouchPassThrough 统一计算（锁定时含 FLAG_NOT_TOUCHABLE）
 
         int targetBackgroundColor = controlsVisible ? parseColor(backgroundMaskColor, 0x99000000) : Color.TRANSPARENT;
         if (backgroundDrawable == null) {
@@ -615,8 +658,12 @@ class DesktopLyricOverlay {
         updateColorPanelSelection();
 
         if (showing) {
+            // 窗口恒定尺寸，仅校正位置；穿透 flags 与锁定态附属浮窗位置随状态同步
             clampToScreen();
             updateWindowIfChanged();
+            applyTouchPassThrough();
+            syncLyricTouchFloat();
+            syncUnlockFloat();
         }
     }
 
@@ -697,13 +744,12 @@ class DesktopLyricOverlay {
 
     /**
      * 切换工具栏显示状态。
-     * 工具栏保持显示，不自动收缩；再次点击歌词区域时收缩。
+     * 工具栏为窗口内 overlay，显隐仅切换可见性与背景渐变，窗口尺寸/位置恒定，无 resize 弹跳。
      */
     private void setControlsVisible(boolean visible) {
         controlsVisible = !locked && visible;
         if (!controlsVisible) toolsPanelVisible = false;
         updateControlBarVisibility();
-        // 窗口尺寸/位置恒定：仅切换 overlay 可见性与背景渐变，不触发 updateViewLayout
         int targetBackgroundColor = controlsVisible
                 ? parseColor(backgroundMaskColor, 0x99000000) : Color.TRANSPARENT;
         if (targetBackgroundColor != currentBackgroundColor) {
@@ -713,9 +759,116 @@ class DesktopLyricOverlay {
     }
 
     /**
-     * 浮窗恒定高度：顶部工具栏（含展开面板）+ 底部歌词区。
-     * 窗口尺寸保持恒定，工具栏/解锁按钮显隐仅切换 overlay 可见性，
-     * 避免 WindowManager resize 触发 BLAST 缓冲拉伸的"弹跳"视觉效果。
+     * 切换主窗口触摸穿透（对齐主流桌面歌词实现）：
+     * 锁定时加 FLAG_NOT_TOUCHABLE 整窗穿透（歌词变只读水印），解锁时移除恢复可拖可点。
+     * 仅切换触摸属性，不改窗口尺寸/位置/背景，无 resize 弹跳。
+     */
+    private void applyTouchPassThrough() {
+        if (layoutParams == null || !showing) return;
+        int targetFlags = baseFlags();
+        if (locked) targetFlags |= WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+        if (layoutParams.flags == targetFlags) return;
+        layoutParams.flags = targetFlags;
+        try {
+            windowManager.updateViewLayout(rootView, layoutParams);
+            Log.d(TAG, "applyTouchPassThrough locked=" + locked);
+        } catch (Exception ignored) {
+        }
+    }
+
+    /**
+     * 同步解锁按钮独立浮窗的屏幕位置（主窗口移动/尺寸变化后调用）。
+     */
+    private void syncUnlockFloat() {
+        if (!unlockAdded || unlockRootView == null) return;
+        computeUnlockPin();
+        if (unlockLayoutParams != null
+                && (unlockLayoutParams.x != unlockPinX || unlockLayoutParams.y != unlockPinY)) {
+            unlockLayoutParams.x = unlockPinX;
+            unlockLayoutParams.y = unlockPinY;
+            try {
+                windowManager.updateViewLayout(unlockRootView, unlockLayoutParams);
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    /**
+     * 构建歌词交互浮窗：透明触摸层，仅覆盖主窗口底部歌词区，
+     * 挂 handleLyricTouch 处理锁定态的点击（唤出解锁按钮），不响应拖动。
+     */
+    private void ensureLyricTouchView() {
+        if (lyricTouchRootView != null) return;
+        lyricTouchRootView = new FrameLayout(context);
+        lyricTouchRootView.setOnTouchListener(this::handleLyricTouch);
+    }
+
+    /** 添加歌词交互浮窗（锁定态），矩形精确覆盖歌词区：顶部透明带继续穿透 */
+    private void addLyricTouchFloat() {
+        if (layoutParams == null) return;
+        ensureLyricTouchView();
+        if (lyricTouchAdded) {
+            syncLyricTouchFloat();
+            return;
+        }
+        lyricTouchLayoutParams = new WindowManager.LayoutParams(
+                layoutParams.width,
+                Math.max(0, lastLyricHeight),
+                windowType(),
+                baseFlags(),
+                PixelFormat.TRANSLUCENT
+        );
+        lyricTouchLayoutParams.gravity = Gravity.TOP | Gravity.START;
+        lyricTouchLayoutParams.x = computeLyricTouchX();
+        lyricTouchLayoutParams.y = computeLyricTouchY();
+        try {
+            windowManager.addView(lyricTouchRootView, lyricTouchLayoutParams);
+            lyricTouchAdded = true;
+        } catch (Exception e) {
+            Log.e(TAG, "添加歌词交互浮窗失败", e);
+        }
+    }
+
+    /** 移除歌词交互浮窗 */
+    private void removeLyricTouchFloat() {
+        if (lyricTouchAdded && lyricTouchRootView != null) {
+            try {
+                windowManager.removeView(lyricTouchRootView);
+            } catch (Exception ignored) {
+            }
+            lyricTouchAdded = false;
+        }
+    }
+
+    /** 歌词交互浮窗 X 坐标：与主窗口水平对齐 */
+    private int computeLyricTouchX() {
+        return layoutParams.x;
+    }
+
+    /** 歌词交互浮窗 Y 坐标：主窗口底部向上 lastLyricHeight（与 lyricArea 区域一致） */
+    private int computeLyricTouchY() {
+        return layoutParams.y + layoutParams.height
+                - rootView.getPaddingBottom() - lastLyricHeight;
+    }
+
+    /** 主窗口位置/尺寸变化后同步歌词交互浮窗位置 */
+    private void syncLyricTouchFloat() {
+        if (!lyricTouchAdded || lyricTouchLayoutParams == null) return;
+        int targetX = computeLyricTouchX();
+        int targetY = computeLyricTouchY();
+        if (lyricTouchLayoutParams.x == targetX && lyricTouchLayoutParams.y == targetY) return;
+        lyricTouchLayoutParams.x = targetX;
+        lyricTouchLayoutParams.y = targetY;
+        try {
+            windowManager.updateViewLayout(lyricTouchRootView, lyricTouchLayoutParams);
+        } catch (Exception ignored) {
+        }
+    }
+
+    /**
+     * 浮窗恒定高度：顶部工具栏预留 + 底部歌词区。
+     * 窗口尺寸保持恒定，工具栏显隐仅切换 overlay 可见性，不触发 resize，
+     * 避免 BLAST 缓冲拉伸的"弹跳"视觉效果；锁定穿透只切 flags，同样不动尺寸。
      */
     private void applyFixedSize() {
         ensureView();
@@ -727,9 +880,12 @@ class DesktopLyricOverlay {
             lyricHeight += measureViewHeight(titleView);
         }
         lyricHeight += measureViewHeight(primaryView) + measureViewHeight(secondaryView);
+        lastControlBarHeight = controlBarHeight;
+        lastLyricHeight = lyricHeight;
         layoutParams.height = rootView.getPaddingTop() + rootView.getPaddingBottom()
                 + controlBarHeight + lyricHeight;
-        Log.d(TAG, "applyFixedSize control=" + controlBarHeight + " lyric=" + lyricHeight + " total=" + layoutParams.height);
+        Log.d(TAG, "applyFixedSize control=" + controlBarHeight + " lyric=" + lyricHeight
+                + " total=" + layoutParams.height);
     }
 
     private int measureViewHeight(View view) {
@@ -751,7 +907,8 @@ class DesktopLyricOverlay {
     private boolean handleLyricTouch(View view, MotionEvent event) {
         if (layoutParams == null) return false;
         Log.d(TAG, "handleLyricTouch action=" + event.getAction() + " locked=" + locked);
-        // 锁定时：点击/拖动歌词唤出解锁按钮，不响应拖动、不切换控制栏
+        // 锁定时：主窗口整窗穿透，触摸由歌词交互浮窗（仅覆盖歌词区）转入本处理；
+        // 点击唤出解锁按钮（3 秒自动隐藏），不响应拖动、不切换控制栏
         if (locked) {
             if (event.getAction() == MotionEvent.ACTION_DOWN) {
                 showUnlockButton();
@@ -777,6 +934,8 @@ class DesktopLyricOverlay {
                     // 若超出屏幕边界由松手回弹兜底
                     if (limitBounds) clampToScreen();
                     updateWindowIfChanged();
+                    // 解锁按钮浮窗（若显示）跟随主窗口移动
+                    syncUnlockFloat();
                 }
                 return true;
             case MotionEvent.ACTION_UP:
@@ -799,12 +958,56 @@ class DesktopLyricOverlay {
         }
     }
 
-    /** 显示解锁按钮（歌词正上方），3 秒后自动隐藏 */
+    /**
+     * 计算解锁按钮钉住的屏幕坐标：主窗口顶部预留带（工具栏区域）内、水平居中，
+     * 与原窗口内布局（gravity TOP|CENTER_HORIZONTAL + topMargin 2dp）位置一致。
+     */
+    private void computeUnlockPin() {
+        if (layoutParams == null) return;
+        int paddingTop = rootView.getPaddingTop();
+        int buttonSize = dp(30);
+        unlockPinX = layoutParams.x + (layoutParams.width - buttonSize) / 2;
+        unlockPinY = layoutParams.y + paddingTop + dp(2);
+        Log.d(TAG, "computeUnlockPin x=" + unlockPinX + " y=" + unlockPinY);
+    }
+
+    /**
+     * 显示解锁按钮独立浮窗（钉在 computeUnlockPin 计算的屏幕位置）。
+     * 锁定期间常驻显示：主窗口已整窗穿透，无法通过点击歌词唤出，故不再 3 秒自动隐藏。
+     */
     private void showUnlockButton() {
-        if (unlockButton == null) return;
-        Log.d(TAG, "showUnlockButton");
-        unlockButton.setVisibility(View.VISIBLE);
+        if (unlockRootView == null) return;
+        computeUnlockPin();
+        Log.d(TAG, "showUnlockButton pinX=" + unlockPinX + " pinY=" + unlockPinY);
         unlockHandler.removeCallbacks(hideUnlockRunnable);
+        if (!unlockAdded) {
+            unlockLayoutParams = new WindowManager.LayoutParams(
+                    dp(30),
+                    dp(30),
+                    windowType(),
+                    baseFlags(),
+                    PixelFormat.TRANSLUCENT
+            );
+            unlockLayoutParams.gravity = Gravity.TOP | Gravity.START;
+            unlockLayoutParams.x = unlockPinX;
+            unlockLayoutParams.y = unlockPinY;
+            try {
+                windowManager.addView(unlockRootView, unlockLayoutParams);
+                unlockAdded = true;
+            } catch (Exception e) {
+                Log.e(TAG, "添加解锁按钮浮窗失败", e);
+            }
+        } else if (unlockLayoutParams != null) {
+            // 已显示：跟随主窗口移动更新位置
+            if (unlockLayoutParams.x != unlockPinX || unlockLayoutParams.y != unlockPinY) {
+                unlockLayoutParams.x = unlockPinX;
+                unlockLayoutParams.y = unlockPinY;
+                try {
+                    windowManager.updateViewLayout(unlockRootView, unlockLayoutParams);
+                } catch (Exception ignored) {
+                }
+            }
+        }
         unlockHandler.postDelayed(hideUnlockRunnable, 3000);
     }
 
@@ -835,9 +1038,8 @@ class DesktopLyricOverlay {
         int newWidth = Math.round(screenWidth * 0.92f);
         layoutParams.width = newWidth;
         applyFixedSize();
-        int viewHeight = layoutParams.height;
         int maxX = Math.max(0, screenWidth - newWidth);
-        int maxY = Math.max(0, screenHeight - viewHeight);
+        int maxY = Math.max(0, screenHeight - layoutParams.height);
         layoutParams.x = clamp(layoutParams.x, 0, maxX);
         layoutParams.y = clamp(layoutParams.y, 0, maxY);
         try {
@@ -848,6 +1050,9 @@ class DesktopLyricOverlay {
                 .putInt(KEY_X, layoutParams.x)
                 .putInt(KEY_Y, layoutParams.y)
                 .apply();
+        // 旋转后主窗口位置变化，同步锁定态附属浮窗（歌词交互层/解锁按钮）
+        syncLyricTouchFloat();
+        syncUnlockFloat();
     }
 
     private int parseColor(String value, int fallback) {
