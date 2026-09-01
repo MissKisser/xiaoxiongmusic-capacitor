@@ -54,12 +54,6 @@ export class PlayModeManager {
 
     this.syncMediaPlayMode();
 
-    // const modeText: Record<RepeatModeType, string> = {
-    //   list: "列表循环",
-    //   one: "单曲循环",
-    //   off: "不循环",
-    // };
-    // window.$message.success(`已切换至：${modeText[statusStore.repeatMode]}`);
   }
 
   /**

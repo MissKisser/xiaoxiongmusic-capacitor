@@ -118,7 +118,6 @@ const isShowComment = computed<boolean>(
 const noLrc = computed<boolean>(() => {
   const noNormalLrc = !musicStore.isHasLrc;
   const noYrcAvailable = !musicStore.isHasYrc || !settingStore.showYrc;
-  // const notLoading = !statusStore.lyricLoading;
 
   return noNormalLrc && noYrcAvailable;
 });

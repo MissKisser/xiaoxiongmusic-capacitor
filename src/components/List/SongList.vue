@@ -350,8 +350,6 @@ const listKey = computed(() => {
   }
   // 对于本地音乐和没有特定ID的列表，使用数据的哈希值确保唯一性
   // 这样当数据内容变化时，key会改变，触发虚拟列表重新渲染
-  // const dataHash = props.data?.map((song) => song.id).join("-") || "";
-  // return `type-${props.type}-${dataHash}`;
   return `list-${props.listVersion}-${props.type}-${statusStore.listSortField}-${statusStore.listSortOrder}`;
 });
 
