@@ -188,13 +188,14 @@ export async function localNcmRequest<T = any>(
     : randomCNIP();
 
   // 单步请求;多步端点(followUp)通过 req 回调复用 ncmPost
-  const req = (u: string, c: CryptoType, d: Record<string, any>) =>
-    ncmPost(u, c, d, cookie, realIP);
-  let result = await ncmPost(uri, ep.crypto, data, cookie, realIP);
+  const req = async (u: string, c: CryptoType, d: Record<string, any>) =>
+    (await ncmPost(u, c, d, cookie, realIP)).body;
+  const { body, headers } = await ncmPost(uri, ep.crypto, data, cookie, realIP);
+  let result = body;
   if (ep.followUp) {
     result = await ep.followUp(result, query, req);
   } else if (ep.transform) {
-    result = ep.transform(result, query);
+    result = ep.transform(result, query, headers);
   }
   return result as T;
 }
@@ -202,6 +203,9 @@ export async function localNcmRequest<T = any>(
 /**
  * 内部单步请求:按 cryptoType 签名 -> CapacitorHttp 发送 -> parse 成对象。
  * localNcmRequest 主请求与 followUp 后续请求都走这里。
+ *
+ * @returns body 为 NCM 响应体;headers 为响应头(含合并后的 Set-Cookie),
+ *          供需要读取登录 Cookie 的端点 transform 使用。
  */
 async function ncmPost(
   uri: string,
@@ -209,7 +213,7 @@ async function ncmPost(
   data: Record<string, any>,
   cookie: Record<string, string>,
   realIP: string,
-): Promise<any> {
+): Promise<{ body: any; headers: Record<string, string> }> {
   let requestUrl: string;
   let headers: Record<string, string> = {};
   let body: string;
@@ -287,5 +291,5 @@ async function ncmPost(
       // 非 JSON 字符串(如纯文本错误),保持原样由上层处理
     }
   }
-  return result;
+  return { body: result, headers: response.headers };
 }

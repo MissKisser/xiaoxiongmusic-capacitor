@@ -12,6 +12,8 @@
  * 作者:Hackerdallas
  */
 
+import { cookieObjectToString, parseSetCookie } from "./setCookie";
+
 /** 签名方式 */
 export type CryptoType = "weapi" | "eapi" | "linuxapi";
 
@@ -33,8 +35,13 @@ export interface EndpointConfig {
 /**
  * 后处理:对 NCM 返回的 body 做与 ncm module 一致的变换。
    * 大部分端点不需要,默认 identity。
+   * @param headers 响应头(CapacitorHttp 已将多个同名头合并为逗号串)
    */
-  transform?: (body: any, query: Record<string, any>) => any;
+  transform?: (
+    body: any,
+    query: Record<string, any>,
+    headers?: Record<string, string>,
+  ) => any;
   /**
    * 多步请求:主请求完成后,基于其结果发起后续请求并返回最终 body。
    * req 是内部请求函数:(uri, crypto, data) => Promise<body>。
@@ -226,12 +233,19 @@ export const ENDPOINT_MAP: Record<string, EndpointConfig> = {
 
   /**
    * 二维码状态检查。
-   * ncm module 返回 {...body, cookie: cookie.join(';')}。
+   * 直连 eapi 时登录 Cookie 只存在于 Set-Cookie 响应头,
+   * 需在此提取并拼入 body.cookie,供扫码成功分支校验 MUSIC_U。
    */
   "/login/qr/check": {
     uri: "/api/login/qrcode/client/login",
     crypto: "eapi",
     buildData: (q) => ({ key: q.key, type: 3 }),
+    transform: (body, _query, headers) => ({
+      ...body,
+      cookie: cookieObjectToString(
+        parseSetCookie(headers?.["Set-Cookie"] ?? headers?.["set-cookie"]),
+      ),
+    }),
   },
 
   /** 登录状态 */

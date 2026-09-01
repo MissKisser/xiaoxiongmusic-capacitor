@@ -146,13 +146,15 @@ const checkQrStatus = async () => {
         break;
       // 登录成功
       case 803:
-        qrStatusCode.value = 803;
         pauseCheck();
         // 是否含有 MUSIC_U
         if (cookie && cookie.includes("MUSIC_U")) {
+          qrStatusCode.value = 803;
           // 储存登录信息
           emit("saveLogin", { code: 200, cookie }, "qr");
         } else {
+          // 凭证缺失视为本次登录无效,重置状态并重新获取二维码
+          qrStatusCode.value = 800;
           window.$message.error("登录出错，请重试");
           getQrData();
         }
