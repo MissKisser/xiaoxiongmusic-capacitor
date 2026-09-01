@@ -1,7 +1,7 @@
 /**
  * @file validate.ts
  * @description 常用验证函数
- * @author imsyy
+ * @author Hackerdallas
  */
 
 /**

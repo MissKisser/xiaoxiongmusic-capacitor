@@ -40,8 +40,6 @@ const player = usePlayerController();
 const dragValue = ref(0);
 // 是否拖动
 const isDragging = ref(false);
-// 是否显示提示
-// const showSliderTooltip = ref(false);
 
 // 实时进度
 const sliderProgress = computed({

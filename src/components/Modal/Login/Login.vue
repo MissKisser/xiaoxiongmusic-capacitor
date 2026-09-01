@@ -1,13 +1,10 @@
 <template>
   <div class="login">
     <img src="/images/logo.png?asset" alt="logo" class="logo" style="border-radius: 50%;" />
-    <!-- 登录方式 -->
+    <!-- 登录方式：仅扫码登录 -->
     <n-tabs class="login-tabs" default-value="login-qr" type="segment" animated>
       <n-tab-pane name="login-qr" tab="扫码登录">
         <LoginQRCode :pause="qrPause" @saveLogin="saveLogin" />
-      </n-tab-pane>
-      <n-tab-pane name="login-phone" tab="验证码登录">
-        <LoginPhone @saveLogin="saveLogin" />
       </n-tab-pane>
     </n-tabs>
     <!-- 关闭登录 -->

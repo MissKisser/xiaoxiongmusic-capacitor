@@ -1,6 +1,9 @@
 import request from "@/utils/request";
 
-// 生成二维码 key
+/**
+ * 生成二维码 key
+ * @returns 二维码 key 请求 Promise
+ */
 export const qrKey = () => {
   return request({
     url: "/login/qr/key",
@@ -11,7 +14,12 @@ export const qrKey = () => {
   });
 };
 
-// 生成二维码
+/**
+ * 生成二维码
+ * @param key 二维码 key
+ * @param qrimg 是否返回二维码图片
+ * @returns 二维码数据请求 Promise
+ */
 export const qrCreate = (key: string, qrimg: boolean = true) => {
   return request({
     url: "/login/qr/create",
@@ -24,7 +32,11 @@ export const qrCreate = (key: string, qrimg: boolean = true) => {
   });
 };
 
-// 检查二维码状态
+/**
+ * 检查二维码状态
+ * @param key 二维码 key
+ * @returns 二维码状态请求 Promise
+ */
 export const checkQr = (key: string) => {
   return request({
     url: "/login/qr/check",
@@ -36,47 +48,11 @@ export const checkQr = (key: string) => {
   });
 };
 
-// 手机号登录
-export const loginPhone = (phone: number, captcha: number, ctcode: number = 86) => {
-  return request({
-    url: "/login/cellphone",
-    params: {
-      phone,
-      captcha,
-      ctcode,
-      noCookie: true,
-      timestamp: Date.now(),
-    },
-  });
-};
 
-// 发送验证码
-export const sentCaptcha = (phone: number, ctcode: number = 86) => {
-  return request({
-    url: "/captcha/sent",
-    params: {
-      phone,
-      ctcode,
-      noCookie: true,
-      timestamp: Date.now(),
-    },
-  });
-};
-
-// 验证验证码是否正确
-export const verifyCaptcha = (phone: number, captcha: number, ctcode: number = 86) => {
-  return request({
-    url: "/captcha/verify",
-    params: {
-      phone,
-      captcha,
-      ctcode,
-      timestamp: Date.now(),
-    },
-  });
-};
-
-// 获取登录状态
+/**
+ * 获取登录状态
+ * @returns 登录状态请求 Promise
+ */
 export const getLoginState = () => {
   return request({
     url: "/login/status",
@@ -86,7 +62,10 @@ export const getLoginState = () => {
   });
 };
 
-// 刷新登录
+/**
+ * 刷新登录
+ * @returns 刷新登录请求 Promise
+ */
 export const refreshLogin = () => {
   return request({
     url: "/login/refresh",
@@ -96,7 +75,10 @@ export const refreshLogin = () => {
   });
 };
 
-// 退出登录
+/**
+ * 退出登录
+ * @returns 退出登录请求 Promise
+ */
 export const logout = () => {
   return request({
     url: "/logout",
@@ -106,7 +88,10 @@ export const logout = () => {
   });
 };
 
-// 国家码列表
+/**
+ * 国家码列表
+ * @returns 国家码列表请求 Promise
+ */
 export const countryList = () => {
   return request({
     url: "/countries/code/list",

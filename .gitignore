@@ -43,6 +43,10 @@ release/
 SHA256SUMS-*.txt
 
 # 文档：仅保留 README.md（其余为 agent 创建/使用的文档，不提交）
+# *.md 覆盖所有 Markdown，仅 !README.md 豁免；docs/ 整体忽略；
+# 下列显式条目为冗余声明（已被 *.md/docs/ 覆盖），保留仅为可读性，
+# 与 AGENTS.md/CLAUDE.md“也不得入库”最终条款一致。若需跟踪 AGENTS.md/CLAUDE.md
+# 应改为 !AGENTS.md / !CLAUDE.md 并同步更新 AGENTS.md 文档规范文字。
 *.md
 !README.md
 docs/

@@ -141,9 +141,6 @@
 </template>
 <script setup lang="ts">
 import { useSettingStore, useStatusStore } from "@/stores";
-// import { renderIcon } from "@/utils/helper";
-// import { openSetting } from "@/utils/modal";
-// import { isDev } from "@/utils/env";
 import { isElectron } from "@/utils/env";
 import { useMobile } from "@/composables/useMobile";
 
