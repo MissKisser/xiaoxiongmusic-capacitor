@@ -11,15 +11,15 @@ import {
   userAlbum,
   userPlaylist,
 } from "@/api/user";
-import { likeSong } from "@/api/song";
+import { likeSong, songDetail } from "@/api/song";
 import { formatCoverList, formatArtistsList, formatSongsList } from "@/utils/format";
 import { useDataStore, useMusicStore } from "@/stores";
 import { logout, refreshLogin } from "@/api/login";
-import { debounce, isFunction, type DebouncedFunc } from "lodash-es";
+import { debounce, isFunction, uniqBy, type DebouncedFunc } from "lodash-es";
 import { isBeforeSixAM } from "./time";
 import { dailyRecommend } from "@/api/rec";
 import { isElectron } from "./env";
-import { likePlaylist, playlistTracks } from "@/api/playlist";
+import { likePlaylist, playlistDetail, playlistAllSongs, playlistTracks } from "@/api/playlist";
 import { likeArtist } from "@/api/artist";
 import { likeAlbum } from "@/api/album";
 import { radioSub } from "@/api/radio";
@@ -120,6 +120,10 @@ export const updateUserData = async () => {
     // 若部分失败
     const hasFailed = allUserLikeResult.some((result) => result.status === "rejected");
     if (hasFailed) throw new Error("Failed to update some user data");
+    // 首页"我喜欢的音乐"卡片依赖歌单列表数据，需在喜欢数据就绪后拉取
+    await updateLikedSongsList().catch((error) => {
+      console.error("❌ Error updating liked songs list:", error);
+    });
   } catch (error) {
     console.error("❌ Error updating user data:", error);
     throw error;
@@ -182,6 +186,53 @@ export const updateUserLikePlaylist = async () => {
 // 更新用户喜欢歌手
 export const updateUserLikeArtists = async () => {
   await setUserLikeDataLoop(userArtist, formatArtistsList, "artists");
+};
+
+/**
+ * 更新我喜欢的音乐歌单数据
+ *
+ * 首页"我喜欢的音乐"卡片读取 likeSongsList,该数据原本仅在访问
+ * 我喜欢页面或应用启动恢复时填充,登录后需主动拉取一次,否则卡片为空。
+ * @returns 是否成功
+ */
+export const updateLikedSongsList = async (): Promise<boolean> => {
+  const dataStore = useDataStore();
+  if (!isLogin() || !dataStore.userData.userId) return false;
+  // 缓存与喜欢列表一致时跳过，避免重复拉取
+  const likedIds = dataStore.userLikeData.songs;
+  const cachedIds = dataStore.likeSongsList.data.map((s) => s.id);
+  if (cachedIds.length > 0 && cachedIds.length === likedIds.length) {
+    const likedSet = new Set(likedIds);
+    if (cachedIds.every((id) => likedSet.has(id))) return true;
+  }
+  // 我喜欢的音乐是用户第一个创建的歌单
+  const likedId = Number(dataStore.userLikeData.playlists[0]?.id);
+  if (!likedId) return false;
+  // 歌单详情
+  const detailRes = await playlistDetail(likedId);
+  const detail = formatCoverList(detailRes.playlist)[0];
+  if (!detail) return false;
+  // 歌单歌曲:800 首以内直接批量详情,超出按 500/页分页拉取
+  let songs: SongType[] = [];
+  if ((detail.count as number) < 800 && Array.isArray(detailRes.privileges)) {
+    const ids: number[] = detailRes.privileges.map((s: any) => s.id as number);
+    songs = uniqBy(formatSongsList((await songDetail(ids)).songs), "id");
+  } else {
+    const collected: SongType[] = [];
+    const limit = 500;
+    let offset = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const result = await playlistAllSongs(likedId, limit, offset);
+      const page = formatSongsList(result.songs);
+      collected.push(...page);
+      offset += limit;
+      hasMore = page.length > 0 && offset < (detail.count as number);
+    }
+    songs = uniqBy(collected, "id");
+  }
+  await dataStore.setLikeSongsList(detail, songs);
+  return true;
 };
 
 // 更新用户喜欢专辑
