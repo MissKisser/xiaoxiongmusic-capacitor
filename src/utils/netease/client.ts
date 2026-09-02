@@ -221,6 +221,16 @@ async function ncmPost(
   if (cryptoType === "weapi") {
     // weapi: data.csrf_token = __csrf, POST /weapi/<uri去掉/api/>
     data.csrf_token = cookie.__csrf || "";
+    const weapiCookie: Record<string, any> = {
+      ...cookie,
+      os: cookie.os || "ios",
+      osver: cookie.osver || "17.2",
+      appver: cookie.appver || IPHONE_OS.appver,
+      channel: cookie.channel || IPHONE_OS.channel,
+      deviceId: cookie.deviceId || getDeviceId(),
+      __csrf: data.csrf_token,
+      __remember_me: cookie.__remember_me || "true",
+    };
     const signed = weapi(data);
     requestUrl = `${DOMAIN}/weapi/${uri.substr(5)}`;
     headers = {
@@ -229,8 +239,8 @@ async function ncmPost(
       "User-Agent": WEAPI_UA,
       Origin: DOMAIN,
       "X-Real-IP": realIP,
+      Cookie: headerToCookieString(weapiCookie),
     };
-    if (cookie.MUSIC_U) headers["Cookie"] = `os=ios; MUSIC_U=${cookie.MUSIC_U}`;
     body = new URLSearchParams({
       params: signed.params,
       encSecKey: signed.encSecKey,
@@ -290,6 +300,15 @@ async function ncmPost(
     } catch {
       // 非 JSON 字符串(如纯文本错误),保持原样由上层处理
     }
+  }
+  if (
+    result &&
+    typeof result === "object" &&
+    Number((result as any).code) === 301
+  ) {
+    throw new Error(
+      `localNcmRequest: NCM code 301 for ${requestUrl} ${(result as any).msg || (result as any).message || ""}`.trim(),
+    );
   }
   return { body: result, headers: response.headers };
 }
