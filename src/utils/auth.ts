@@ -268,9 +268,13 @@ export const toLikeSong: DebouncedFunc<(song: SongType, like: boolean) => Promis
         window.$message.warning("该类型歌曲暂未实现");
         return;
       }
+      const result: any = await likeSong(id, like);
+      if (result?.code !== undefined && Number(result.code) !== 200) {
+        window.$message.error(result?.msg || result?.message || `${like ? "喜欢" : "取消"}失败，请重试`);
+        return;
+      }
       const likeList = dataStore.userLikeData.songs;
       const exists = likeList.includes(id);
-      await likeSong(id, like);
       if (like && !exists) {
         likeList.push(id);
         window.$message.success("已添加到我喜欢的音乐");
