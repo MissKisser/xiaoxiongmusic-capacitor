@@ -22,6 +22,7 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.app.ServiceCompat;
 import androidx.media.app.NotificationCompat.MediaStyle;
 
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -59,6 +60,7 @@ public class MusicService extends Service {
     private String currentArtist = "未知艺术家";
     private String currentAlbum = "";
     private Bitmap coverBitmap = null;
+    private volatile int coverLoadSeq = 0;
     private boolean isPlaying = false;
     private long currentDuration = -1; // 新增时长字段
 
@@ -156,8 +158,10 @@ public class MusicService extends Service {
         if (coverUrl != null && !coverUrl.isEmpty()) {
             loadCoverAsync(coverUrl);
         } else {
+            coverLoadSeq++;
             coverBitmap = null;
             updateNotification();
+            updateMediaSessionMetadata();
         }
     }
 
@@ -380,49 +384,96 @@ public class MusicService extends Service {
     }
 
     private void loadCoverAsync(final String url) {
+        // 本地 blob/file 与兜底资源无需网络请求，直接清空封面
+        if (url == null || url.isEmpty() || url.startsWith("blob:") || url.startsWith("file:")
+                || url.contains("?asset") || url.startsWith("content:")) {
+            coverLoadSeq++;
+            coverBitmap = null;
+            new Handler(Looper.getMainLooper()).post(() -> {
+                updateNotification();
+                updateMediaSessionMetadata();
+            });
+            Log.d(TAG, "Cover skip local/asset url: " + url);
+            return;
+        }
+
+        final int seq = ++coverLoadSeq;
+        // 立即失效旧封面，避免切歌时旧图残留
+        coverBitmap = null;
+
         new Thread(() -> {
             HttpURLConnection c = null;
-            InputStream i = null;
             try {
                 URL u = new URL(url);
                 c = (HttpURLConnection) u.openConnection();
-                // 设置超时，避免网络异常时后台线程长时间挂起
                 c.setConnectTimeout(10000);
                 c.setReadTimeout(15000);
                 c.setDoInput(true);
+                c.setInstanceFollowRedirects(true);
+                c.setRequestProperty("User-Agent",
+                        "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+                c.setRequestProperty("Referer", u.getProtocol() + "://" + u.getHost() + "/");
+                c.setRequestProperty("Accept", "image/avif,image/webp,image/*,*/*;q=0.8");
                 c.connect();
 
-                // 先读取边界信息计算采样率，避免全尺寸解码占用过多内存
+                int responseCode = c.getResponseCode();
+                if (responseCode < 200 || responseCode >= 300) {
+                    Log.w(TAG, "Cover HTTP " + responseCode + " for " + url);
+                    return;
+                }
+
+                // 一次性缓冲到内存，避免 HttpURLConnection 流不可复读的问题
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                try (InputStream in = c.getInputStream()) {
+                    byte[] buf = new byte[8192];
+                    int n;
+                    while ((n = in.read(buf)) != -1) {
+                        baos.write(buf, 0, n);
+                    }
+                }
+                byte[] data = baos.toByteArray();
+                if (data.length == 0) {
+                    Log.w(TAG, "Cover empty body: " + url);
+                    return;
+                }
+                if (seq != coverLoadSeq) {
+                    Log.d(TAG, "Cover superseded before decode, drop: " + url);
+                    return;
+                }
+
                 BitmapFactory.Options bounds = new BitmapFactory.Options();
                 bounds.inJustDecodeBounds = true;
-                i = c.getInputStream();
-                BitmapFactory.decodeStream(i, null, bounds);
+                BitmapFactory.decodeByteArray(data, 0, data.length, bounds);
 
-                // 计算采样率：图片最长边不超过 512px（通知栏大图足够清晰）
                 int sampleSize = 1;
                 int maxEdge = Math.max(bounds.outWidth, bounds.outHeight);
                 while (maxEdge / sampleSize > 512) {
                     sampleSize *= 2;
                 }
 
-                i.close();
-                i = c.getInputStream();
                 BitmapFactory.Options opts = new BitmapFactory.Options();
                 opts.inSampleSize = sampleSize;
-                Bitmap bitmap = BitmapFactory.decodeStream(i, null, opts);
+                Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length, opts);
                 if (bitmap != null) {
+                    if (seq != coverLoadSeq) {
+                        bitmap.recycle();
+                        Log.d(TAG, "Cover superseded after decode, drop: " + url);
+                        return;
+                    }
                     coverBitmap = bitmap;
-                    updateNotification();
-                    updateMediaSessionMetadata();
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        if (seq != coverLoadSeq) return;
+                        updateNotification();
+                        updateMediaSessionMetadata();
+                    });
+                    Log.d(TAG, "Cover loaded: " + url + " " + bounds.outWidth + "x" + bounds.outHeight
+                            + " sample=" + sampleSize);
+                } else {
+                    Log.w(TAG, "Cover decode failed: " + url + " bytes=" + data.length);
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Failed to load cover", e);
+                Log.e(TAG, "Failed to load cover: " + url, e);
             } finally {
-                // 先关闭流再断开连接，确保资源完整释放
-                try {
-                    if (i != null) i.close();
-                } catch (Exception ignored) {
-                    /* 忽略 */ }
                 if (c != null) c.disconnect();
             }
         }).start();
