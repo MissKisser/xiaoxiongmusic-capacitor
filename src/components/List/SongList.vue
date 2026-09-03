@@ -523,10 +523,17 @@ onBeforeUnmount(() => {
   height: 100%;
   border-radius: 12px 0 0 12px;
   overflow: hidden;
-  // 平铺模式：容器随内容自然撑开，保持 overflow 可见以允许表头 sticky 吸附页面滚动容器
+  // 平铺模式：容器随内容自然撑开；横向裁剪防止长歌名撑大页面滚动轨道
+  // （overflow-x: clip 不产生滚动容器，表头 sticky 仍吸附页面滚动容器；y 轴须显式 visible，否则 clip 被降级为 hidden）
   &.plain-mode {
     height: auto;
-    overflow: visible;
+    overflow-x: clip;
+    overflow-y: visible;
+    .list-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
     .plain-list {
       padding-bottom: 80px;
     }
