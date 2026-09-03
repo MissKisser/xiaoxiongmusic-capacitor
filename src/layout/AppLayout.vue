@@ -59,6 +59,9 @@
           }"
           :content-style="{
             display: 'grid',
+            // 列轨道显式锁定为 minmax(0, 1fr)：隐式 auto 轨道会取页面内容最小宽度作下限，
+            // 长英文歌名等不可断行内容会把整个页面滚动区域撑宽，导致所有页面可横向滑动
+            gridTemplateColumns: 'minmax(0, 1fr)',
             gridTemplateRows: '1fr',
             minHeight: '100%',
             padding: isMobile ? '0 12px' : '0 24px',
