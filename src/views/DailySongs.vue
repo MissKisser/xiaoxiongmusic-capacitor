@@ -40,7 +40,7 @@
     <SongList
       :data="musicStore.dailySongsData.list"
       :loading="false"
-      :height="songListHeight"
+      disableVirtual
       isDailyRecommend
       disabledSort
     />
@@ -49,7 +49,7 @@
 
 <script setup lang="ts">
 import type { DropdownOption } from "naive-ui";
-import { useMusicStore, useStatusStore } from "@/stores";
+import { useMusicStore } from "@/stores";
 import { updateDailySongsData } from "@/utils/auth";
 import { formatTimestamp } from "@/utils/time";
 import { renderIcon } from "@/utils/helper";
@@ -58,10 +58,6 @@ import { usePlayerController } from "@/core/player/PlayerController";
 
 const player = usePlayerController();
 const musicStore = useMusicStore();
-const statusStore = useStatusStore();
-
-// 列表高度：布局内容区高度 - 标题区(300px) - 标题下间距(20px)
-const songListHeight = computed(() => Math.max(200, statusStore.mainContentHeight - 320));
 
 // 更新日期
 const updatedTime = computed(() =>
@@ -96,16 +92,11 @@ onMounted(updateDailySongsData);
 
 <style lang="scss" scoped>
 .daily-songs {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
   .title {
     display: flex;
     align-items: center;
     justify-content: center;
     flex-direction: column;
-    flex-shrink: 0;
     height: 300px;
     margin-bottom: 20px;
     .name {

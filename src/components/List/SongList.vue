@@ -1,8 +1,55 @@
 <!-- 歌曲列表 - 虚拟列表 -->
 <template>
   <Transition name="fade" mode="out-in">
-    <div v-if="!isEmpty(listData)" ref="songListRef" class="song-list">
-      <Transition name="fade" mode="out-in">
+    <div
+      v-if="!isEmpty(listData)"
+      ref="songListRef"
+      class="song-list"
+      :class="{ 'plain-mode': disableVirtual }"
+    >
+      <!-- 平铺模式：不启用内层虚拟滚动，列表由页面外层滚动容器承担（适用于每日推荐等数据量小的固定列表） -->
+      <template v-if="disableVirtual">
+        <div class="list-header song-card sticky-header">
+          <n-text class="num">#</n-text>
+          <n-text v-if="!disabledSort" class="title has-sort">标题</n-text>
+          <n-text v-else class="title">标题</n-text>
+          <n-text v-if="type !== 'radio' && !hiddenAlbum && !isSmallScreen" class="album">
+            专辑
+          </n-text>
+          <n-text v-if="type !== 'radio'" class="actions">操作</n-text>
+          <n-text v-if="type === 'radio' && !isSmallScreen" class="meta date">更新日期</n-text>
+          <n-text v-if="type === 'radio' && !isSmallScreen" class="meta">播放量</n-text>
+          <n-text v-if="!isSmallScreen" class="meta">时长</n-text>
+          <n-text v-if="data?.[0].size && !hiddenSize && !isSmallScreen" class="meta size">
+            大小
+          </n-text>
+        </div>
+        <div class="plain-list">
+          <SongCard
+            v-for="(song, index) in listData"
+            :key="song.id"
+            :song="song"
+            :index="index"
+            :data-song-id="song.id"
+            :hiddenCover="hiddenCover"
+            :hiddenAlbum="hiddenAlbum"
+            :hiddenSize="hiddenSize"
+            @click.stop="handleSongClick(song)"
+            @dblclick.stop="handleSongPlay(song)"
+            @contextmenu.stop="handleShowMenu($event, song, index)"
+            @show-menu="handleShowMenu($event, song, index)"
+          />
+          <!-- 加载更多 -->
+          <div v-if="loadMore !== undefined" class="load-more">
+            <n-flex v-if="loadMore && loading">
+              <n-spin size="small" />
+              <n-text>{{ loadingText }}</n-text>
+            </n-flex>
+            <n-divider v-else dashed> 没有更多啦 ~ </n-divider>
+          </div>
+        </div>
+      </template>
+      <Transition v-else name="fade" mode="out-in">
         <div
           :key="listKey"
           :style="{
@@ -181,6 +228,8 @@ const props = withDefaults(
     listVersion?: string | number;
     /** 禁用高度过渡动画 */
     disableHeightTransition?: boolean;
+    /** 禁用虚拟滚动，平铺渲染全部列表项，滚动由页面外层容器承担（适用于每日推荐等数据量小的固定列表） */
+    disableVirtual?: boolean;
   }>(),
   {
     type: "song",
@@ -379,14 +428,27 @@ const onScroll = (e: Event) => {
 
 // 滚动到顶部
 const scrollToTop = () => {
+  // 平铺模式：滚动由页面外层容器承担
+  if (props.disableVirtual) {
+    const pageScroller = songListRef.value?.closest(".n-scrollbar-container");
+    pageScroller?.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
   listRef.value?.scrollToIndex(0);
 };
 
 // 滚动到当前播放歌曲
 const scrollToCurrentSong = () => {
-  if (hasPlaySong.value >= 0) {
-    listRef.value?.scrollToIndex(hasPlaySong.value);
+  if (hasPlaySong.value < 0) return;
+  // 平铺模式：定位到对应歌曲卡片
+  if (props.disableVirtual) {
+    const target = songListRef.value?.querySelector(
+      `[data-song-id="${musicStore.playSong.id}"]`,
+    );
+    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
   }
+  listRef.value?.scrollToIndex(hasPlaySong.value);
 };
 
 // 更新列表播放顺序
@@ -461,6 +523,14 @@ onBeforeUnmount(() => {
   height: 100%;
   border-radius: 12px 0 0 12px;
   overflow: hidden;
+  // 平铺模式：容器随内容自然撑开，保持 overflow 可见以允许表头 sticky 吸附页面滚动容器
+  &.plain-mode {
+    height: auto;
+    overflow: visible;
+    .plain-list {
+      padding-bottom: 80px;
+    }
+  }
   .song-card {
     padding-bottom: 8px;
     // padding-right: 4px;
