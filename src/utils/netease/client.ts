@@ -21,13 +21,21 @@ import type { CryptoType } from "./endpoints";
 const DOMAIN = "https://music.163.com";
 const EAPI_DOMAIN = "https://interfacepc.music.163.com";
 
-/** weapi 用的 User-Agent(模仿浏览器) */
+/** weapi 用的 User-Agent(对齐标准库 userAgentMap.weapi.pc,PC 桌面浏览器) */
 const WEAPI_UA =
-  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1";
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0";
 
 /** eapi 用的 User-Agent(模仿 iPhone 客户端) */
 const EAPI_UA =
   "NeteaseMusic/9.0.90.120317174335 (iPhone; iOS 16.2; Apple CPU iPhone14,3)";
+
+/** weapi 默认设备档(对齐标准库 osMap.pc,weapi 通道固定模拟 PC 网页端) */
+const PC_WEAPI_OS = {
+  os: "pc",
+  appver: "3.1.17.204416",
+  osver: "Microsoft-Windows-10-Professional-build-19045-64bit",
+  channel: "netease",
+};
 
 /** eapi 默认设备配置(模仿 iPhone 客户端) */
 const IPHONE_OS = {
@@ -86,17 +94,37 @@ function headerToCookieString(header: Record<string, any>): string {
  * 持久化在 localStorage,避免每次请求都换设备 ID 触发风控。
  */
 function getDeviceId(): string {
-  const KEY = "ncm-local-device-id";
-  let id = localStorage.getItem(KEY);
-  if (!id) {
-    const arr = new Uint8Array(16);
-    crypto.getRandomValues(arr);
-    id = Array.from(arr)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-    localStorage.setItem(KEY, id);
+  return getStableValue("ncm-local-device-id", () => randomHex(32));
+}
+
+/** 生成指定字符长度的随机 hex 串 */
+function randomHex(length: number): string {
+  const bytes = new Uint8Array(Math.ceil(length / 2));
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, length);
+}
+
+/** 生成 WNMCID(对齐标准库格式:6 位小写字母.时间戳.01.0) */
+function generateWnmcid(): string {
+  const letters = "abcdefghijklmnopqrstuvwxyz";
+  let prefix = "";
+  for (let i = 0; i < 6; i++) {
+    prefix += letters[Math.floor(Math.random() * letters.length)];
   }
-  return id;
+  return `${prefix}.${Date.now()}.01.0`;
+}
+
+/** 读取/生成 localStorage 持久化值,保证指纹字段设备级稳定 */
+function getStableValue(key: string, generate: () => string): string {
+  let value = localStorage.getItem(key);
+  if (!value) {
+    value = generate();
+    localStorage.setItem(key, value);
+  }
+  return value;
 }
 
 /** 生成 requestId(对齐 ncm 的 generateRequestId) */
@@ -129,22 +157,6 @@ function buildEapiHeader(
   if (cookie.MUSIC_U) header.MUSIC_U = cookie.MUSIC_U;
   if (cookie.MUSIC_A) header.MUSIC_A = cookie.MUSIC_A;
   return header;
-}
-
-/** 生成随机中国 IP(对齐 ncm 的 generateRandomChineseIP,简化版) */
-function randomCNIP(): string {
-  const ranges = [
-    [36, 40, 112, 120],
-    [58, 60, 16, 31],
-    [59, 60, 110, 120],
-    [60, 60, 200, 220],
-    [110, 120, 144, 150],
-    [180, 184, 128, 200],
-    [182, 182, 140, 254],
-    [210, 210, 0, 50],
-  ];
-  const r = ranges[Math.floor(Math.random() * ranges.length)];
-  return `${r[0] + Math.floor(Math.random() * (r[1] - r[0] + 1))}.${r[2] + Math.floor(Math.random() * (r[3] - r[2] + 1))}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`;
 }
 
 /**
@@ -182,10 +194,10 @@ export async function localNcmRequest<T = any>(
   const uri = resolveUri(ep, query);
   const data = ep.buildData(query);
 
-  // realIP / X-Real-IP 伪装(缓解单 IP 风控)
-  const realIP = settingStore.useRealIP
-    ? settingStore.realIP || randomCNIP()
-    : randomCNIP();
+  // IP 伪造头仅在用户显式配置 realIP 时携带(对齐标准库默认不携带;
+  // 每请求随机 IP 属风控高危特征,不再默认注入)
+  const realIP =
+    settingStore.useRealIP && settingStore.realIP ? settingStore.realIP : "";
 
   // 单步请求;多步端点(followUp)通过 req 回调复用 ncmPost
   const req = async (u: string, c: CryptoType, d: Record<string, any>) =>
@@ -220,16 +232,25 @@ async function ncmPost(
 
   if (cryptoType === "weapi") {
     // weapi: data.csrf_token = __csrf, POST /weapi/<uri去掉/api/>
+    // Cookie 对齐标准库 processCookieObject:PC 网页端设备档 + 网页风控指纹字段
     data.csrf_token = cookie.__csrf || "";
+    const nuid =
+      cookie._ntes_nuid || getStableValue("ncm-local-ntes-nuid", () => randomHex(64));
     const weapiCookie: Record<string, any> = {
       ...cookie,
-      os: cookie.os || "ios",
-      osver: cookie.osver || "17.2",
-      appver: cookie.appver || IPHONE_OS.appver,
-      channel: cookie.channel || IPHONE_OS.channel,
+      __remember_me: "true",
+      ntes_kaola_ad: "1",
+      _ntes_nuid: nuid,
+      _ntes_nnid: cookie._ntes_nnid || `${nuid},${Date.now()}`,
+      WNMCID: cookie.WNMCID || getStableValue("ncm-local-wnmcid", generateWnmcid),
+      WEVNSM: cookie.WEVNSM || "1.0.0",
+      os: cookie.os || PC_WEAPI_OS.os,
+      osver: cookie.osver || PC_WEAPI_OS.osver,
       deviceId: cookie.deviceId || getDeviceId(),
+      channel: cookie.channel || PC_WEAPI_OS.channel,
+      appver: cookie.appver || PC_WEAPI_OS.appver,
       __csrf: data.csrf_token,
-      __remember_me: cookie.__remember_me || "true",
+      NMTID: cookie.NMTID || randomHex(32),
     };
     const signed = weapi(data);
     requestUrl = `${DOMAIN}/weapi/${uri.substr(5)}`;
@@ -238,7 +259,6 @@ async function ncmPost(
       Referer: DOMAIN,
       "User-Agent": WEAPI_UA,
       Origin: DOMAIN,
-      "X-Real-IP": realIP,
       Cookie: headerToCookieString(weapiCookie),
     };
     body = new URLSearchParams({
@@ -254,7 +274,6 @@ async function ncmPost(
     headers = {
       "Content-Type": "application/x-www-form-urlencoded",
       "User-Agent": EAPI_UA,
-      "X-Real-IP": realIP,
       Cookie: headerToCookieString(header),
     };
     body = new URLSearchParams({ params: signed.params }).toString();
@@ -270,10 +289,15 @@ async function ncmPost(
       "Content-Type": "application/x-www-form-urlencoded",
       "User-Agent":
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36",
-      "X-Real-IP": realIP,
     };
     if (cookie.MUSIC_U) headers["Cookie"] = `os=ios; MUSIC_U=${cookie.MUSIC_U}`;
     body = new URLSearchParams({ eparams: signed.eparams }).toString();
+  }
+
+  // IP 伪造头仅在显式配置 realIP 时携带(对齐标准库,同时伪造 X-Forwarded-For)
+  if (realIP) {
+    headers["X-Real-IP"] = realIP;
+    headers["X-Forwarded-For"] = realIP;
   }
 
   // 用 CapacitorHttp 发请求(绕过 WebView CORS)
@@ -301,13 +325,13 @@ async function ncmPost(
       // 非 JSON 字符串(如纯文本错误),保持原样由上层处理
     }
   }
-  if (
-    result &&
-    typeof result === "object" &&
-    Number((result as any).code) === 301
-  ) {
+  // 通道级失败(需要登录 code 301 / 风控拦截 code -460 或提示语含"风险")
+  // 抛错交由 request.ts 回退服务器链路重试
+  const code = Number(result?.code);
+  const msg = String(result?.msg || result?.message || "");
+  if (code === 301 || code === -460 || (code !== 200 && msg.includes("风险"))) {
     throw new Error(
-      `localNcmRequest: NCM code 301 for ${requestUrl} ${(result as any).msg || (result as any).message || ""}`.trim(),
+      `localNcmRequest: NCM code ${code} for ${requestUrl} ${msg}`.trim(),
     );
   }
   return { body: result, headers: response.headers };
