@@ -1,7 +1,7 @@
 <div align="center">
   <img alt="logo" height="100" width="100" src="public/icons/favicon.png" />
   <h2>SPlayer Mobile</h2>
-  <p>一款专为Android平台设计的独立音乐播放器应用</p>
+  <p>一款面向移动端的独立音乐播放器应用（Android 已发布 / iOS 扩展中）</p>
 
   <br />
 
@@ -12,7 +12,7 @@
 
 ## 项目概述
 
-SPlayer Mobile（小熊音乐）是基于 Capacitor 8 框架构建的 Android 平台独立音乐播放应用，采用 Vue 3 + TypeScript 技术栈开发。本项目为原生 Android 应用，通过 Capacitor 将前端代码封装为可在 Android 设备上独立运行的原生应用程序。
+SPlayer Mobile（小熊音乐）是基于 Capacitor 8 框架构建的移动端独立音乐播放应用，采用 Vue 3 + TypeScript 技术栈开发。Android 端已发布；iOS 端扩展中（自用侧载分发，实施基准见 `docs/project/ios-expansion-plan.md`），通过 Capacitor 将前端代码封装为可在移动设备上独立运行的原生应用程序。
 
 应用通过连接远程服务器 API（`https://music.viaxv.top`）获取音乐数据，当前仅支持扫码登录（验证码登录已下线，仅保留二维码链路），为用户提供完整的移动端音乐播放体验。
 
@@ -28,13 +28,13 @@ SPlayer Mobile（小熊音乐）是基于 Capacitor 8 框架构建的 Android �
 | UI 组件库 | Naive UI |
 | HTTP 请求 | Axios |
 | 移动端封装 | Capacitor 8 |
-| 目标平台 | Android |
+| 目标平台 | Android（已发布）/ iOS（扩展中） |
 
 ### 系统架构
 
 ```
 ┌─────────────────────────────────────────────┐
-│              Android 原生层                  │
+│           原生层（Android / iOS）           │
 │  ┌─────────────────────────────────────────┐│
 │  │           Capacitor 插件                 ││
 │  │  - 文件系统访问 (Filesystem)             ││
@@ -97,6 +97,7 @@ SPlayer Mobile（小熊音乐）是基于 Capacitor 8 框架构建的 Android �
 - Node.js >= 20
 - pnpm >= 8
 - Android SDK（用于构建 APK）
+- iOS 构建：经 GitHub Actions（macOS runner）完成，本机无需 macOS（见 `docs/project/ios-expansion-plan.md`）
 
 ### 安装依赖
 
@@ -135,6 +136,7 @@ pnpm cap:open:android
 ```bash
 pnpm android:build
 ```
+> iOS 端构建与装机（GitHub Actions 打包 + AltServer 侧载）流程见 `docs/project/ios-expansion-plan.md`，当前处于阶段 0（装机闭环搭建）。
 
 ## 配置说明
 
@@ -172,11 +174,11 @@ export default config;
 
 | 特性 | 桌面版本 (Electron) | 移动版本 (Capacitor) |
 |------|---------------------|----------------------|
-| 运行环境 | Windows / macOS / Linux 桌面 | Android 移动设备 |
+| 运行环境 | Windows / macOS / Linux 桌面 | Android 移动设备（iOS 扩展中） |
 | 后端服务 | 内置 Node.js 服务器 | 连接远程 API |
 | 原生能力 | Electron API | Capacitor 插件 |
-| 打包方式 | Electron Builder | Android Studio / Gradle |
-| 安装形式 | 安装包 / 可执行文件 | APK / AAB |
+| 打包方式 | Electron Builder | Gradle（Android）；GitHub Actions + Xcode（iOS） |
+| 安装形式 | 安装包 / 可执行文件 | APK（Android）；IPA 侧载（iOS） |
 
 ## 项目结构
 
@@ -197,7 +199,7 @@ export default config;
 - 后端服务独立部署于 `music.viaxv.top`（见 `server/` 与 `baota.nginx.conf`），`server/` 为 git submodule 指向 [xiaoxiongmusic-server](https://github.com/MissKisser/xiaoxiongmusic-server)，请勿直接在 `server/` 目录改代码；同步请执行 `git submodule update --remote server`
 - 部分高级功能（如 Hi-Res 音质下载）需要网易云音乐会员账号
 - Android 版本需通过 Android Studio 或 Gradle 构建，产物位于 `android/app/build/outputs/apk/debug/app-debug.apk`
-- 本项目严格限定于 Capacitor Android 端，不涉及 iOS/Web/Windows 兼容性处理
+- Android 已发布；iOS 端扩展中（自用侧载分发，实施基准见 `docs/project/ios-expansion-plan.md`），不涉及 Web/Windows 分发
 ## 开源许可
 
 本项目基于 [GNU Affero General Public License (AGPL-3.0)](https://www.gnu.org/licenses/agpl-3.0.html) 许可进行开源。

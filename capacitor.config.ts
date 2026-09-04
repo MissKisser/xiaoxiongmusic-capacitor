@@ -17,6 +17,9 @@ const config: CapacitorConfig = {
             releaseType: 'APK'
         }
     },
+    ios: {
+        contentInset: 'always'
+    },
     plugins: {
         CapacitorHttp: {
             enabled: true,

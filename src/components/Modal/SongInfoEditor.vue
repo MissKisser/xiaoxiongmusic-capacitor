@@ -272,7 +272,6 @@ const onlineMatch = debounce(
       // 若评分算法无有效匹配（评分 0 或时长偏差过大），回退到原先首项
       const song = best ?? rawSongs[0];
       const songData = formatSongsList([song])[0];
-      // console.log(songData);
       // 更新数据
       infoFormData.value = {
         ...infoFormData.value,
