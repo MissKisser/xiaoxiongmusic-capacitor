@@ -19,7 +19,6 @@ const init = async () => {
       const { StatusBar, Style } = await import('@capacitor/status-bar');
       await StatusBar.setOverlaysWebView({ overlay: true }); // 开启覆盖，配合 main.scss 的 padding-top
       await StatusBar.setStyle({ style: Style.Light });
-      // await StatusBar.setBackgroundColor({ color: '#ffffff' }); // 开启覆盖后此项通常由网页背景控制
       console.log('✅ 状态栏初始化成功');
     } catch (error) {
       console.error('❌ 状态栏初始化失败:', error);
