@@ -33,6 +33,9 @@ Mobile.zip
 tmp/
 releases/
 release/
+altinstaller.zip
+altinstaller/
+pnpm-workspace.yaml
 
 # 开发工作文件（会话记录、任务进度等）
 .superpowers/
