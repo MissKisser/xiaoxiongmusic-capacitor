@@ -51,9 +51,10 @@ jobs:
 
       - name: Install UI automation tool (idb)
         run: |
+          brew tap facebook/fb
           brew install idb-companion
           python3 -m pip install --break-system-packages fb-idb || python3 -m pip install fb-idb
-          idb list-targets | head -5 || true
+          idb --help > /dev/null 2>&1 && echo "idb CLI ready"
 
       - name: Select available iPhone simulator
         id: device
