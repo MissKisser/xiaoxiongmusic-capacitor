@@ -68,7 +68,7 @@
         "vue-router": "^4.6.3"
     },
     "devDependencies": {
-        "@fastify/cookie": "^11.0.2",
+        "@fastify/cookie": "^11.1.2",
         "@fastify/multipart": "^9.3.0",
         "@fastify/static": "^8.3.0",
         "@neteasecloudmusicapienhanced/api": "^4.29.20",
