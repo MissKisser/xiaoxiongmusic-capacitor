@@ -91,28 +91,53 @@ jobs:
           mkdir -p artifacts
           xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/01_home.png
 
-      # 系统弹窗自动处理：按 accessibility 树找按钮点击，不依赖坐标
-      # 优先点 "Don't Allow"（冒烟不需要通知权限），无则点 "Allow"
+      # 系统弹窗自动处理：优先 accessibility 树按 label 查找点击；
+      # 兜底用比例坐标（系统弹窗按钮位置固定：Open 对话框 0.695/0.542，通知 Don't Allow 0.326/0.607）
       - name: Auto-dismiss system dialogs (helper script)
         run: |
           cat > tap_button.py <<'EOF'
-          import json, subprocess, sys, time
+          import json, subprocess, sys, time, os
           DEVICE = sys.argv[1]
-          LABELS = sys.argv[2].split("|")
+          MODE = sys.argv[2]  # "label" 或 "coord"
+          dump_path = os.environ.get("A11Y_DUMP", "")
           out = subprocess.run(["idb", "ui", "describe-all", "--udid", DEVICE],
                                capture_output=True, text=True, timeout=60)
+          if dump_path:
+              with open(dump_path, "w", encoding="utf-8", errors="replace") as f:
+                  f.write(out.stdout[-200000:])
           elements = []
-          for line in out.stdout.splitlines():
-              line = line.strip()
-              if not line.startswith("{"):
-                  continue
-              try:
-                  elements.append(json.loads(line))
-              except json.JSONDecodeError:
-                  pass
+          try:
+              parsed = json.loads(out.stdout)
+              elements = parsed if isinstance(parsed, list) else parsed.get("elements", [parsed])
+          except json.JSONDecodeError:
+              for line in out.stdout.splitlines():
+                  line = line.strip()
+                  if line.startswith("{"):
+                      try:
+                          elements.append(json.loads(line))
+                      except json.JSONDecodeError:
+                          pass
+          def tap(x_pt, y_pt):
+              subprocess.run(["idb", "ui", "tap", str(int(x_pt)), str(int(y_pt)),
+                              "--udid", DEVICE], check=True)
+              time.sleep(3)
+          if MODE == "coord":
+              xf, yf = float(sys.argv[3]), float(sys.argv[4])
+              # 从截图 PNG 真实分辨率推算逻辑点尺寸（iOS 模拟器 @3x）
+              import struct
+              png = subprocess.run(["xcrun", "simctl", "io", DEVICE, "screenshot",
+                                    "/tmp/_dim.png"], capture_output=True, text=True)
+              with open("/tmp/_dim.png", "rb") as fp:
+                  hdr = fp.read(33)
+              w_px, h_px = struct.unpack(">II", hdr[16:24])
+              tap(xf * w_px / 3, yf * h_px / 3)
+              print(f"coord tap at ({xf}, {yf}) -> ({xf*w_px/3:.0f},{yf*h_px/3:.0f})pt [{w_px}x{h_px}px]")
+              sys.exit(0)
+          LABELS = sys.argv[3].split("|")
           def find(label):
               for e in elements:
-                  if e.get("AXLabel") == label and e.get("type") in ("Button", "StaticText", "Cell"):
+                  lab = str(e.get("AXLabel", ""))
+                  if label.lower() in lab.lower() and str(e.get("type", "")) in ("Button", "StaticText", "Cell", "Alert"):
                       f = e.get("frame", {})
                       return f.get("x", 0) + f.get("width", 0) / 2, f.get("y", 0) + f.get("height", 0) / 2
               return None
@@ -122,12 +147,10 @@ jobs:
                   target = find(label)
                   if target:
                       print(f"tap '{label}' at ({target[0]:.0f},{target[1]:.0f})")
-                      subprocess.run(["idb", "ui", "tap", str(int(target[0])), str(int(target[1])),
-                                      "--udid", DEVICE], check=True)
-                      time.sleep(3)
+                      tap(target[0], target[1])
                       break
               if not target:
-                  print(f"attempt {attempt+1}: labels {LABELS} not found, done")
+                  print(f"attempt {attempt+1}: labels {LABELS} not found in a11y tree ({len(elements)} elements)")
                   break
               time.sleep(2)
           EOF
@@ -135,7 +158,7 @@ jobs:
 
       - name: Dismiss notification permission dialog
         run: |
-          python3 tap_button.py "${{ steps.device.outputs.id }}" "Don't Allow|Allow" || true
+          python3 tap_button.py "${{ steps.device.outputs.id }}" label "Don't Allow|Allow" || true
           xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/01b_after_alerts.png || true
 
       - name: Play free song via deep link
@@ -144,7 +167,8 @@ jobs:
           echo "Deep link: $URL"
           xcrun simctl openurl "${{ steps.device.outputs.id }}" "$URL"
           sleep 4
-          python3 tap_button.py "${{ steps.device.outputs.id }}" "Open" || true
+          A11Y_DUMP=artifacts/a11y_open1.json python3 tap_button.py "${{ steps.device.outputs.id }}" label "Open" \
+            || python3 tap_button.py "${{ steps.device.outputs.id }}" coord 0.695 0.542 || true
           sleep 30
           xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/02_free_song.png
 
@@ -154,7 +178,8 @@ jobs:
           echo "Deep link: $URL"
           xcrun simctl openurl "${{ steps.device.outputs.id }}" "$URL"
           sleep 4
-          python3 tap_button.py "${{ steps.device.outputs.id }}" "Open" || true
+          A11Y_DUMP=artifacts/a11y_open2.json python3 tap_button.py "${{ steps.device.outputs.id }}" label "Open" \
+            || python3 tap_button.py "${{ steps.device.outputs.id }}" coord 0.695 0.542 || true
           sleep 40
           xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/03_vip_song.png
 
@@ -163,7 +188,7 @@ jobs:
           URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.free_song_id || '347230' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
           xcrun simctl openurl "${{ steps.device.outputs.id }}" "$URL"
           sleep 4
-          python3 tap_button.py "${{ steps.device.outputs.id }}" "Open" || true
+          python3 tap_button.py "${{ steps.device.outputs.id }}" coord 0.695 0.542 || true
           sleep 15
           xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/04_free_replay.png
 
