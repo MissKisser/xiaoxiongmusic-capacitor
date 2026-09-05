@@ -68,4 +68,4 @@ jobs:
           restore-keys: gradle-${{ runner.os }}-
 
       - name: Android assembleDebug
-        run: cd android && ./gradlew assembleDebug --no-daemon
+        run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
