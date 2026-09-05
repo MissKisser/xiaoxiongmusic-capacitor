@@ -9,12 +9,16 @@ on:
       vip_song_id:
         description: VIP 歌曲 ID（解锁链路验证，未登录走音源解锁）
         default: '186016'
+      login_mode:
+        description: 登录测试模式（打开登录弹窗并等待扫码，登录后测 VIP）
+        type: boolean
+        default: false
   schedule:
     # 每周一 03:00 UTC（北京时间周一 11:00）定时冒烟，防 macos 镜像漂移
     - cron: '0 3 * * 1'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: smoke-${{ github.ref }}
@@ -184,6 +188,45 @@ jobs:
           python3 tap_button.py "$DEVICE" label "同意" || true
           sleep 2
           xcrun simctl io "$DEVICE" screenshot artifacts/01c_after_agreement.png || true
+
+      # 登录测试模式：点右上角头像打开登录弹窗（默认扫码标签）；
+      # 网易云二维码约 2 分钟过期且 App 内自动刷新，故循环推送最新截图（唯一文件名）+ 实时更新 Summary 链接，
+      # 用户始终点最新链接扫码；检出 MUSIC_U Cookie 即登录成功
+      - name: Open login modal, publish QR and poll login
+        if: ${{ inputs.login_mode == true }}
+        run: |
+          DEVICE="${{ steps.device.outputs.id }}"
+          idb ui tap 362 95 --udid "$DEVICE" || true
+          sleep 4
+          git config user.email "ci@example.local"
+          git config user.name "ci-qr"
+          echo "## 请扫码登录（网易云音乐 App）" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "二维码约 2 分钟过期、自动轮换；**永远点下面最新的链接**扫码：" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          DATA=$(xcrun simctl get_app_container "$DEVICE" com.xiaoxiong.music data 2>/dev/null || true)
+          FOUND=0
+          for i in $(seq 1 24); do
+            xcrun simctl io "$DEVICE" screenshot "artifacts/05_qr_$i.png" || true
+            git checkout --orphan ci-qr-login 2>/dev/null || git checkout ci-qr-login
+            git rm -rf --cached . >/dev/null 2>&1 || true
+            git add -f "artifacts/05_qr_$i.png"
+            git commit -m "qr $i" >/dev/null || true
+            git push origin "HEAD:ci-qr-login" --force
+            QR_URL="https://raw.githubusercontent.com/${{ github.repository }}/ci-qr-login/artifacts/05_qr_$i.png"
+            echo "- [第 $i 张二维码（点此打开并立即扫）]($QR_URL)" >> "$GITHUB_STEP_SUMMARY"
+            if [ -n "$DATA" ] && grep -rla "MUSIC_U" "$DATA/Library" 2>/dev/null | head -1 | grep -q .; then
+              FOUND=1
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "✅ 登录成功（第 $i 次轮询检出 MUSIC_U）" >> "$GITHUB_STEP_SUMMARY"
+              echo "登录成功（第 $i 次轮询检出 MUSIC_U）"
+              break
+            fi
+            echo "poll $i: 未检出登录态，已推送新二维码链接"
+            sleep 30
+          done
+          git push origin --delete ci-qr-login >/dev/null 2>&1 || true
+          echo "LOGIN_FOUND=$FOUND" >> "$GITHUB_ENV"
 
       - name: Play free song via deep link
         run: |
