@@ -19,7 +19,7 @@ public final class MediaNotificationRuntime: NSObject {
     private var isPlaying: Bool = false
     private var lastPosition: Double = 0
     private var lastDuration: Double = 0
-
+    private var isSessionActive: Bool = false
     private var playTarget: Any?
     private var pauseTarget: Any?
     private var togglePlayPauseTarget: Any?
@@ -37,6 +37,7 @@ public final class MediaNotificationRuntime: NSObject {
      */
     public func initialize() {
         configureAudioSession()
+        setupInterruptionListener()
         setupRemoteCommands()
     }
 
@@ -48,6 +49,7 @@ public final class MediaNotificationRuntime: NSObject {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playback, mode: .default, options: [])
             try session.setActive(true)
+            isSessionActive = true
         } catch {
             NSLog("[MediaNotificationRuntime] 激活音频会话失败: \(error)")
         }
@@ -57,6 +59,7 @@ public final class MediaNotificationRuntime: NSObject {
      * 监听系统音频中断事件
      */
     private func setupInterruptionListener() {
+        NotificationCenter.default.removeObserver(self, name: AVAudioSession.interruptionNotification, object: nil)
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleAudioInterruption(_:)),
@@ -71,6 +74,7 @@ public final class MediaNotificationRuntime: NSObject {
      * - Parameter notification: 中断通知对象
      */
     @objc private func handleAudioInterruption(_ notification: Notification) {
+        guard isSessionActive else { return }
         guard let userInfo = notification.userInfo,
               let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
               let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
@@ -218,6 +222,9 @@ public final class MediaNotificationRuntime: NSObject {
      * - Parameter coverUrl: 封面图片地址
      */
     private func loadCoverArtwork(from coverUrl: String?) {
+        coverSeq += 1
+        let expectedSeq = coverSeq
+
         guard let coverUrl = coverUrl, !coverUrl.isEmpty else {
             currentNowPlayingInfo.removeValue(forKey: MPMediaItemPropertyArtwork)
             MPNowPlayingInfoCenter.default().nowPlayingInfo = currentNowPlayingInfo
@@ -230,10 +237,6 @@ public final class MediaNotificationRuntime: NSObject {
         }
 
         guard let url = URL(string: coverUrl) else { return }
-
-        coverSeq += 1
-        let expectedSeq = coverSeq
-
         var request = URLRequest(url: url)
         request.timeoutInterval = 15.0
         request.setValue(
@@ -343,6 +346,8 @@ public final class MediaNotificationRuntime: NSObject {
      * 销毁媒体会话及相关资源
      */
     public func destroy() {
+        isSessionActive = false
+        NotificationCenter.default.removeObserver(self, name: AVAudioSession.interruptionNotification, object: nil)
         clearSleepTimer()
         removeRemoteCommands()
         currentNowPlayingInfo.removeAll()

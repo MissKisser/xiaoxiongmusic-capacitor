@@ -44,7 +44,7 @@ export async function getCurrentVersion(): Promise<string> {
  * 检查更新 (核心函数)
  */
 export async function checkForUpdates(): Promise<CheckResult> {
-    // 决策 D3：iOS 侧载模式无应用内自更新，直接短路返回
+    // iOS 侧载分发无应用内自更新链路，跳过版本检查
     if (isIos) {
         return { hasUpdate: false, versionInfo: null };
     }
@@ -123,7 +123,7 @@ export async function checkForUpdates(): Promise<CheckResult> {
  * 返回是否发现新版本
  */
 export async function performVersionCheck(): Promise<boolean> {
-    // 决策 D3：iOS 短路
+    // iOS 侧载分发无应用内自更新链路，跳过版本检查
     if (isIos) {
         return false;
     }
