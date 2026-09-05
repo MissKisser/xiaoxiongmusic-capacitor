@@ -1,0 +1,141 @@
+name: iOS Simulator Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      free_song_id:
+        description: 免费歌曲 ID（缓存链路验证）
+        default: '347230'
+      vip_song_id:
+        description: VIP 歌曲 ID（解锁链路验证，未登录走音源解锁）
+        default: '186016'
+  schedule:
+    # 每周一 03:00 UTC（北京时间周一 11:00）定时冒烟，防 macos 镜像漂移
+    - cron: '0 3 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Simulator Smoke (boot/play/cache)
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web assets
+        run: pnpm build
+
+      - name: Sync Capacitor iOS
+        run: npx cap sync ios
+
+      - name: Select available iPhone simulator
+        id: device
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available | grep -m1 "iPhone" | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')
+          if [ -z "$DEVICE_ID" ]; then
+            echo "::error::No available iPhone simulator found"
+            xcrun simctl list devices available
+            exit 1
+          fi
+          DEVICE_NAME=$(xcrun simctl list devices available | grep -m1 "iPhone" | sed -E 's/^ *([^ ]+ [^(]+) \(.*/\1/' | xargs)
+          echo "id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
+          echo "name=$DEVICE_NAME" >> "$GITHUB_OUTPUT"
+          echo "Selected simulator: $DEVICE_NAME ($DEVICE_ID)"
+
+      - name: Build for simulator (Debug, unsigned)
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "id=${{ steps.device.outputs.id }}" \
+            -derivedDataPath build \
+            -quiet CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+
+      - name: Boot simulator and install app
+        run: |
+          xcrun simctl boot "${{ steps.device.outputs.id }}"
+          xcrun simctl bootstatus "${{ steps.device.outputs.id }}" -b
+          xcrun simctl install "${{ steps.device.outputs.id }}" build/Build/Products/Debug-iphonesimulator/App.app
+          xcrun simctl launch "${{ steps.device.outputs.id }}" com.xiaoxiong.music
+          sleep 20
+          mkdir -p artifacts
+          xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/01_home.png
+
+      - name: Play free song via deep link
+        run: |
+          URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.free_song_id || '347230' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
+          echo "Deep link: $URL"
+          xcrun simctl openurl "${{ steps.device.outputs.id }}" "$URL"
+          sleep 30
+          xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/02_free_song.png
+
+      - name: Play VIP song via deep link
+        run: |
+          URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.vip_song_id || '186016' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
+          echo "Deep link: $URL"
+          xcrun simctl openurl "${{ steps.device.outputs.id }}" "$URL"
+          sleep 40
+          xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/03_vip_song.png
+
+      - name: Collect evidence (cache / process / logs)
+        if: always()
+        run: |
+          DEVICE="${{ steps.device.outputs.id }}"
+          DATA_DIR=$(xcrun simctl get_app_container "$DEVICE" com.xiaoxiong.music data 2>/dev/null || true)
+          echo "=== App data container: $DATA_DIR ===" | tee artifacts/cache_report.txt
+          if [ -n "$DATA_DIR" ] && [ -d "$DATA_DIR/Library/Caches/audio_cache" ]; then
+            ls -la "$DATA_DIR/Library/Caches/audio_cache" | tee -a artifacts/cache_report.txt
+          else
+            echo "audio_cache 目录不存在或为空（可能未触发缓存或 App 未运行）" | tee -a artifacts/cache_report.txt
+          fi
+          echo "=== App 进程存活检查 ===" | tee -a artifacts/cache_report.txt
+          xcrun simctl spawn "$DEVICE" launchctl list 2>/dev/null | grep -i "com.xiaoxiong" | tee -a artifacts/cache_report.txt || echo "进程未在运行（可能已崩溃或被系统回收）" | tee -a artifacts/cache_report.txt
+          xcrun simctl spawn "$DEVICE" log show --last 6m --style compact --predicate 'process == "App"' > artifacts/app_console.log 2>&1 || true
+          grep -iE "error|fail|cors|crash|exception" artifacts/app_console.log | head -60 > artifacts/error_lines.log || true
+
+      - name: Smoke verdict
+        run: |
+          CACHE_HITS=$(grep -cE "\.cache|\.tmp" artifacts/cache_report.txt || true)
+          ALIVE=$(grep -c "com.xiaoxiong" artifacts/cache_report.txt || true)
+          {
+            echo "## 模拟器冒烟结果"
+            echo ""
+            echo "| 信号 | 结果 |"
+            echo "|---|---|"
+            echo "| App 进程 | $([ "$ALIVE" -gt 0 ] && echo '✅ 存活' || echo '❌ 未运行') |"
+            echo "| 缓存文件落地 | $([ "$CACHE_HITS" -gt 0 ] && echo "✅ ${CACHE_HITS} 个文件" || echo '❌ 无') |"
+            echo ""
+            echo "详细证据见 artifacts（截图 01~03、cache_report、app_console.log）"
+          } >> "$GITHUB_STEP_SUMMARY"
+          # 首个基线期不硬失败，只报告；链路调稳后改为硬门禁
+          exit 0
+
+      - name: Upload smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-smoke-${{ github.run_number }}
+          path: artifacts/
+          retention-days: 7

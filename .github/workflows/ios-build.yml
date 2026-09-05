@@ -7,6 +7,14 @@ on:
       - 'ios/**'
       - 'src/**'
       - 'package.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build iOS (Unsigned)
@@ -77,4 +85,4 @@ jobs:
         with:
           name: xiaoxiongmusic-ios-unsigned-${{ github.run_number }}
           path: xiaoxiongmusic-ios-unsigned-${{ github.run_number }}.ipa
-          retention-days: 30
+          retention-days: 7
