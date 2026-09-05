@@ -36,7 +36,6 @@ export async function checkAndRequestNotificationPermission(): Promise<boolean> 
       console.log('[NotificationPermission] 权限检查异常或插件缺失，回退放行');
       return true;
     }
-    return true;
   } catch (error) {
     console.error('[NotificationPermission] 检查通知权限失败:', error);
     // 如果出错，尝试继续（可能不需要权限或插件未安装）
