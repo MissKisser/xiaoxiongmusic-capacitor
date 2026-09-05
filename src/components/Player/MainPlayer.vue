@@ -384,9 +384,9 @@ const instantLyrics = computed(() => {
 .main-player {
   position: fixed;
   left: 0;
-  bottom: -90px;
-  height: 80px;
-  padding: 0 clamp(8px, 2vw, 15px);
+  bottom: calc(-90px - env(safe-area-inset-bottom, 0px));
+  height: calc(80px + env(safe-area-inset-bottom, 0px));
+  padding: 0 clamp(8px, 2vw, 15px) env(safe-area-inset-bottom, 0px);
   width: 100%;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -399,10 +399,10 @@ const instantLyrics = computed(() => {
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     background-color: rgba(var(--surface-container), 0.5) !important;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-    height: clamp(70px, 15vw, 80px);
+    height: calc(clamp(70px, 15vw, 80px) + env(safe-area-inset-bottom, 0px));
   }
   @media (max-width: 512px) {
-    height: 70px;
+    height: calc(70px + env(safe-area-inset-bottom, 0px));
   }
   &.show {
     bottom: 0;

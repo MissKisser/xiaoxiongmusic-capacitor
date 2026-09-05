@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import axios from 'axios';
 import packageJson from '@/../package.json';
+import { isIos } from '@/utils/env';
 
 interface VersionInfo {
     version: string;
@@ -39,9 +40,12 @@ export const useVersionStore = defineStore('version', {
 
         // 检查更新
         async checkUpdate(): Promise<boolean> {
+            // 决策 D3：iOS 短路
+            if (isIos) {
+                return false;
+            }
             this.isChecking = true;
             this.errorMessage = null;
-
             try {
                 const response = await axios.get('/api/version/check', {
                     params: {

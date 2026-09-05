@@ -9,7 +9,7 @@ import {
 } from "@/stores";
 import { QualityType, type SongType } from "@/types/main";
 import { isLogin } from "@/utils/auth";
-import { isElectron, isCapacitor } from "@/utils/env";
+import { isElectron, isCapacitor, isIos } from "@/utils/env";
 import { formatSongsList } from "@/utils/format";
 import { handleSongQuality } from "@/utils/helper";
 import { openUserLogin } from "@/utils/modal";
@@ -166,7 +166,9 @@ class SongManager {
     // Capacitor 环境：通过本地代理转发（NanoHTTPD 在手机本地运行，添加 CORS 头）
     // 不消耗远程服务器带宽，同时保证 Web Audio API（均衡器、频谱）正常工作
     if (isCapacitor) {
-      let proxyUrl = `http://localhost:18520/proxy/audio?url=${encodeURIComponent(url)}`;
+      let proxyUrl = isIos
+        ? `capacitor-audio://proxy/audio?url=${encodeURIComponent(url)}`
+        : `http://localhost:18520/proxy/audio?url=${encodeURIComponent(url)}`;
       // 传递稳定的缓存 key（歌曲 ID），避免 URL 中的时间戳/token 变化导致缓存失效
       if (cacheKey) {
         proxyUrl += `&key=${encodeURIComponent(String(cacheKey))}`;

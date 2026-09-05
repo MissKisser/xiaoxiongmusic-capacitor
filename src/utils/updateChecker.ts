@@ -7,7 +7,7 @@ import api from '@/utils/api';
 import { useVersionStore } from '@/stores';
 import packageJson from '@/../package.json';
 import { App } from '@capacitor/app';
-
+import { isIos } from '@/utils/env';
 const LOG_TAG = '[UpdateChecker]';
 
 export interface VersionInfo {
@@ -44,8 +44,11 @@ export async function getCurrentVersion(): Promise<string> {
  * 检查更新 (核心函数)
  */
 export async function checkForUpdates(): Promise<CheckResult> {
+    // 决策 D3：iOS 侧载模式无应用内自更新，直接短路返回
+    if (isIos) {
+        return { hasUpdate: false, versionInfo: null };
+    }
     console.log(`${LOG_TAG} ========== 开始检查更新 ==========`);
-
     try {
         // 使用 await 获取版本
         const currentVersion = await getCurrentVersion();
@@ -120,6 +123,10 @@ export async function checkForUpdates(): Promise<CheckResult> {
  * 返回是否发现新版本
  */
 export async function performVersionCheck(): Promise<boolean> {
+    // 决策 D3：iOS 短路
+    if (isIos) {
+        return false;
+    }
     console.log(`${LOG_TAG} 🚀 执行版本检查任务...`);
 
     const versionStore = useVersionStore();

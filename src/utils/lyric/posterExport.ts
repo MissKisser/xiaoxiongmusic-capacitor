@@ -6,14 +6,14 @@
  * Licensed under AGPL-3.0
  *
  * 上游桌面端通过 `window.api.system.saveFile` 落盘；
- * 移动端改为 Capacitor Filesystem 写入应用外部目录，
- * 并优先调用系统分享面板（Share 插件存在时），否则回退到 FileOpener 预览。
+ * 移动端改为 Capacitor Filesystem 写入应用目录（iOS 使用 Cache，Android 使用 External），
+ * 并优先调用系统分享面板，失败时回退到 FileOpener 预览。
  */
 
 import type { LyricPosterOptions } from "./poster";
 import { createLyricPoster } from "./poster";
-import { isCapacitor } from "@/utils/env";
-import { Capacitor } from "@capacitor/core";
+import { isCapacitor, isIos } from "@/utils/env";
+import { Share } from "@capacitor/share";
 import { saveAs } from "file-saver";
 
 /** 海报存放目录（应用外部私有目录，无需存储权限） */
@@ -55,17 +55,12 @@ const blobToBase64 = (blob: Blob): Promise<string> =>
 
 /**
  * 调起系统分享面板
- * `@capacitor/share` 为可选依赖，未安装时通过运行时探测跳过（不产生打包依赖）
  */
 const tryShareFile = async (uri: string, title: string): Promise<boolean> => {
   try {
-    const share = (Capacitor as any)?.Plugins?.Share;
-    if (!share?.share) return false;
-    if (typeof share.canShare === "function") {
-      const res = await share.canShare();
-      if (res && res.value === false) return false;
-    }
-    await share.share({ title, text: title, files: [uri], dialogTitle: "分享歌词图片" });
+    const canShareResult = await Share.canShare();
+    if (canShareResult && canShareResult.value === false) return false;
+    await Share.share({ title, text: title, files: [uri], dialogTitle: "分享歌词图片" });
     return true;
   } catch (error) {
     console.warn("[LyricPoster] 系统分享失败，回退到本地预览", error);
@@ -109,7 +104,7 @@ export const exportLyricPoster = async (
     const written = await Filesystem.writeFile({
       path,
       data: base64,
-      directory: Directory.External,
+      directory: isIos ? Directory.Cache : Directory.External,
       recursive: true,
     });
     const uri = written.uri;
