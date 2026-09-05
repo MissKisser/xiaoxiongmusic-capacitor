@@ -164,8 +164,13 @@ jobs:
 
       - name: Dismiss notification permission dialog
         run: |
-          python3 tap_button.py "${{ steps.device.outputs.id }}" label "Don't Allow|Allow" || true
-          xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/01b_after_alerts.png || true
+          DEVICE="${{ steps.device.outputs.id }}"
+          # 弹窗出现时机不定，20 秒内多次重试
+          for i in 1 2 3 4 5; do
+            python3 tap_button.py "$DEVICE" label "Don't Allow|Allow" && break || true
+            sleep 4
+          done
+          xcrun simctl io "$DEVICE" screenshot artifacts/01b_after_alerts.png || true
 
       # 首装用户协议：上滑到底解锁同意按钮后点击（状态持久化，仅首启出现）
       - name: Accept user agreement (first launch)
@@ -224,8 +229,8 @@ jobs:
           fi
           echo "=== App 进程存活检查 ===" | tee -a artifacts/cache_report.txt
           xcrun simctl spawn "$DEVICE" launchctl list 2>/dev/null | grep -i "com.xiaoxiong" | tee -a artifacts/cache_report.txt || echo "进程未在运行（可能已崩溃或被系统回收）" | tee -a artifacts/cache_report.txt
-          xcrun simctl spawn "$DEVICE" log show --last 8m --style compact --predicate 'process == "App"' > artifacts/app_console.log 2>&1 || true
-          grep -aE "Open Orpheus|Unsupported|Audio|audio|CORS|capacitor-audio|Unblock|unlock|playStatus|Failed to|❌" artifacts/app_console.log | grep -avE "CoreHaptics|WebPrivacy|app_launch|XPCErrors|TextInputUI|extensionkit|AppSSO" | head -80 > artifacts/error_lines.log || true
+          xcrun simctl spawn "$DEVICE" log show --last 10m --info --debug --style compact --predicate 'process == "App" OR processImagePath CONTAINS "WebKit.Networking"' > artifacts/app_console.log 2>&1 || true
+          grep -avE "CoreHaptics|WebPrivacy|app_launch|XPCErrors|TextInputUI|extensionkit|AppSSO|ScreenTime|UIKBFeedback" artifacts/app_console.log | grep -aiE "⚡️|orpheus|capacitor-audio|audio|proxy|CORS|❌|Unblock|songDetail|playStatus|media" | head -120 > artifacts/error_lines.log || true
 
       - name: Smoke verdict
         run: |
