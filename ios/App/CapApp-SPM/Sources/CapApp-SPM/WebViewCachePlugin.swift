@@ -35,6 +35,7 @@ public class WebViewCachePlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async {
             var dataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
             dataTypes.remove(WKWebsiteDataTypeLocalStorage)
+            dataTypes.remove(WKWebsiteDataTypeSessionStorage)
             dataTypes.remove(WKWebsiteDataTypeIndexedDBDatabases)
             dataTypes.remove(WKWebsiteDataTypeCookies)
 
@@ -103,12 +104,11 @@ public class WebViewCachePlugin: CAPPlugin, CAPBridgedPlugin {
         let currentVersion = currentAppVersion
         let previousVersion = UserDefaults.standard.string(forKey: versionKey) ?? ""
 
-        if previousVersion.isEmpty {
-            UserDefaults.standard.set(currentVersion, forKey: versionKey)
+        if currentVersion.isEmpty {
             call.resolve([
                 "cleared": false,
-                "previousVersion": "",
-                "currentVersion": currentVersion
+                "previousVersion": previousVersion,
+                "currentVersion": ""
             ])
             return
         }
@@ -116,6 +116,7 @@ public class WebViewCachePlugin: CAPPlugin, CAPBridgedPlugin {
         if previousVersion != currentVersion {
             performClearCache { [weak self] in
                 guard let self = self else { return }
+                self.performClearAppCaches()
                 UserDefaults.standard.set(currentVersion, forKey: self.versionKey)
                 call.resolve([
                     "cleared": true,

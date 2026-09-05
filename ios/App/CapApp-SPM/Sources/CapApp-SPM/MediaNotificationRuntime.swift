@@ -234,11 +234,23 @@ public final class MediaNotificationRuntime: NSObject {
         coverSeq += 1
         let expectedSeq = coverSeq
 
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15.0
+        request.setValue(
+            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+            forHTTPHeaderField: "User-Agent"
+        )
+        if let scheme = url.scheme, let host = url.host {
+            request.setValue("\(scheme)://\(host)/", forHTTPHeaderField: "Referer")
+        }
+        request.setValue("image/avif,image/webp,image/*,*/*;q=0.8", forHTTPHeaderField: "Accept")
+
         let configuration = URLSessionConfiguration.default
-        configuration.timeoutIntervalForRequest = 10.0
+        configuration.timeoutIntervalForRequest = 15.0
+        configuration.timeoutIntervalForResource = 15.0
         let session = URLSession(configuration: configuration)
 
-        session.dataTask(with: url) { [weak self] data, _, error in
+        session.dataTask(with: request) { [weak self] data, _, error in
             guard let self = self, error == nil, let data = data,
                   let image = UIImage(data: data) else {
                 return
