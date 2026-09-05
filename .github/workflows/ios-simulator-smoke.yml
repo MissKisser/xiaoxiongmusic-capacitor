@@ -24,7 +24,7 @@ jobs:
   smoke:
     name: Simulator Smoke (boot/play/cache)
     runs-on: macos-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -48,6 +48,12 @@ jobs:
 
       - name: Sync Capacitor iOS
         run: npx cap sync ios
+
+      - name: Install UI automation tool (idb)
+        run: |
+          brew install idb-companion
+          python3 -m pip install --break-system-packages fb-idb || python3 -m pip install fb-idb
+          idb list-targets | head -5 || true
 
       - name: Select available iPhone simulator
         id: device
@@ -83,11 +89,60 @@ jobs:
           mkdir -p artifacts
           xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/01_home.png
 
+      # 系统弹窗自动处理：按 accessibility 树找按钮点击，不依赖坐标
+      # 优先点 "Don't Allow"（冒烟不需要通知权限），无则点 "Allow"
+      - name: Auto-dismiss system dialogs (helper script)
+        run: |
+          cat > tap_button.py <<'EOF'
+          import json, subprocess, sys, time
+          DEVICE = sys.argv[1]
+          LABELS = sys.argv[2].split("|")
+          out = subprocess.run(["idb", "ui", "describe-all", "--udid", DEVICE],
+                               capture_output=True, text=True, timeout=60)
+          elements = []
+          for line in out.stdout.splitlines():
+              line = line.strip()
+              if not line.startswith("{"):
+                  continue
+              try:
+                  elements.append(json.loads(line))
+              except json.JSONDecodeError:
+                  pass
+          def find(label):
+              for e in elements:
+                  if e.get("AXLabel") == label and e.get("type") in ("Button", "StaticText", "Cell"):
+                      f = e.get("frame", {})
+                      return f.get("x", 0) + f.get("width", 0) / 2, f.get("y", 0) + f.get("height", 0) / 2
+              return None
+          for attempt in range(3):
+              target = None
+              for label in LABELS:
+                  target = find(label)
+                  if target:
+                      print(f"tap '{label}' at ({target[0]:.0f},{target[1]:.0f})")
+                      subprocess.run(["idb", "ui", "tap", str(int(target[0])), str(int(target[1])),
+                                      "--udid", DEVICE], check=True)
+                      time.sleep(3)
+                      break
+              if not target:
+                  print(f"attempt {attempt+1}: labels {LABELS} not found, done")
+                  break
+              time.sleep(2)
+          EOF
+          echo "helper ready"
+
+      - name: Dismiss notification permission dialog
+        run: |
+          python3 tap_button.py "${{ steps.device.outputs.id }}" "Don't Allow|Allow" || true
+          xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/01b_after_alerts.png || true
+
       - name: Play free song via deep link
         run: |
           URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.free_song_id || '347230' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
           echo "Deep link: $URL"
           xcrun simctl openurl "${{ steps.device.outputs.id }}" "$URL"
+          sleep 4
+          python3 tap_button.py "${{ steps.device.outputs.id }}" "Open" || true
           sleep 30
           xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/02_free_song.png
 
@@ -96,8 +151,19 @@ jobs:
           URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.vip_song_id || '186016' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
           echo "Deep link: $URL"
           xcrun simctl openurl "${{ steps.device.outputs.id }}" "$URL"
+          sleep 4
+          python3 tap_button.py "${{ steps.device.outputs.id }}" "Open" || true
           sleep 40
           xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/03_vip_song.png
+
+      - name: Replay free song (cache hit path)
+        run: |
+          URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.free_song_id || '347230' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
+          xcrun simctl openurl "${{ steps.device.outputs.id }}" "$URL"
+          sleep 4
+          python3 tap_button.py "${{ steps.device.outputs.id }}" "Open" || true
+          sleep 15
+          xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/04_free_replay.png
 
       - name: Collect evidence (cache / process / logs)
         if: always()
@@ -112,8 +178,8 @@ jobs:
           fi
           echo "=== App 进程存活检查 ===" | tee -a artifacts/cache_report.txt
           xcrun simctl spawn "$DEVICE" launchctl list 2>/dev/null | grep -i "com.xiaoxiong" | tee -a artifacts/cache_report.txt || echo "进程未在运行（可能已崩溃或被系统回收）" | tee -a artifacts/cache_report.txt
-          xcrun simctl spawn "$DEVICE" log show --last 6m --style compact --predicate 'process == "App"' > artifacts/app_console.log 2>&1 || true
-          grep -iE "error|fail|cors|crash|exception" artifacts/app_console.log | head -60 > artifacts/error_lines.log || true
+          xcrun simctl spawn "$DEVICE" log show --last 8m --style compact --predicate 'process == "App"' > artifacts/app_console.log 2>&1 || true
+          grep -aE "Open Orpheus|Unsupported|Audio|audio|CORS|capacitor-audio|Unblock|unlock|playStatus|Failed to|❌" artifacts/app_console.log | grep -avE "CoreHaptics|WebPrivacy|app_launch|XPCErrors|TextInputUI|extensionkit|AppSSO" | head -80 > artifacts/error_lines.log || true
 
       - name: Smoke verdict
         run: |
@@ -127,9 +193,9 @@ jobs:
             echo "| App 进程 | $([ "$ALIVE" -gt 0 ] && echo '✅ 存活' || echo '❌ 未运行') |"
             echo "| 缓存文件落地 | $([ "$CACHE_HITS" -gt 0 ] && echo "✅ ${CACHE_HITS} 个文件" || echo '❌ 无') |"
             echo ""
-            echo "详细证据见 artifacts（截图 01~03、cache_report、app_console.log）"
+            echo "详细证据见 artifacts（截图 01~04、cache_report、app_console.log、error_lines.log）"
           } >> "$GITHUB_STEP_SUMMARY"
-          # 首个基线期不硬失败，只报告；链路调稳后改为硬门禁
+          # 基线期不硬失败，只报告；链路调稳后改为硬门禁
           exit 0
 
       - name: Upload smoke artifacts
