@@ -21,7 +21,7 @@ public final class AudioProxySchemeHandler: NSObject, WKURLSchemeHandler {
 
     private let corsHeaders: [String: String] = [
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS, HEAD",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
         "Access-Control-Allow-Headers": "Range, Content-Type",
         "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges, X-Cache"
     ]
@@ -44,19 +44,28 @@ public final class AudioProxySchemeHandler: NSObject, WKURLSchemeHandler {
             return
         }
 
+        guard let components = URLComponents(url: requestUrl, resolvingAgainstBaseURL: false) else {
+            failTask(urlSchemeTask, statusCode: 400)
+            return
+        }
+
+        let fullPath = "\(components.host ?? "")\(components.path)"
+        guard fullPath == "proxy/audio" || components.path == "/proxy/audio" else {
+            failTask(urlSchemeTask, statusCode: 404)
+            return
+        }
+
         if urlSchemeTask.request.httpMethod?.uppercased() == "OPTIONS" {
             handleOptions(urlSchemeTask)
             return
         }
 
-        guard let components = URLComponents(url: requestUrl, resolvingAgainstBaseURL: false),
-              let queryItems = components.queryItems,
+        guard let queryItems = components.queryItems,
               let targetUrlStr = queryItems.first(where: { $0.name == "url" })?.value,
               let targetUrl = URL(string: targetUrlStr) else {
             failTask(urlSchemeTask, statusCode: 400)
             return
         }
-
         guard let scheme = targetUrl.scheme?.lowercased(),
               scheme == "http" || scheme == "https" else {
             failTask(urlSchemeTask, statusCode: 403)
@@ -160,6 +169,27 @@ public final class AudioProxySchemeHandler: NSObject, WKURLSchemeHandler {
                 endOffset = min(totalSize - 1, end)
             }
         }
+        if isRangeRequest && startOffset >= totalSize {
+            var headers = corsHeaders
+            headers["Content-Range"] = "bytes */\(totalSize)"
+            guard let response = HTTPURLResponse(
+                url: requestUrl,
+                statusCode: 416,
+                httpVersion: "HTTP/1.1",
+                headerFields: headers
+            ) else {
+                failTask(task, statusCode: 500)
+                return
+            }
+            if isTaskActive(task) {
+                task.didReceive(response)
+                task.didFinish()
+            }
+            activeTasksLock.lock()
+            activeTasks.remove(ObjectIdentifier(task))
+            activeTasksLock.unlock()
+            return
+        }
 
         let contentLength = max(0, endOffset - startOffset + 1)
         var headers = corsHeaders
@@ -217,21 +247,20 @@ public final class AudioProxySchemeHandler: NSObject, WKURLSchemeHandler {
         var upstreamRequest = URLRequest(url: targetUrl)
         upstreamRequest.timeoutInterval = 30.0
 
-        if let range = task.request.value(forHTTPHeaderField: "Range") {
+        let rangeHeader = task.request.value(forHTTPHeaderField: "Range")
+        let canCache = cacheManager.enabled && (rangeHeader == nil || rangeHeader == "bytes=0-")
+
+        if !canCache, let range = rangeHeader {
             upstreamRequest.setValue(range, forHTTPHeaderField: "Range")
         }
 
         upstreamRequest.setValue(
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
             forHTTPHeaderField: "User-Agent"
         )
         if let scheme = targetUrl.scheme, let host = targetUrl.host {
             upstreamRequest.setValue("\(scheme)://\(host)/", forHTTPHeaderField: "Referer")
         }
-
-        let rangeHeader = task.request.value(forHTTPHeaderField: "Range")
-        let canCache = cacheManager.enabled && (rangeHeader == nil || rangeHeader == "bytes=0-")
-
         var tempUrl: URL?
         var tempHandle: FileHandle?
 

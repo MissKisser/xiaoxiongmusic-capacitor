@@ -51,6 +51,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 /**
  * 应用主视图控制器，继承 CAPBridgeViewController 并接管配置与插件注册
+ *
+ * App target 自定义插件须经 CAPBridgeViewController 子类调用 bridge?.registerPluginInstance(...) 注册
+ * 在 capacitorDidLoad() 阶段注册以确保在 loadWebView() 之前完成，消除 WKUserScript 注入竞态
  */
 class MainViewController: CAPBridgeViewController {
 
@@ -60,8 +63,8 @@ class MainViewController: CAPBridgeViewController {
         return config
     }
 
-    override func viewDidLoad() {
-        super.viewDidLoad()
+    override func capacitorDidLoad() {
+        super.capacitorDidLoad()
         bridge?.registerPluginInstance(MediaNotificationPlugin())
         bridge?.registerPluginInstance(AudioCachePlugin())
         bridge?.registerPluginInstance(WebViewCachePlugin())
