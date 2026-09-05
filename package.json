@@ -86,7 +86,7 @@
         "naive-ui": "^2.43.2",
         "pnpm": "^10.28.2",
         "rollup": "^4.57.0",
-        "sass": "^1.94.2",
+        "sass": "^1.103.1",
         "tsx": "^4.21.0",
         "typescript": "^5.9.3",
         "unplugin-auto-import": "^20.3.0",
