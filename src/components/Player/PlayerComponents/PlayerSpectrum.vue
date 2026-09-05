@@ -134,6 +134,7 @@ onBeforeUnmount(() => {
   position: fixed;
   left: 0;
   bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   width: 100%;
   display: flex;
   flex-direction: row;
