@@ -66,7 +66,7 @@
 <script setup lang="ts">
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useDataStore, useSettingStore, useStatusStore } from "@/stores";
-import { isCapacitor, isElectron } from "@/utils/env";
+import { isCapacitor, isElectron, isIos } from "@/utils/env";
 import { renderIcon } from "@/utils/helper";
 import { openAutoClose, openChangeRate, openEqualizer } from "@/utils/modal";
 import type { DropdownOption } from "naive-ui";
@@ -75,7 +75,7 @@ const dataStore = useDataStore();
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
 const player = usePlayerController();
-const desktopLyricAvailable = isElectron || isCapacitor;
+const desktopLyricAvailable = (isElectron || isCapacitor) && !isIos;
 
 // 更多功能
 const controlsOptions = computed<DropdownOption[]>(() => [

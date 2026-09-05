@@ -1,13 +1,14 @@
 import UIKit
+import WebKit
 import Capacitor
-
+import CapApp_SPM
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        AudioCacheManager.shared.cleanupOldTempFiles()
         return true
     }
 
@@ -46,4 +47,23 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
+}
+
+/**
+ * 应用主视图控制器，继承 CAPBridgeViewController 并接管配置与插件注册
+ */
+class MainViewController: CAPBridgeViewController {
+
+    override func webViewConfiguration(for instanceConfiguration: InstanceConfiguration) -> WKWebViewConfiguration {
+        let config = super.webViewConfiguration(for: instanceConfiguration)
+        config.setURLSchemeHandler(AudioProxySchemeHandler(), forURLScheme: "capacitor-audio")
+        return config
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        bridge?.registerPluginInstance(MediaNotificationPlugin())
+        bridge?.registerPluginInstance(AudioCachePlugin())
+        bridge?.registerPluginInstance(WebViewCachePlugin())
+    }
 }
