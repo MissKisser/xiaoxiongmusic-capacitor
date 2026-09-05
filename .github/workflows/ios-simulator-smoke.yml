@@ -135,9 +135,15 @@ jobs:
               sys.exit(0)
           LABELS = sys.argv[3].split("|")
           def find(label):
+              # 先精确匹配（任意非容器类型），再退化为仅 Button 的子串匹配，
+              # 避免误选 StaticText 标题（如 "Open in 小熊音乐?" 含 "Open"）
+              for e in elements:
+                  if str(e.get("AXLabel", "")) == label and str(e.get("type", "")) != "Alert":
+                      f = e.get("frame", {})
+                      return f.get("x", 0) + f.get("width", 0) / 2, f.get("y", 0) + f.get("height", 0) / 2
               for e in elements:
                   lab = str(e.get("AXLabel", ""))
-                  if label.lower() in lab.lower() and str(e.get("type", "")) in ("Button", "StaticText", "Cell", "Alert"):
+                  if label.lower() in lab.lower() and str(e.get("type", "")) == "Button":
                       f = e.get("frame", {})
                       return f.get("x", 0) + f.get("width", 0) / 2, f.get("y", 0) + f.get("height", 0) / 2
               return None
@@ -160,6 +166,19 @@ jobs:
         run: |
           python3 tap_button.py "${{ steps.device.outputs.id }}" label "Don't Allow|Allow" || true
           xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/01b_after_alerts.png || true
+
+      # 首装用户协议：上滑到底解锁同意按钮后点击（状态持久化，仅首启出现）
+      - name: Accept user agreement (first launch)
+        run: |
+          DEVICE="${{ steps.device.outputs.id }}"
+          for i in 1 2 3 4 5 6; do
+            idb ui swipe 201 620 201 180 --udid "$DEVICE" || true
+            sleep 1
+          done
+          sleep 1
+          python3 tap_button.py "$DEVICE" label "同意" || true
+          sleep 2
+          xcrun simctl io "$DEVICE" screenshot artifacts/01c_after_agreement.png || true
 
       - name: Play free song via deep link
         run: |
