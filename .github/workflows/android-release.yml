@@ -1,0 +1,138 @@
+name: Android Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 发布版本号（如 4.8.7）
+        required: true
+      is_force:
+        description: 是否强更
+        type: boolean
+        default: false
+      do_push:
+        description: 构建后是否推送服务端更新（默认仅构建 + GitHub Release）
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build + Sign + Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web assets
+        run: pnpm build
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
+      - name: Restore signing key from secrets
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/splayer-release-key.jks
+          cat > android/keystore.properties <<EOF
+          storeFile=splayer-release-key.jks
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          EOF
+          test -s android/splayer-release-key.jks || { echo "::error::keystore 解码失败"; exit 1; }
+
+      - name: Bump version
+        run: |
+          cd android/app
+          sed -i.bak 's/versionCode [0-9]*/versionCode ${{ github.run_number }}/' build.gradle
+          sed -i.bak 's/versionName "[^"]*"/versionName "${{ inputs.version }}"/' build.gradle
+          rm -f build.gradle.bak
+          grep -E "versionCode|versionName" build.gradle
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle*') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Assemble signed release APK
+        run: cd android && ./gradlew assembleRelease --no-daemon
+
+      - name: Collect APK
+        run: |
+          mkdir -p release_out
+          cp android/app/build/outputs/apk/release/app-release.apk "release_out/xiaoxiongmusic-release-${{ inputs.version }}.apk"
+          ls -la release_out/
+          # 验证签名（apksigner）
+          ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          BT=$(ls "$ANDROID_HOME/build-tools/" | sort -V | tail -1)
+          "$ANDROID_HOME/build-tools/$BT/apksigner" verify --print-certs "release_out/xiaoxiongmusic-release-${{ inputs.version }}.apk" | head -5
+
+      - name: Create GitHub Release
+        run: |
+          gh release create "v${{ inputs.version }}" \
+            "release_out/xiaoxiongmusic-release-${{ inputs.version }}.apk" \
+            --title "v${{ inputs.version }}" \
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Push update to server
+        if: ${{ inputs.do_push }}
+        run: |
+          TOKEN=$(curl -s --max-time 15 -X POST https://music.viaxv.top/api/admin/login \
+            -H "Content-Type: application/json" \
+            -d "{\"username\":\"${{ secrets.SERVER_API_USERNAME }}\",\"password\":\"${{ secrets.SERVER_API_PASSWORD }}\"}" \
+            | python3 -c "import json,sys;print(json.load(sys.stdin)['data']['token'])")
+          test -n "$TOKEN" || { echo "::error::登录失败"; exit 1; }
+          APK_URL="https://slink.viaxv.top/music/"
+          DESC=$(printf '## v%s\n\n- 详细变更见 [GitHub Release](https://github.com/%s/releases/tag/v%s)' "${{ inputs.version }}" "${{ github.repository }}" "${{ inputs.version }}")
+          jq -n --arg v "${{ inputs.version }}" \
+                --argjson bn "${{ github.run_number }}" \
+                --arg url "$APK_URL" \
+                --arg desc "$DESC" \
+                --argjson force "${{ inputs.is_force }}" \
+                '{version:$v, buildNumber:$bn, platform:"android", apkUrl:$url, description:$desc, isForce:$force}' > payload.json
+          HTTP=$(curl -s --max-time 20 -o push_resp.json -w "%{http_code}" -X POST https://music.viaxv.top/api/admin/versions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d @payload.json)
+          cat push_resp.json
+          [ "$HTTP" = "200" ] || { echo "::error::推送失败 HTTP=$HTTP"; exit 1; }
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xiaoxiongmusic-release-${{ inputs.version }}
+          path: release_out/
+          retention-days: 30

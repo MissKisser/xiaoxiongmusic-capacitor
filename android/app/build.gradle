@@ -23,7 +23,11 @@ android {
         }
     }
 
-    def keystorePropertiesFile = file("D:/document/Projects/xiaoxiongmusic/keystore.properties")
+    // 优先读取模块内 keystore.properties（CI 场景，由流水线注入），回退本机绝对路径（本地开发场景）
+    def keystorePropertiesFile = file("keystore.properties")
+    if (!keystorePropertiesFile.exists()) {
+        keystorePropertiesFile = file("D:/document/Projects/xiaoxiongmusic/keystore.properties")
+    }
     def keystoreProperties = new Properties()
     if (keystorePropertiesFile.exists()) {
         keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
