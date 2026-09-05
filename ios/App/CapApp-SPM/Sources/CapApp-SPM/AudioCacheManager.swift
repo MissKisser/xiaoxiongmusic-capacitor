@@ -1,5 +1,5 @@
 import Foundation
-import CommonCrypto
+import CryptoKit
 
 /**
  * 音频缓存管理器
@@ -64,11 +64,7 @@ public final class AudioCacheManager: NSObject {
      * - Returns: 32 位小写 MD5 十六进制字符串
      */
     public func md5Hash(_ string: String) -> String {
-        let data = Data(string.utf8)
-        var digest = [UInt8](repeating: 0, count: Int(CC_MD5_DIGEST_LENGTH))
-        _ = data.withUnsafeBytes { buffer in
-            CC_MD5(buffer.baseAddress, CC_LONG(data.count), &digest)
-        }
+        let digest = Insecure.MD5.hash(data: Data(string.utf8))
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 

@@ -40,7 +40,7 @@ export const useVersionStore = defineStore('version', {
 
         // 检查更新
         async checkUpdate(): Promise<boolean> {
-            // 决策 D3：iOS 短路
+            // iOS 侧载分发无应用内自更新链路，跳过版本检查
             if (isIos) {
                 return false;
             }

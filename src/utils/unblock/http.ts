@@ -16,7 +16,7 @@ export async function unblockGet(
         return CapacitorHttp.get({
             url,
             headers: {
-                // 决策 D4：保持 Android UA 伪装，与平台无关
+                // 保持移动端 UA 伪装以兼容音源服务的反爬策略，双端一致
                 "User-Agent": "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36",
                 ...headers,
             },
@@ -46,7 +46,7 @@ export async function unblockPost(
         return CapacitorHttp.post({
             url,
             headers: {
-                // 决策 D4：保持 Android UA 伪装，与平台无关
+                // 保持移动端 UA 伪装以兼容音源服务的反爬策略，双端一致
                 "User-Agent": "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36",
                 "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
                 ...headers,
