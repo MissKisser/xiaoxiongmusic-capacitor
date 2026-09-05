@@ -252,7 +252,7 @@ public final class AudioProxySchemeHandler: NSObject, WKURLSchemeHandler {
         // WKWebView 媒体加载器的首请求为 bytes=0-1 探针（不会发送 bytes=0- 或无 Range），
         // 从零开始的请求（含探针）均按可缓存路径处理：不转发 Range，上游返回 200 完整流写入缓存，
         // 后续偏移 Range 请求即可命中缓存
-        let isRangeFromStart = rangeHeader == nil || rangeHeader.hasPrefix("bytes=0-")
+        let isRangeFromStart = rangeHeader == nil || rangeHeader?.hasPrefix("bytes=0-") == true
         let canCache = cacheManager.enabled && isRangeFromStart
 
         if !canCache, let range = rangeHeader {
