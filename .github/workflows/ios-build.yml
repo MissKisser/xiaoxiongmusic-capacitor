@@ -81,7 +81,7 @@ jobs:
           zip -r xiaoxiongmusic-ios-unsigned-${{ github.run_number }}.ipa Payload
 
       - name: Upload unsigned IPA artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: xiaoxiongmusic-ios-unsigned-${{ github.run_number }}
           path: xiaoxiongmusic-ios-unsigned-${{ github.run_number }}.ipa
