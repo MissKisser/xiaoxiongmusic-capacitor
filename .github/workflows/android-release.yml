@@ -86,7 +86,7 @@ jobs:
           restore-keys: gradle-${{ runner.os }}-
 
       - name: Assemble signed release APK
-        run: cd android && ./gradlew assembleRelease --no-daemon
+        run: cd android && chmod +x gradlew && ./gradlew assembleRelease --no-daemon
 
       - name: Collect APK
         run: |
