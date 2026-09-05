@@ -52,6 +52,7 @@ jobs:
       - name: Install UI automation tool (idb)
         run: |
           brew tap facebook/fb
+          brew trust --formula facebook/fb/idb-companion || brew trust facebook/fb || true
           brew install idb-companion
           python3 -m pip install --break-system-packages fb-idb || python3 -m pip install fb-idb
           idb --help > /dev/null 2>&1 && echo "idb CLI ready"
