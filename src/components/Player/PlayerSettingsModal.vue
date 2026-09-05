@@ -95,7 +95,7 @@
 
 <script setup lang="ts">
 import { useSettingStore, useStatusStore } from "@/stores";
-import { isCapacitor, isElectron } from "@/utils/env";
+import { isCapacitor, isElectron, isIos } from "@/utils/env";
 import SleepTimerModal from "./SettingsModals/SleepTimerModal.vue";
 import EqualizerModal from "./SettingsModals/EqualizerModal.vue";
 import PlayRateModal from "./SettingsModals/PlayRateModal.vue";
@@ -114,7 +114,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
-const desktopLyricAvailable = isElectron || isCapacitor;
+const desktopLyricAvailable = (isElectron || isCapacitor) && !isIos;
 
 const showModal = computed({
   get: () => props.show,

@@ -2,7 +2,11 @@ name: iOS Build (Unsigned IPA)
 
 on:
   workflow_dispatch:
-
+  push:
+    paths:
+      - 'ios/**'
+      - 'src/**'
+      - 'package.json'
 jobs:
   build:
     name: Build iOS (Unsigned)

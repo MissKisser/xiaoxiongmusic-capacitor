@@ -21,6 +21,8 @@ export const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Oper
 /** 是否为 Capacitor 环境 */
 import { Capacitor } from '@capacitor/core';
 export const isCapacitor = Capacitor.isNativePlatform();
+/** 是否为 iOS 原生环境 */
+export const isIos = Capacitor.getPlatform() === "ios";
 
 /** 是否为 DEV 构建 */
 export const isDevBuild = import.meta.env.VITE_BUILD_TYPE === "dev";
