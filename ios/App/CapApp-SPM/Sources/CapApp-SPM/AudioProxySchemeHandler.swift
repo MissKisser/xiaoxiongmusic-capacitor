@@ -225,7 +225,6 @@ public final class AudioProxySchemeHandler: NSObject, WKURLSchemeHandler {
             let chunkSize = 65536
 
             while remaining > 0 {
-                if task.isStopped { break }
                 let toRead = Int(min(Int64(chunkSize), remaining))
                 let chunk = fileHandle.readData(ofLength: toRead)
                 if chunk.isEmpty { break }
@@ -379,8 +378,8 @@ extension AudioProxySchemeHandler: URLSessionDataDelegate {
         }
 
         if context.tempUrl != nil {
-            fileIOQueue.async { [weak context] in
-                guard let context = context, let handle = context.tempHandle else { return }
+            fileIOQueue.async {
+                guard let handle = context.tempHandle else { return }
                 handle.write(data)
                 context.totalBytesWritten += Int64(data.count)
             }
@@ -397,8 +396,8 @@ extension AudioProxySchemeHandler: URLSessionDataDelegate {
 
         guard let context = matchingContext else { return }
 
-        fileIOQueue.async { [weak self, weak context] in
-            guard let self = self, let context = context else { return }
+        fileIOQueue.async { [weak self] in
+            guard let self = self else { return }
 
             if let handle = context.tempHandle {
                 try? handle.close()
