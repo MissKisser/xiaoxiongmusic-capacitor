@@ -263,7 +263,7 @@ public final class MediaNotificationRuntime: NSObject {
     public func updatePlaybackState(isPlaying: Bool) {
         self.isPlaying = isPlaying
         currentNowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
-        currentNowPlayingInfo[MPNowPlayingPropertyElapsedPlaybackTime] = lastPosition
+        currentNowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = lastPosition
         if lastDuration > 0 {
             currentNowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = lastDuration
         }
@@ -283,7 +283,7 @@ public final class MediaNotificationRuntime: NSObject {
             lastDuration = duration
             currentNowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = duration
         }
-        currentNowPlayingInfo[MPNowPlayingPropertyElapsedPlaybackTime] = position
+        currentNowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = position
         currentNowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
         MPNowPlayingInfoCenter.default().nowPlayingInfo = currentNowPlayingInfo
     }
