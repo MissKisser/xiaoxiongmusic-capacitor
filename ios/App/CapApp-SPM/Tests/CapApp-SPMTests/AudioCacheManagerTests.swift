@@ -103,12 +103,18 @@ final class AudioCacheManagerTests: XCTestCase {
     }
 
     func testGetCacheSizeExcludesTmpAndRoundsToTwoDecimals() {
-        makeCacheFile(named: "a.cache", size: 1536)
+        makeCacheFile(named: "a.cache", size: 1_572_864)
         makeCacheFile(named: "b_XXXX.cache.tmp", size: 4096)
         let (sizeMB, count) = manager.getCacheSize()
         XCTAssertEqual(count, 1)
-        XCTAssertEqual((sizeMB * 100).rounded(), sizeMB * 100)
-        XCTAssertGreaterThan(sizeMB, 0)
+        XCTAssertEqual(sizeMB, 1.5)
+
+        // 舍入行为：统计值经两位小数舍入，不足 0.01MB 的占用归零
+        manager.clearCache()
+        makeCacheFile(named: "c.cache", size: 1536)
+        let (smallMB, smallCount) = manager.getCacheSize()
+        XCTAssertEqual(smallCount, 1)
+        XCTAssertEqual(smallMB, 0.0)
     }
 
     func testTrimCacheEvictsOldestByLRU() {
