@@ -54,5 +54,46 @@ class MainViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(MediaNotificationPlugin())
         bridge?.registerPluginInstance(AudioCachePlugin())
         bridge?.registerPluginInstance(WebViewCachePlugin())
+        injectSimLoginCookie()
+    }
+
+    /**
+     * 模拟器测试注入：从启动环境变量 SIM_LOGIN_COOKIE 读取网易云 Cookie 串（形如 "MUSIC_U=xxx; __csrf=yyy"），
+     * 以 WKUserScript 在 documentStart 写入 document.cookie 与 localStorage 影子库（cookie-<key>），
+     * 使 App 自身的 syncNativeCookies 链路将其同步到原生层，达成测试态登录。
+     * 仅 DEBUG 构建生效，正式产物不受影响。
+     */
+    private func injectSimLoginCookie() {
+        #if DEBUG
+        guard let raw = ProcessInfo.processInfo.environment["SIM_LOGIN_COOKIE"], !raw.isEmpty else { return }
+        let escaped = raw
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+            .replacingOccurrences(of: "\n", with: "")
+        let source = """
+        (function(){
+          var raw = '\(escaped)';
+          function apply(){
+            try {
+              raw.split(';').forEach(function(p){
+                var i = p.indexOf('=');
+                if (i < 1) return;
+                var k = p.slice(0, i).trim(), v = p.slice(i + 1).trim();
+                if (!k) return;
+                document.cookie = k + '=' + v + '; path=/';
+                localStorage.setItem('cookie-' + k, v);
+              });
+              return true;
+            } catch (e) { return false; }
+          }
+          if (!apply()) {
+            document.addEventListener('DOMContentLoaded', function(){ apply(); });
+            window.addEventListener('load', function(){ apply(); });
+          }
+        })();
+        """
+        let script = WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+        webView?.configuration.userContentController.addUserScript(script)
+        #endif
     }
 }
