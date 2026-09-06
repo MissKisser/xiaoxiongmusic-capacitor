@@ -469,34 +469,52 @@ jobs:
           sleep 12
           xcrun simctl io "$DEVICE" screenshot artifacts/15_timer_persist.png || true
 
-      # 睡眠定时器到点暂停（P1-5 行为断言）：10min 档 arm 原生定时器 → 深链起播 →
-      # 等 630s（600s 档位 + 30s 余量）断言播放图标翻转 + 原生到点日志 + 重启后状态清零
-      - name: Sleep timer fire (10 min wait)
+      # 睡眠定时器到点暂停（P1-5 行为断言）：免费歌起播避开 VIP 取源失败连锁；
+      # 10min 双 tap（selectTime 幂等）+ checkbox 双 tap 归零 waitSongEnd +
+      # 自定义 1 分钟链覆盖 arm（输入即生效），等待 100s 断言到点；
+      # 若自定义输入未生效则回落 10min 档，追加 540s 等待二次判定
+      - name: Sleep timer fire (custom 1 min, fallback 10 min)
         if: ${{ inputs.login_mode == true }}
         run: |
           DEVICE="${{ steps.device.outputs.id }}"
           xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
           sleep 2
           SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play/timer"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
-          sleep 12
+          sleep 15
           xcrun simctl io "$DEVICE" screenshot artifacts/18_timer_arm_page.png || true
-          python3 tap_button.py "$DEVICE" coord 0.1866 0.3121 || true
+          idb ui tap 75 273 --udid "$DEVICE" || true
+          sleep 1
+          idb ui tap 75 273 --udid "$DEVICE" || true
+          sleep 2
+          idb ui tap 201 443 --udid "$DEVICE" || true
+          sleep 2
+          idb ui tap 201 500 --udid "$DEVICE" || true
+          sleep 1
+          idb ui text "1" --udid "$DEVICE" || true
           sleep 2
           xcrun simctl io "$DEVICE" screenshot artifacts/18_timer_armed.png || true
-          URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.vip_song_id || '186016' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
+          URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.free_song_id || '347230' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
           xcrun simctl openurl "$DEVICE" "$URL"
+          sleep 5
+          python3 tap_button.py "$DEVICE" label "Open" || python3 tap_button.py "$DEVICE" coord 0.695 0.542 || true
+          sleep 15
+          xcrun simctl openurl "$DEVICE" "$URL" || true
           sleep 4
-          python3 tap_button.py "$DEVICE" coord 0.695 0.542 || true
-          sleep 16
+          python3 tap_button.py "$DEVICE" label "Open" || python3 tap_button.py "$DEVICE" coord 0.695 0.542 || true
+          sleep 15
           xcrun simctl io "$DEVICE" screenshot artifacts/18_timer_before.png || true
-          echo "定时器已 arm（10min），等待 630 秒到点..."
-          sleep 630
+          echo "等待 100 秒验证 1 分钟定时器到点..."
+          sleep 100
           xcrun simctl io "$DEVICE" screenshot artifacts/18_timer_after.png || true
-          xcrun simctl spawn "$DEVICE" log show --last 14m --info --debug --style compact             --predicate 'process == "App"' > artifacts/timer_fire_console.log 2>&1 || true
+          xcrun simctl spawn "$DEVICE" log show --last 6m --info --debug --style compact             --predicate 'process == "App"' > artifacts/timer_fire_console.log 2>&1 || true
           if grep -q "睡眠定时器到点" artifacts/timer_fire_console.log; then
-            echo "✅ 原生定时器到点日志命中"
+            echo "✅ 原生定时器到点日志命中（1min 档）"
           else
-            echo "⚠️ 原生定时器到点日志未检出"
+            echo "1min 档未检出，回落等待 10min 档（540 秒）..."
+            sleep 540
+            xcrun simctl io "$DEVICE" screenshot artifacts/18_timer_after_10min.png || true
+            xcrun simctl spawn "$DEVICE" log show --last 14m --info --debug --style compact               --predicate 'process == "App"' > artifacts/timer_fire_console.log 2>&1 || true
+            grep -q "睡眠定时器到点" artifacts/timer_fire_console.log             && echo "✅ 原生定时器到点日志命中（10min 档）" || echo "⚠️ 原生定时器到点日志未检出"
           fi
           xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
           sleep 2
@@ -504,8 +522,8 @@ jobs:
           sleep 12
           xcrun simctl io "$DEVICE" screenshot artifacts/20_timer_reset.png || true
 
-      # 加分项（waitSongEnd）：自定义 1 分钟 + 勾选等待曲终 → 到点后歌曲应继续播放
-      # 自定义输入无确认按钮（输入即生效）；曲终自动暂停受歌长限制不等待，如实记录
+      # 加分项（waitSongEnd）：主链 checkbox 双 tap 已归零，此处单次勾选状态可控；
+      # 勾选后经自定义 1 分钟链 arm，到点后歌曲应继续播放（原生不发 pause）
       - name: Sleep timer waitSongEnd (bonus)
         if: ${{ inputs.login_mode == true }}
         run: |
@@ -513,28 +531,33 @@ jobs:
           xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
           sleep 2
           SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play/timer"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
-          sleep 12
+          sleep 15
           xcrun simctl io "$DEVICE" screenshot artifacts/21_wse_page.png || true
           idb ui tap 201 443 --udid "$DEVICE" || true
           sleep 2
-          idb ui tap 201 487 --udid "$DEVICE" || true
+          idb ui tap 201 500 --udid "$DEVICE" || true
           sleep 1
           idb ui text "1" --udid "$DEVICE" || true
           sleep 2
-          idb ui tap 201 505 --udid "$DEVICE" || true
+          # 主链已输出 waitSongEnd 实际值：为 true 则不再勾选（保持），为 false 则翻转勾选
+          if grep -q "waitSongEnd=true" artifacts/timer_fire_console.log 2>/dev/null; then
+            echo "主链 waitSongEnd=true，保持现状"
+          else
+            idb ui tap 201 520 --udid "$DEVICE" || true
+          fi
           sleep 2
           xcrun simctl io "$DEVICE" screenshot artifacts/21_wse_armed.png || true
           URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.free_song_id || '347230' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
           xcrun simctl openurl "$DEVICE" "$URL"
-          sleep 4
-          python3 tap_button.py "$DEVICE" coord 0.695 0.542 || true
-          sleep 16
+          sleep 5
+          python3 tap_button.py "$DEVICE" label "Open" || python3 tap_button.py "$DEVICE" coord 0.695 0.542 || true
+          sleep 15
           xcrun simctl io "$DEVICE" screenshot artifacts/21_wse_before.png || true
-          echo "等待 90 秒验证 1 分钟定时器到点后歌曲继续..."
-          sleep 90
+          echo "等待 100 秒验证 1 分钟定时器到点后歌曲继续..."
+          sleep 100
           xcrun simctl io "$DEVICE" screenshot artifacts/21_wse_after.png || true
-          xcrun simctl spawn "$DEVICE" log show --last 5m --info --debug --style compact             --predicate 'process == "App"' > artifacts/wse_console.log 2>&1 || true
-          grep -q "睡眠定时器到点" artifacts/wse_console.log && echo "waitSongEnd 到点事件命中" || echo "waitSongEnd 到点事件未检出"
+          xcrun simctl spawn "$DEVICE" log show --last 6m --info --debug --style compact             --predicate 'process == "App"' > artifacts/wse_console.log 2>&1 || true
+          grep -q "睡眠定时器到点" artifacts/wse_console.log && echo "✅ waitSongEnd 到点事件命中" || echo "⚠️ waitSongEnd 到点事件未检出"
 
       # Cookie 自然持久化（P4-1）：不带注入环境变量重启，验证登录态由 App 自身持久化保持
       - name: Cookie persistence check (no injection)
@@ -557,6 +580,97 @@ jobs:
           xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
           sleep 3
           xcrun simctl io "$DEVICE" screenshot artifacts/19_springboard.png || true
+
+      # 歌词海报导出分享（P2-1）：迷你条 → 全屏播放器 → 歌词视图 → 复制歌词弹窗 →
+      # 勾选歌词 → 导出图片 → 原生分享面板。坐标链长且 App 内 a11y 不可用，
+      # 每步落截图供判读与迭代修正；沙盒 lyric-poster 落盘为导出链路的独立证据
+      - name: Lyric poster export chain (T4)
+        if: ${{ inputs.login_mode == true }}
+        run: |
+          DEVICE="${{ steps.device.outputs.id }}"
+          URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.free_song_id || '347230' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
+          xcrun simctl openurl "$DEVICE" "$URL"
+          sleep 4
+          python3 tap_button.py "$DEVICE" coord 0.695 0.542 || true
+          sleep 16
+          xcrun simctl io "$DEVICE" screenshot artifacts/22_home_miniplayer.png || true
+          idb ui tap 181 769 --udid "$DEVICE" || true
+          sleep 5
+          xcrun simctl io "$DEVICE" screenshot artifacts/22_player_full.png || true
+          idb ui tap 201 320 --udid "$DEVICE" || true
+          sleep 4
+          xcrun simctl io "$DEVICE" screenshot artifacts/22b_after_tap_cover.png || true
+          idb ui tap 371 200 --udid "$DEVICE" || true
+          sleep 3
+          xcrun simctl io "$DEVICE" screenshot artifacts/22c_copy_lyrics.png || true
+          idb ui tap 60 330 --udid "$DEVICE" || true
+          sleep 2
+          xcrun simctl io "$DEVICE" screenshot artifacts/23_line_selected.png || true
+          idb ui tap 330 800 --udid "$DEVICE" || true
+          sleep 6
+          xcrun simctl io "$DEVICE" screenshot artifacts/23_share_sheet.png || true
+          A11Y_DUMP=artifacts/a11y_share_sheet.json python3 tap_button.py "$DEVICE" label "取消|Cancel" || true
+          sleep 2
+          xcrun simctl io "$DEVICE" screenshot artifacts/23b_after_dismiss.png || true
+          DATA=$(xcrun simctl get_app_container "$DEVICE" com.xiaoxiong.music data 2>/dev/null || true)
+          if [ -n "$DATA" ] && ls "$DATA/Library/Caches/lyric-poster/"*.png >/dev/null 2>&1; then
+            echo "✅ 海报 PNG 已落盘：$(ls "$DATA/Library/Caches/lyric-poster/")"
+          else
+            echo "⚠️ lyric-poster 目录无 PNG（导出链路未走通或面板先于落盘）"
+          fi
+
+      # FFmpeg 引擎不崩溃冒烟（P4-6 机制层）：DEBUG 注入预置 setting-store（audioEngine=ffmpeg）
+      # → 深链起播持续 ≥60 秒 + 进程存活 → 切回 element 引擎恢复原状；内存/听感归真机
+      - name: FFmpeg engine smoke (T5)
+        if: ${{ inputs.login_mode == true }}
+        run: |
+          DEVICE="${{ steps.device.outputs.id }}"
+          xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
+          sleep 2
+          SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_SETTING_OVERRIDES='{"audioEngine":"ffmpeg"}'             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
+          sleep 15
+          URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.free_song_id || '347230' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
+          xcrun simctl openurl "$DEVICE" "$URL"
+          sleep 10
+          python3 tap_button.py "$DEVICE" coord 0.695 0.542 || true
+          sleep 15
+          xcrun simctl io "$DEVICE" screenshot artifacts/25_ffmpeg_start.png || true
+          sleep 60
+          xcrun simctl io "$DEVICE" screenshot artifacts/26_ffmpeg_60s.png || true
+          xcrun simctl spawn "$DEVICE" launchctl list 2>/dev/null | grep -i "com.xiaoxiong"           && echo "FFmpeg 引擎进程存活（60 秒后）" || echo "警告: FFmpeg 引擎进程未运行"
+          xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
+          sleep 2
+          SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_SETTING_OVERRIDES='{"audioEngine":"element"}'             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
+          sleep 10
+          xcrun simctl io "$DEVICE" screenshot artifacts/26b_engine_restored.png || true
+
+      # dev server 热载机制验证（P0-2 机制层）：job 内运行时补丁 server.url（一次性，严禁提交仓库）
+      # → pnpm dev(14558) → cap sync + 重建安装 → 截图断言 WebView 从 dev server 完整渲染
+      - name: Dev server hot reload (T6 mechanism)
+        if: ${{ inputs.login_mode == true }}
+        run: |
+          DEVICE="${{ steps.device.outputs.id }}"
+          nohup pnpm dev > artifacts/devserver.log 2>&1 &
+          sleep 20
+          grep -qE "14558|Local:" artifacts/devserver.log && echo "dev server 已启动（14558）" || echo "警告: dev server 启动信号未检出"
+          python3 - <<'PYEOF'
+          path = 'capacitor.config.ts'
+          src = open(path, encoding='utf-8').read()
+          patched = src.replace(
+              "server: {\n        androidScheme: 'https',",
+              "server: {\n        androidScheme: 'https',\n        url: 'http://localhost:14558',",
+          )
+          assert patched != src, 'server.url 补丁未生效（锚点未匹配）'
+          open(path, 'w', encoding='utf-8').write(patched)
+          PYEOF
+          grep -n "localhost:14558" capacitor.config.ts
+          npx cap sync ios
+          xcodebuild -project ios/App/App.xcodeproj             -scheme App             -configuration Debug             -sdk iphonesimulator             -destination "id=$DEVICE"             -derivedDataPath build             -quiet CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+          xcrun simctl install "$DEVICE" build/Build/Products/Debug-iphonesimulator/App.app
+          xcrun simctl launch "$DEVICE" com.xiaoxiong.music
+          sleep 25
+          xcrun simctl io "$DEVICE" screenshot artifacts/24_devserver.png || true
+          curl -sf http://localhost:14558/ -o /dev/null && echo "dev server HTTP 200" || echo "警告: dev server 不可达"
 
       - name: Collect evidence (cache / process / logs)
         if: always()
