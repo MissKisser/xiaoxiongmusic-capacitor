@@ -257,6 +257,25 @@ jobs:
             sleep 2
             xcrun simctl io "$DEVICE" screenshot "artifacts/08_settings_$i.png" || true
           done
+          # 应用设置子页：验证检查更新隐藏（P2-3）、缓存/性能/音源组渲染
+          idb ui tap 201 481 --udid "$DEVICE" || true
+          sleep 5
+          xcrun simctl io "$DEVICE" screenshot artifacts/09_app_settings_1.png || true
+          for i in 1 2 3; do
+            idb ui swipe 201 640 201 200 --udid "$DEVICE" || true
+            sleep 2
+            xcrun simctl io "$DEVICE" screenshot "artifacts/09_app_settings_$((i+1)).png" || true
+          done
+          # 返回后进歌词设置子页：验证桌面歌词项隐藏（T2.7）
+          idb ui swipe 8 400 320 400 --udid "$DEVICE" || true
+          sleep 3
+          idb ui tap 201 391 --udid "$DEVICE" || true
+          sleep 5
+          for i in 1 2 3; do
+            idb ui swipe 201 640 201 200 --udid "$DEVICE" || true
+            sleep 2
+            xcrun simctl io "$DEVICE" screenshot "artifacts/10_lyric_settings_$i.png" || true
+          done
 
       - name: Play free song via deep link
         run: |
