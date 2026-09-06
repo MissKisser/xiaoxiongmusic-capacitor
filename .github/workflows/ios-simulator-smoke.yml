@@ -395,7 +395,11 @@ jobs:
           sleep 2
           URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.free_song_id || '347230' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
           xcrun simctl openurl "$DEVICE" "$URL"
-          sleep 40
+          # 系统确认框可能出现也可能已被记住：出现则点击 Open，不出现则 App 已直接拉起
+          sleep 6
+          A11Y_DUMP=artifacts/a11y_coldstart.json python3 tap_button.py "$DEVICE" label "Open" \
+            || python3 tap_button.py "$DEVICE" coord 0.695 0.542 || true
+          sleep 30
           xcrun simctl io "$DEVICE" screenshot artifacts/12_coldstart.png || true
 
       - name: Play free song via deep link
@@ -429,18 +433,24 @@ jobs:
           sleep 15
           xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/04_free_replay.png
 
-      # 收藏红心（登录态鉴权交互）：播放中点迷你播放条红心，无登录弹窗即鉴权通过
+      # 收藏红心（登录态鉴权交互）：先深链拉起播放与迷你条，截 tap 前状态，
+      # 单次点击红心后截图对比（两次点击会翻转两次，无法证明状态变化）
       - name: Tap favorite heart
         if: ${{ inputs.login_mode == true }}
         run: |
           DEVICE="${{ steps.device.outputs.id }}"
-          idb ui tap 121 768 --udid "$DEVICE" || true
-          sleep 3
-          idb ui tap 121 768 --udid "$DEVICE" || true
+          URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.vip_song_id || '186016' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
+          xcrun simctl openurl "$DEVICE" "$URL"
+          sleep 4
+          python3 tap_button.py "$DEVICE" coord 0.695 0.542 || true
+          sleep 16
+          xcrun simctl io "$DEVICE" screenshot artifacts/13_heart_before.png || true
+          A11Y_DUMP=artifacts/a11y_heart.json python3 tap_button.py "$DEVICE" coord 0.734 0.880 || true
           sleep 3
           xcrun simctl io "$DEVICE" screenshot artifacts/13_heart.png || true
 
-      # 睡眠定时器（P1-5）：直达定时器设置页截图，尝试选 1 分钟档，播放中等待 75 秒验证到点暂停
+      # 睡眠定时器（P1-5）：a11y label 点击 10min 档位并截图选中态，
+      # 重启回定时器页验证设置持久化；到点暂停需 ≥10min 真实等待，CI 不验证
       - name: Sleep timer verification
         if: ${{ inputs.login_mode == true }}
         run: |
@@ -450,20 +460,14 @@ jobs:
           SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play/timer"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
           sleep 12
           xcrun simctl io "$DEVICE" screenshot artifacts/15_timer_page.png || true
-          idb ui tap 201 320 --udid "$DEVICE" || true
+          A11Y_DUMP=artifacts/a11y_timer.json python3 tap_button.py "$DEVICE" label "10min|10 分钟|10分钟" || true
           sleep 2
           xcrun simctl io "$DEVICE" screenshot artifacts/15_timer_set.png || true
           xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
           sleep 2
-          SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
+          SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play/timer"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
           sleep 12
-          URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.vip_song_id || '186016' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
-          xcrun simctl openurl "$DEVICE" "$URL"
-          sleep 10
-          xcrun simctl io "$DEVICE" screenshot artifacts/15_playing_before_timer.png || true
-          echo "等待 80 秒验证定时器到点暂停..."
-          sleep 80
-          xcrun simctl io "$DEVICE" screenshot artifacts/15_timer_end.png || true
+          xcrun simctl io "$DEVICE" screenshot artifacts/15_timer_persist.png || true
 
       # Cookie 自然持久化（P4-1）：不带注入环境变量重启，验证登录态由 App 自身持久化保持
       - name: Cookie persistence check (no injection)
