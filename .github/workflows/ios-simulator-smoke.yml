@@ -243,6 +243,96 @@ jobs:
             echo "- 私人 FM 与个人主页截图见 artifacts（06_fm / 07_profile），a11y 树见 a11y_fm / a11y_profile"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # 设置页巡检（登录态）：SIM_ROUTE 直达 /settings，全量下钻——
+      # 应用设置→缓存/性能/更多（音频缓存值、检查更新隐藏）→歌词设置（桌面歌词隐藏）→播放设置（定时器/均衡器/引擎）
+      - name: Settings page sweep
+        if: ${{ inputs.login_mode == true }}
+        run: |
+          DEVICE="${{ steps.device.outputs.id }}"
+          xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
+          sleep 2
+          SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
+          sleep 15
+          xcrun simctl io "$DEVICE" screenshot artifacts/08_settings_root.png || true
+          # 应用设置 → 缓存/性能/更多（音频缓存设置值）
+          idb ui tap 201 481 --udid "$DEVICE" || true
+          sleep 4
+          idb ui tap 201 402 --udid "$DEVICE" || true
+          sleep 4
+          xcrun simctl io "$DEVICE" screenshot artifacts/09_audio_cache.png || true
+          idb ui swipe 201 640 201 200 --udid "$DEVICE" || true
+          sleep 2
+          xcrun simctl io "$DEVICE" screenshot artifacts/09_cache_more_1.png || true
+          idb ui swipe 201 640 201 200 --udid "$DEVICE" || true
+          sleep 2
+          xcrun simctl io "$DEVICE" screenshot artifacts/09_cache_more_2.png || true
+          # 返回两级到设置根 → 歌词设置（桌面歌词隐藏验证）
+          idb ui tap 46 179 --udid "$DEVICE" || true
+          sleep 2
+          idb ui tap 46 179 --udid "$DEVICE" || true
+          sleep 2
+          idb ui tap 201 391 --udid "$DEVICE" || true
+          sleep 4
+          xcrun simctl io "$DEVICE" screenshot artifacts/10_lyric_1.png || true
+          idb ui swipe 201 640 201 200 --udid "$DEVICE" || true
+          sleep 2
+          xcrun simctl io "$DEVICE" screenshot artifacts/10_lyric_2.png || true
+          # 返回设置根 → 播放设置（定时器/均衡器/播放速度/AB 循环/引擎）
+          idb ui tap 46 179 --udid "$DEVICE" || true
+          sleep 2
+          idb ui tap 201 300 --udid "$DEVICE" || true
+          sleep 4
+          xcrun simctl io "$DEVICE" screenshot artifacts/11_play_1.png || true
+          idb ui swipe 201 640 201 200 --udid "$DEVICE" || true
+          sleep 2
+          xcrun simctl io "$DEVICE" screenshot artifacts/11_play_2.png || true
+
+      # 登录测试模式：启动环境变量经 DEBUG 注入钩子写入影子库（MUSIC_U 来自 Secrets），
+      # 此步仅做登录态验证（沙盒 Cookie 检出 + 截图），后续 VIP 歌步骤即为登录态复测
+      - name: Verify injected login state
+        if: ${{ inputs.login_mode == true }}
+        run: |
+          DEVICE="${{ steps.device.outputs.id }}"
+          DATA=$(xcrun simctl get_app_container "$DEVICE" com.xiaoxiong.music data 2>/dev/null || true)
+          FOUND=0
+          for i in 1 2 3 4 5 6; do
+            if [ -n "$DATA" ] && grep -rla "MUSIC_U" "$DATA/Library" 2>/dev/null | head -1 | grep -q .; then
+              FOUND=1
+              echo "登录态注入验证通过（MUSIC_U 已落地 Cookie 存储）"
+              break
+            fi
+            echo "verify $i: Cookie 未检出，等待后重试"
+            sleep 5
+          done
+          echo "LOGIN_FOUND=$FOUND" >> "$GITHUB_ENV"
+          xcrun simctl io "$DEVICE" screenshot artifacts/05_login_verify.png || true
+
+      # 登录态功能巡检：私人 FM（纯登录态功能）真实播放 + 个人主页用户数据渲染
+      # a11y 取证 + 截图双重验证；坐标兜底基于 402x874pt（iPhone 16 Pro）
+      - name: Logged-in feature sweep (FM / profile)
+        if: ${{ inputs.login_mode == true }}
+        run: |
+          DEVICE="${{ steps.device.outputs.id }}"
+          # 弹窗与协议均为延迟出现，巡检前先做一轮强制清理
+          for i in 1 2 3; do
+            python3 tap_button.py "$DEVICE" label "Don't Allow|Allow" || true
+            for j in 1 2 3; do idb ui swipe 201 620 201 160 --udid "$DEVICE" || true; sleep 1; done
+            python3 tap_button.py "$DEVICE" label "同意" || true
+            idb ui tap 201 699 --udid "$DEVICE" || true
+            sleep 3
+          done
+          A11Y_DUMP=artifacts/a11y_fm.json python3 tap_button.py "$DEVICE" label "私人FM"             || python3 tap_button.py "$DEVICE" coord 0.829 0.676 || true
+          sleep 12
+          xcrun simctl io "$DEVICE" screenshot artifacts/06_fm.png || true
+          A11Y_DUMP=artifacts/a11y_profile.json python3 tap_button.py "$DEVICE" coord 0.901 0.1085 || true
+          sleep 6
+          xcrun simctl io "$DEVICE" screenshot artifacts/07_profile.png || true
+          {
+            echo "## 登录态功能巡检"
+            echo ""
+            echo "- 私人 FM 与个人主页截图见 artifacts（06_fm / 07_profile），a11y 树见 a11y_fm / a11y_profile"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # 设置页巡检：terminate 后带 SIM_ROUTE 重启直达 /settings，分段截图全量设置项
       - name: Settings page sweep
         if: ${{ inputs.login_mode == true }}
