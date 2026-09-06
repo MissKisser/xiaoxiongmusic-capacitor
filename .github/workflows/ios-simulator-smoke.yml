@@ -367,6 +367,37 @@ jobs:
             xcrun simctl io "$DEVICE" screenshot "artifacts/10_lyric_settings_$i.png" || true
           done
 
+      # 歌词/播放设置页直达（SIM_ROUTE）：桌面歌词隐藏验证（T2.7）+ 播放设置项渲染
+      - name: Lyric and play settings pages
+        if: ${{ inputs.login_mode == true }}
+        run: |
+          DEVICE="${{ steps.device.outputs.id }}"
+          xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
+          sleep 2
+          SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/lyrics/display"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
+          sleep 12
+          xcrun simctl io "$DEVICE" screenshot artifacts/16_lyrics_display.png || true
+          idb ui swipe 201 640 201 200 --udid "$DEVICE" || true
+          sleep 2
+          xcrun simctl io "$DEVICE" screenshot artifacts/16_lyrics_display_2.png || true
+          xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
+          sleep 2
+          SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
+          sleep 12
+          xcrun simctl io "$DEVICE" screenshot artifacts/17_play_settings.png || true
+
+      # 冷启动深链：terminate 后不经 launch 直接 openurl，验证 App 未运行时深链拉起并播放
+      - name: Cold-start deep link
+        if: ${{ inputs.login_mode == true }}
+        run: |
+          DEVICE="${{ steps.device.outputs.id }}"
+          xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
+          sleep 2
+          URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.free_song_id || '347230' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
+          xcrun simctl openurl "$DEVICE" "$URL"
+          sleep 40
+          xcrun simctl io "$DEVICE" screenshot artifacts/12_coldstart.png || true
+
       - name: Play free song via deep link
         run: |
           URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.free_song_id || '347230' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
@@ -397,6 +428,55 @@ jobs:
           python3 tap_button.py "${{ steps.device.outputs.id }}" coord 0.695 0.542 || true
           sleep 15
           xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/04_free_replay.png
+
+      # 收藏红心（登录态鉴权交互）：播放中点迷你播放条红心，无登录弹窗即鉴权通过
+      - name: Tap favorite heart
+        if: ${{ inputs.login_mode == true }}
+        run: |
+          DEVICE="${{ steps.device.outputs.id }}"
+          idb ui tap 121 768 --udid "$DEVICE" || true
+          sleep 3
+          idb ui tap 121 768 --udid "$DEVICE" || true
+          sleep 3
+          xcrun simctl io "$DEVICE" screenshot artifacts/13_heart.png || true
+
+      # 睡眠定时器（P1-5）：直达定时器设置页截图，尝试选 1 分钟档，播放中等待 75 秒验证到点暂停
+      - name: Sleep timer verification
+        if: ${{ inputs.login_mode == true }}
+        run: |
+          DEVICE="${{ steps.device.outputs.id }}"
+          xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
+          sleep 2
+          SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play/timer"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
+          sleep 12
+          xcrun simctl io "$DEVICE" screenshot artifacts/15_timer_page.png || true
+          idb ui tap 201 320 --udid "$DEVICE" || true
+          sleep 2
+          xcrun simctl io "$DEVICE" screenshot artifacts/15_timer_set.png || true
+          xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
+          sleep 2
+          SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
+          sleep 12
+          URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.vip_song_id || '186016' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
+          xcrun simctl openurl "$DEVICE" "$URL"
+          sleep 10
+          xcrun simctl io "$DEVICE" screenshot artifacts/15_playing_before_timer.png || true
+          echo "等待 80 秒验证定时器到点暂停..."
+          sleep 80
+          xcrun simctl io "$DEVICE" screenshot artifacts/15_timer_end.png || true
+
+      # Cookie 自然持久化（P4-1）：不带注入环境变量重启，验证登录态由 App 自身持久化保持
+      - name: Cookie persistence check (no injection)
+        if: ${{ inputs.login_mode == true }}
+        run: |
+          DEVICE="${{ steps.device.outputs.id }}"
+          xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
+          sleep 2
+          xcrun simctl launch "$DEVICE" com.xiaoxiong.music
+          sleep 15
+          xcrun simctl io "$DEVICE" screenshot artifacts/14_persistence.png || true
+          DATA=$(xcrun simctl get_app_container "$DEVICE" com.xiaoxiong.music data 2>/dev/null || true)
+          grep -rla "MUSIC_U" "$DATA/Library" 2>/dev/null | head -1 | grep -q . && echo "Cookie 存储中 MUSIC_U 仍在" || echo "警告: MUSIC_U 未检出"
 
       - name: Collect evidence (cache / process / logs)
         if: always()
