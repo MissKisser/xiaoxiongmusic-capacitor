@@ -321,6 +321,7 @@ public final class MediaNotificationRuntime: NSObject {
 
         timer.setEventHandler { [weak self] in
             guard let self = self else { return }
+            NSLog("[MediaNotificationRuntime] 睡眠定时器到点（waitSongEnd=\(waitSongEnd)）")
             self.clearSleepTimer()
             self.eventHandler?("sleepTimerFinished", [:])
             if !waitSongEnd {
