@@ -214,6 +214,24 @@ jobs:
           echo "LOGIN_FOUND=$FOUND" >> "$GITHUB_ENV"
           xcrun simctl io "$DEVICE" screenshot artifacts/05_login_verify.png || true
 
+      # 登录态功能巡检：私人 FM（纯登录态功能）真实播放 + 个人主页用户数据渲染
+      # a11y 取证 + 截图双重验证；坐标兜底基于 402x874pt（iPhone 16 Pro）
+      - name: Logged-in feature sweep (FM / profile)
+        if: ${{ inputs.login_mode == true }}
+        run: |
+          DEVICE="${{ steps.device.outputs.id }}"
+          A11Y_DUMP=artifacts/a11y_fm.json python3 tap_button.py "$DEVICE" label "私人FM"             || python3 tap_button.py "$DEVICE" coord 0.829 0.676 || true
+          sleep 12
+          xcrun simctl io "$DEVICE" screenshot artifacts/06_fm.png || true
+          A11Y_DUMP=artifacts/a11y_profile.json python3 tap_button.py "$DEVICE" coord 0.901 0.1085 || true
+          sleep 6
+          xcrun simctl io "$DEVICE" screenshot artifacts/07_profile.png || true
+          {
+            echo "## 登录态功能巡检"
+            echo ""
+            echo "- 私人 FM 与个人主页截图见 artifacts（06_fm / 07_profile），a11y 树见 a11y_fm / a11y_profile"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Play free song via deep link
         run: |
           URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.free_song_id || '347230' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
