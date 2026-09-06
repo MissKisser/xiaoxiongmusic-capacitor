@@ -1,0 +1,58 @@
+name: iOS Unit Tests
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'ios/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unit-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: CapApp-SPM Unit Tests
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      # 包内 testTarget 依赖 node_modules 下的本地 path 插件包，需先安装依赖
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Select available iPhone simulator
+        id: device
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available | grep -m1 "iPhone" | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')
+          if [ -z "$DEVICE_ID" ]; then
+            echo "::error::No available iPhone simulator found"
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
+          echo "Selected simulator: $DEVICE_ID"
+
+      - name: Run package unit tests
+        run: |
+          cd ios/App/CapApp-SPM
+          xcodebuild test \
+            -scheme CapApp-SPM \
+            -destination "platform=iOS Simulator,id=${{ steps.device.outputs.id }}" \
+            -quiet
