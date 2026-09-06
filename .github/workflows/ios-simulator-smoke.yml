@@ -64,13 +64,16 @@ jobs:
       - name: Select available iPhone simulator
         id: device
         run: |
-          DEVICE_ID=$(xcrun simctl list devices available | grep -m1 "iPhone" | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')
+          # 优先锁定 iPhone 16 Pro：冒烟坐标均按其 402x874pt 实测，镜像更新引入新机型
+          # （如 iPhone 17 Pro）时 HID 触摸坐标映射不一致，禁止盲选第一台 iPhone
+          DEVICE_LINE=$(xcrun simctl list devices available | grep -m1 "iPhone 16 Pro"           || xcrun simctl list devices available | grep -m1 "iPhone")
+          DEVICE_ID=$(echo "$DEVICE_LINE" | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')
           if [ -z "$DEVICE_ID" ]; then
             echo "::error::No available iPhone simulator found"
             xcrun simctl list devices available
             exit 1
           fi
-          DEVICE_NAME=$(xcrun simctl list devices available | grep -m1 "iPhone" | sed -E 's/^ *([^ ]+ [^(]+) \(.*/\1/' | xargs)
+          DEVICE_NAME=$(echo "$DEVICE_LINE" | sed -E 's/^ *([^ ]+ [^(]+) \(.*/\1/' | xargs)
           echo "id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
           echo "name=$DEVICE_NAME" >> "$GITHUB_OUTPUT"
           echo "Selected simulator: $DEVICE_NAME ($DEVICE_ID)"
