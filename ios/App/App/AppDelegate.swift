@@ -58,9 +58,13 @@ class MainViewController: CAPBridgeViewController {
     }
 
     /**
-     * 模拟器测试注入：从启动环境变量 SIM_LOGIN_COOKIE 读取网易云 Cookie 串（形如 "MUSIC_U=xxx; __csrf=yyy"），
-     * 以 WKUserScript 在 documentStart 写入 document.cookie 与 localStorage 影子库（cookie-<key>），
-     * 使 App 自身的 syncNativeCookies 链路将其同步到原生层，达成测试态登录。
+     * 模拟器测试注入：从启动环境变量读取测试态配置。
+     * SIM_LOGIN_COOKIE：网易云 Cookie 串（形如 "MUSIC_U=xxx; __csrf=yyy"），以 WKUserScript 在
+     * documentStart 写入 document.cookie 与 localStorage 影子库（cookie-<key>），使 App 自身的
+     * syncNativeCookies 链路将其同步到原生层，达成测试态登录。
+     * SIM_ROUTE：目标 hash 路由，页面 load 后直达。
+     * SIM_SETTING_OVERRIDES：设置项覆盖 JSON（如 {"audioEngine":"ffmpeg"}），documentStart 阶段
+     * 合并进 localStorage["setting-store"]，供无 UI 入口的设置项（引擎切换等）自动化验证。
      * 仅 DEBUG 构建生效，正式产物不受影响。
      */
     private func injectSimLoginCookie() {
@@ -68,7 +72,8 @@ class MainViewController: CAPBridgeViewController {
         let env = ProcessInfo.processInfo.environment
         let raw = env["SIM_LOGIN_COOKIE"] ?? ""
         let route = env["SIM_ROUTE"] ?? ""
-        guard !raw.isEmpty || !route.isEmpty else { return }
+        let settingsOverrides = env["SIM_SETTING_OVERRIDES"] ?? ""
+        guard !raw.isEmpty || !route.isEmpty || !settingsOverrides.isEmpty else { return }
         let escaped = raw
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "'", with: "\\'")
@@ -97,9 +102,21 @@ class MainViewController: CAPBridgeViewController {
           if (route) {
             window.addEventListener('load', function(){ location.hash = route; });
           }
+          var settingsRaw = '__SIM_SETTINGS__';
+          if (settingsRaw) {
+            try {
+              var patch = JSON.parse(settingsRaw);
+              var cur = {};
+              try { cur = JSON.parse(localStorage.getItem('setting-store') || '{}'); } catch (e) {}
+              for (var k in patch) { cur[k] = patch[k]; }
+              localStorage.setItem('setting-store', JSON.stringify(cur));
+            } catch (e) {}
+          }
         })();
         """
-        let finalSource = source.replacingOccurrences(of: "__SIM_ROUTE__", with: route.replacingOccurrences(of: "'", with: ""))
+        let finalSource = source
+            .replacingOccurrences(of: "__SIM_ROUTE__", with: route.replacingOccurrences(of: "'", with: ""))
+            .replacingOccurrences(of: "__SIM_SETTINGS__", with: settingsOverrides.replacingOccurrences(of: "'", with: ""))
         let script = WKUserScript(source: finalSource, injectionTime: .atDocumentStart, forMainFrameOnly: true)
         webView?.configuration.userContentController.addUserScript(script)
         #endif
