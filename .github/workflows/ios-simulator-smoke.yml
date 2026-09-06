@@ -460,7 +460,7 @@ jobs:
           SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play/timer"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
           sleep 12
           xcrun simctl io "$DEVICE" screenshot artifacts/15_timer_page.png || true
-          A11Y_DUMP=artifacts/a11y_timer.json python3 tap_button.py "$DEVICE" label "10min|10 分钟|10分钟" || true
+          python3 tap_button.py "$DEVICE" coord 0.1866 0.3121 || true
           sleep 2
           xcrun simctl io "$DEVICE" screenshot artifacts/15_timer_set.png || true
           xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
