@@ -10,7 +10,7 @@ on:
         description: VIP 歌曲 ID（解锁链路验证，未登录走音源解锁）
         default: '186016'
       login_mode:
-        description: 登录测试模式（打开登录弹窗并等待扫码，登录后测 VIP）
+        description: 登录态注入模式（Secrets 的 MUSIC_U/CSRF 经 DEBUG 钩子写入模拟器，验证登录态功能）
         type: boolean
         default: false
   schedule:
@@ -28,7 +28,7 @@ jobs:
   smoke:
     name: Simulator Smoke (boot/play/cache)
     runs-on: macos-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -469,6 +469,73 @@ jobs:
           sleep 12
           xcrun simctl io "$DEVICE" screenshot artifacts/15_timer_persist.png || true
 
+      # 睡眠定时器到点暂停（P1-5 行为断言）：10min 档 arm 原生定时器 → 深链起播 →
+      # 等 630s（600s 档位 + 30s 余量）断言播放图标翻转 + 原生到点日志 + 重启后状态清零
+      - name: Sleep timer fire (10 min wait)
+        if: ${{ inputs.login_mode == true }}
+        run: |
+          DEVICE="${{ steps.device.outputs.id }}"
+          xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
+          sleep 2
+          SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play/timer"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
+          sleep 12
+          xcrun simctl io "$DEVICE" screenshot artifacts/18_timer_arm_page.png || true
+          python3 tap_button.py "$DEVICE" coord 0.1866 0.3121 || true
+          sleep 2
+          xcrun simctl io "$DEVICE" screenshot artifacts/18_timer_armed.png || true
+          URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.vip_song_id || '186016' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
+          xcrun simctl openurl "$DEVICE" "$URL"
+          sleep 4
+          python3 tap_button.py "$DEVICE" coord 0.695 0.542 || true
+          sleep 16
+          xcrun simctl io "$DEVICE" screenshot artifacts/18_timer_before.png || true
+          echo "定时器已 arm（10min），等待 630 秒到点..."
+          sleep 630
+          xcrun simctl io "$DEVICE" screenshot artifacts/18_timer_after.png || true
+          xcrun simctl spawn "$DEVICE" log show --last 14m --info --debug --style compact             --predicate 'process == "App"' > artifacts/timer_fire_console.log 2>&1 || true
+          if grep -q "睡眠定时器到点" artifacts/timer_fire_console.log; then
+            echo "✅ 原生定时器到点日志命中"
+          else
+            echo "⚠️ 原生定时器到点日志未检出"
+          fi
+          xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
+          sleep 2
+          SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play/timer"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
+          sleep 12
+          xcrun simctl io "$DEVICE" screenshot artifacts/20_timer_reset.png || true
+
+      # 加分项（waitSongEnd）：自定义 1 分钟 + 勾选等待曲终 → 到点后歌曲应继续播放
+      # 自定义输入无确认按钮（输入即生效）；曲终自动暂停受歌长限制不等待，如实记录
+      - name: Sleep timer waitSongEnd (bonus)
+        if: ${{ inputs.login_mode == true }}
+        run: |
+          DEVICE="${{ steps.device.outputs.id }}"
+          xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
+          sleep 2
+          SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play/timer"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
+          sleep 12
+          xcrun simctl io "$DEVICE" screenshot artifacts/21_wse_page.png || true
+          idb ui tap 201 443 --udid "$DEVICE" || true
+          sleep 2
+          idb ui tap 201 487 --udid "$DEVICE" || true
+          sleep 1
+          idb ui text "1" --udid "$DEVICE" || true
+          sleep 2
+          idb ui tap 201 505 --udid "$DEVICE" || true
+          sleep 2
+          xcrun simctl io "$DEVICE" screenshot artifacts/21_wse_armed.png || true
+          URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.free_song_id || '347230' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
+          xcrun simctl openurl "$DEVICE" "$URL"
+          sleep 4
+          python3 tap_button.py "$DEVICE" coord 0.695 0.542 || true
+          sleep 16
+          xcrun simctl io "$DEVICE" screenshot artifacts/21_wse_before.png || true
+          echo "等待 90 秒验证 1 分钟定时器到点后歌曲继续..."
+          sleep 90
+          xcrun simctl io "$DEVICE" screenshot artifacts/21_wse_after.png || true
+          xcrun simctl spawn "$DEVICE" log show --last 5m --info --debug --style compact             --predicate 'process == "App"' > artifacts/wse_console.log 2>&1 || true
+          grep -q "睡眠定时器到点" artifacts/wse_console.log && echo "waitSongEnd 到点事件命中" || echo "waitSongEnd 到点事件未检出"
+
       # Cookie 自然持久化（P4-1）：不带注入环境变量重启，验证登录态由 App 自身持久化保持
       - name: Cookie persistence check (no injection)
         if: ${{ inputs.login_mode == true }}
@@ -481,6 +548,15 @@ jobs:
           xcrun simctl io "$DEVICE" screenshot artifacts/14_persistence.png || true
           DATA=$(xcrun simctl get_app_container "$DEVICE" com.xiaoxiong.music data 2>/dev/null || true)
           grep -rla "MUSIC_U" "$DATA/Library" 2>/dev/null | head -1 | grep -q . && echo "Cookie 存储中 MUSIC_U 仍在" || echo "警告: MUSIC_U 未检出"
+
+      # AppIcon SpringBoard 截图（P3-2）：terminate 后回落桌面，图标渲染即闭环缺口
+      - name: SpringBoard icon screenshot
+        if: ${{ inputs.login_mode == true }}
+        run: |
+          DEVICE="${{ steps.device.outputs.id }}"
+          xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
+          sleep 3
+          xcrun simctl io "$DEVICE" screenshot artifacts/19_springboard.png || true
 
       - name: Collect evidence (cache / process / logs)
         if: always()
@@ -495,7 +571,7 @@ jobs:
           fi
           echo "=== App 进程存活检查 ===" | tee -a artifacts/cache_report.txt
           xcrun simctl spawn "$DEVICE" launchctl list 2>/dev/null | grep -i "com.xiaoxiong" | tee -a artifacts/cache_report.txt || echo "进程未在运行（可能已崩溃或被系统回收）" | tee -a artifacts/cache_report.txt
-          xcrun simctl spawn "$DEVICE" log show --last 10m --info --debug --style compact --predicate 'process == "App" OR processImagePath CONTAINS "WebKit.Networking"' > artifacts/app_console.log 2>&1 || true
+          xcrun simctl spawn "$DEVICE" log show --last 20m --info --debug --style compact --predicate 'process == "App" OR processImagePath CONTAINS "WebKit.Networking"' > artifacts/app_console.log 2>&1 || true
           grep -avE "CoreHaptics|WebPrivacy|app_launch|XPCErrors|TextInputUI|extensionkit|AppSSO|ScreenTime|UIKBFeedback" artifacts/app_console.log | grep -aiE "⚡️|orpheus|capacitor-audio|audio|proxy|CORS|❌|Unblock|songDetail|playStatus|media" | head -120 > artifacts/error_lines.log || true
 
       - name: Smoke verdict
