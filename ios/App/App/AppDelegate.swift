@@ -65,7 +65,10 @@ class MainViewController: CAPBridgeViewController {
      */
     private func injectSimLoginCookie() {
         #if DEBUG
-        guard let raw = ProcessInfo.processInfo.environment["SIM_LOGIN_COOKIE"], !raw.isEmpty else { return }
+        let env = ProcessInfo.processInfo.environment
+        let raw = env["SIM_LOGIN_COOKIE"] ?? ""
+        let route = env["SIM_ROUTE"] ?? ""
+        guard !raw.isEmpty || !route.isEmpty else { return }
         let escaped = raw
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "'", with: "\\'")
@@ -90,9 +93,14 @@ class MainViewController: CAPBridgeViewController {
             document.addEventListener('DOMContentLoaded', function(){ apply(); });
             window.addEventListener('load', function(){ apply(); });
           }
+          var route = '__SIM_ROUTE__';
+          if (route) {
+            window.addEventListener('load', function(){ location.hash = route; });
+          }
         })();
         """
-        let script = WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+        let finalSource = source.replacingOccurrences(of: "__SIM_ROUTE__", with: route.replacingOccurrences(of: "'", with: ""))
+        let script = WKUserScript(source: finalSource, injectionTime: .atDocumentStart, forMainFrameOnly: true)
         webView?.configuration.userContentController.addUserScript(script)
         #endif
     }
