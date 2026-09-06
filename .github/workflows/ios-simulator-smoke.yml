@@ -181,17 +181,20 @@ jobs:
           done
           xcrun simctl io "$DEVICE" screenshot artifacts/01b_after_alerts.png || true
 
-      # 首装用户协议：上滑到底解锁同意按钮后点击（状态持久化，仅首启出现）
+      # 首装用户协议：弹窗出现时机不定（约 20~60s），长窗口重试；
+      # WebView 内容 a11y 暴露不完整，以滑动到底 + 同意按钮 label/坐标双点位点击
       - name: Accept user agreement (first launch)
         run: |
           DEVICE="${{ steps.device.outputs.id }}"
-          for i in 1 2 3 4 5 6; do
-            idb ui swipe 201 620 201 180 --udid "$DEVICE" || true
-            sleep 1
+          for i in 1 2 3 4 5 6 7 8 9; do
+            for j in 1 2 3; do
+              idb ui swipe 201 620 201 160 --udid "$DEVICE" || true
+              sleep 1
+            done
+            python3 tap_button.py "$DEVICE" label "同意" || true
+            idb ui tap 201 640 --udid "$DEVICE" || true
+            sleep 5
           done
-          sleep 1
-          python3 tap_button.py "$DEVICE" label "同意" || true
-          sleep 2
           xcrun simctl io "$DEVICE" screenshot artifacts/01c_after_agreement.png || true
 
       # 登录测试模式：启动环境变量经 DEBUG 注入钩子写入影子库（MUSIC_U 来自 Secrets），
