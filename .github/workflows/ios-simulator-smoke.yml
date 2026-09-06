@@ -192,7 +192,7 @@ jobs:
               sleep 1
             done
             python3 tap_button.py "$DEVICE" label "同意" || true
-            idb ui tap 201 640 --udid "$DEVICE" || true
+            idb ui tap 201 699 --udid "$DEVICE" || true
             sleep 5
           done
           xcrun simctl io "$DEVICE" screenshot artifacts/01c_after_agreement.png || true
@@ -228,7 +228,7 @@ jobs:
             python3 tap_button.py "$DEVICE" label "Don't Allow|Allow" || true
             for j in 1 2 3; do idb ui swipe 201 620 201 160 --udid "$DEVICE" || true; sleep 1; done
             python3 tap_button.py "$DEVICE" label "同意" || true
-            idb ui tap 201 640 --udid "$DEVICE" || true
+            idb ui tap 201 699 --udid "$DEVICE" || true
             sleep 3
           done
           A11Y_DUMP=artifacts/a11y_fm.json python3 tap_button.py "$DEVICE" label "私人FM"             || python3 tap_button.py "$DEVICE" coord 0.829 0.676 || true
