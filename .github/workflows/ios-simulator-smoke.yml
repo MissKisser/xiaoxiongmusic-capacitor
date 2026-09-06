@@ -243,6 +243,21 @@ jobs:
             echo "- 私人 FM 与个人主页截图见 artifacts（06_fm / 07_profile），a11y 树见 a11y_fm / a11y_profile"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # 设置页巡检：terminate 后带 SIM_ROUTE 重启直达 /settings，分段截图全量设置项
+      - name: Settings page sweep
+        if: ${{ inputs.login_mode == true }}
+        run: |
+          DEVICE="${{ steps.device.outputs.id }}"
+          xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
+          sleep 2
+          SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
+          sleep 15
+          for i in 1 2 3; do
+            idb ui swipe 201 640 201 200 --udid "$DEVICE" || true
+            sleep 2
+            xcrun simctl io "$DEVICE" screenshot "artifacts/08_settings_$i.png" || true
+          done
+
       - name: Play free song via deep link
         run: |
           URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.free_song_id || '347230' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
