@@ -30,6 +30,10 @@ let package = Package(
                 .product(name: "CapacitorLocalNotifications", package: "CapacitorLocalNotifications"),
                 .product(name: "CapacitorStatusBar", package: "CapacitorStatusBar")
             ]
+        ),
+        .testTarget(
+            name: "CapApp-SPMTests",
+            dependencies: ["CapApp-SPM"]
         )
     ]
 )

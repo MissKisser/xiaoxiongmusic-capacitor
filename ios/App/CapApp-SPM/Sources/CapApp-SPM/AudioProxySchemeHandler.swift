@@ -149,23 +149,9 @@ public final class AudioProxySchemeHandler: NSObject, WKURLSchemeHandler {
         }
 
         let rangeHeader = task.request.value(forHTTPHeaderField: "Range")
-        var startOffset: Int64 = 0
-        var endOffset: Int64 = totalSize - 1
-        var isRangeRequest = false
+        let resolution = AudioRangeParser.resolve(rangeHeader: rangeHeader, totalSize: totalSize)
 
-        if let rangeHeader = rangeHeader, rangeHeader.hasPrefix("bytes=") {
-            isRangeRequest = true
-            let rangeSpec = String(rangeHeader.dropFirst(6)).trimmingCharacters(in: .whitespaces)
-            let parts = rangeSpec.components(separatedBy: "-")
-            if let first = parts.first, let start = Int64(first) {
-                startOffset = max(0, start)
-            }
-            if parts.count > 1, let second = parts.last, !second.isEmpty, let end = Int64(second) {
-                endOffset = min(totalSize - 1, end)
-            }
-        }
-
-        if isRangeRequest && startOffset >= totalSize {
+        if resolution.isUnsatisfiable {
             var headers = corsHeaders
             headers["Content-Range"] = "bytes */\(totalSize)"
             guard let response = HTTPURLResponse(
@@ -186,6 +172,9 @@ public final class AudioProxySchemeHandler: NSObject, WKURLSchemeHandler {
             return
         }
 
+        let startOffset = resolution.startOffset
+        let endOffset = resolution.endOffset
+        let isRangeRequest = resolution.isRangeRequest
         let contentLength = max(0, endOffset - startOffset + 1)
         var headers = corsHeaders
         headers["Content-Type"] = "audio/mpeg"
