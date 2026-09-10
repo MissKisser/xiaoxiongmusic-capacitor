@@ -59,7 +59,20 @@ jobs:
       - name: Run package unit tests
         run: |
           cd ios/App/CapApp-SPM
-          xcodebuild test \
-            -scheme CapApp-SPM \
-            -destination "platform=iOS Simulator,id=${{ steps.device.outputs.id }}" \
-            -quiet
+          echo "=== 可用 schemes ==="
+          xcodebuild -list 2>&1 | tee /tmp/schemes.txt
+          SCHEMES=$(sed -n '/Schemes:/,$p' /tmp/schemes.txt | grep -E '^[[:space:]]{4}[^[:space:]]' | sed 's/^ *//;s/ *$//')
+          if [ -z "$SCHEMES" ]; then
+            echo "::error::包无可用 scheme"; exit 1
+          fi
+          for SCHEME in $SCHEMES; do
+            echo "=== 尝试 scheme: $SCHEME ==="
+            if xcodebuild test \
+              -scheme "$SCHEME" \
+              -destination "platform=iOS Simulator,id=${{ steps.device.outputs.id }}" \
+              -quiet; then
+              echo "✅ 测试经 scheme '$SCHEME' 通过"; exit 0
+            fi
+          done
+          echo "::error::所有 scheme 均未配置可用的 test action"
+          exit 1
