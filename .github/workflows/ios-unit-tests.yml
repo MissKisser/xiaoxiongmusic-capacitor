@@ -16,7 +16,8 @@ concurrency:
 jobs:
   tests:
     name: CapApp-SPM Unit Tests
-    # 无坐标依赖，跟随 _latest；Xcode 26 的包自动 scheme 含 test action
+    # 无坐标依赖，跟随 _latest；测试入口依赖仓库内共享 scheme（.swiftpm/xcschemes），
+    # 不依赖 Xcode 自动生成（Xcode 26 起 CLI 不再为 SPM 包生成 scheme）
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
@@ -45,16 +46,16 @@ jobs:
           npx cap sync ios
 
       - name: Run package unit tests on iOS simulator
+        working-directory: ios/App/CapApp-SPM
         run: |
-          # Xcode 26 起不再为 SPM 包自动生成含 test action 的 scheme，
-          # 改用 swift test 的 destination 描述文件直跑 iOS 模拟器（swift.org CI 文档模式）
-          cat > /tmp/dest.json <<EOF
-          {
-            "version": 1,
-            "sdkRoot": "$(xcrun --sdk iphonesimulator --show-sdk-path)",
-            "targetPlatform": "ios",
-            "arch": "$(uname -m)"
-          }
-          EOF
-          cd ios/App/CapApp-SPM
-          swift test --destination /tmp/dest.json
+          set -euo pipefail
+          # 镜像设备组合随版本漂移（iPhone 16 Pro → 17 Pro），动态取首个可用 iPhone，缺失即报错
+          DEVICE=$(xcrun simctl list devices available | grep -m1 -oE 'iPhone [^(]+' | sed 's/[[:space:]]*$//')
+          if [ -z "$DEVICE" ]; then
+            echo "::error::未找到可用 iPhone 模拟器，请检查 runner 镜像设备列表" >&2
+            exit 1
+          fi
+          echo "使用模拟器: $DEVICE"
+          xcodebuild test \
+            -scheme CapApp-SPM \
+            -destination "platform=iOS Simulator,name=$DEVICE"
