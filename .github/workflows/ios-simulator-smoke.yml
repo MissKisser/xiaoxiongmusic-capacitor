@@ -53,11 +53,19 @@ jobs:
       - name: Sync Capacitor iOS
         run: npx cap sync ios
 
+      - name: Select Xcode 26 for idb runtime
+        run: |
+          # idb 1.5.2 预构建二进制按 26.x SDK 构建，运行时从选中开发者目录加载
+          # CoreSimulator；镜像默认 Xcode 16.4 会被公式与二进制同时拒绝。
+          # 设备坐标系不受影响：坐标按 iPhone 16 Pro（iOS 18.x）实测，该设备仍存在
+          sudo xcode-select -s /Applications/Xcode_26.3.app
+          xcodebuild -version
+
       - name: Install UI automation tool (idb)
         run: |
           brew tap facebook/fb
-          # 2026-09-08 起的公式（1.5.3+）要求 Xcode 26 源码编译，macos-15（Xcode 16）
-          # 须钉回 1.5.2 修订，与 2026-09-05 冒烟绿灯组合（Xcode 16 + idb 1.5.2）一致
+          # 2026-09-08 起的公式（1.5.3+）源码布局变更，钉回 1.5.2 预构建修订并
+          # 固定 fb-idb==1.5.2 客户端，与 2026-09-05 冒烟绿灯组合一致
           git -C "$(brew --repository facebook/fb)" checkout --quiet 28de056321
           brew trust --formula facebook/fb/idb-companion || brew trust facebook/fb || true
           HOMEBREW_NO_INSTALL_FROM_API=1 brew install facebook/fb/idb-companion
@@ -68,8 +76,9 @@ jobs:
         id: device
         run: |
           # 优先锁定 iPhone 16 Pro：冒烟坐标均按其 402x874pt 实测，镜像更新引入新机型
-          # （如 iPhone 17 Pro）时 HID 触摸坐标映射不一致，禁止盲选第一台 iPhone
-          DEVICE_LINE=$(xcrun simctl list devices available | grep -m1 "iPhone 16 Pro")
+          # （如 iPhone 17 Pro）时 HID 触摸坐标映射不一致，禁止盲选第一台 iPhone；
+          # 带尾括号匹配避免误中 Pro Max（440x956pt 坐标系不同）
+          DEVICE_LINE=$(xcrun simctl list devices available | grep -m1 "iPhone 16 Pro (")
           if [ -z "$DEVICE_LINE" ]; then
             echo "::error::iPhone 16 Pro 不可用：冒烟坐标按 402x874pt 实测，改选其他机型将致 HID 坐标失准，禁止静默继续"
             xcrun simctl list devices available
