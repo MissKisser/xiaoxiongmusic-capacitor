@@ -434,8 +434,11 @@ jobs:
           SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play/timer"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
           sleep 12
           xcrun simctl io "$DEVICE" screenshot artifacts/15_timer_page.png || true
-          # 10min 档位 chip 实测中心 (81,295)：iOS 18.5/18.6 下页面较 C3 时代下移，
-          # 旧坐标 (75,273) 落在档位行上方空白带（截图哈希全同证零状态变化）
+          # 组件层守卫：开关未开启时档位/自定义/复选框全部 disabled（SleepTimerItem.vue），
+          # 必须先点开关（实测中心 (366,100)）再选档位（10min chip 实测中心 (81,295)，
+          # iOS 18.5/18.6 下页面较 C3 时代下移，旧坐标落在档位行上方空白带）
+          python3 tap_button.py "$DEVICE" coord 0.9104 0.1144 || true
+          sleep 2
           python3 tap_button.py "$DEVICE" coord 0.2015 0.3375 || true
           sleep 2
           xcrun simctl io "$DEVICE" screenshot artifacts/15_timer_set.png || true
@@ -446,9 +449,9 @@ jobs:
           xcrun simctl io "$DEVICE" screenshot artifacts/15_timer_persist.png || true
 
       # 睡眠定时器到点暂停（P1-5 行为断言）：免费歌起播避开 VIP 取源失败连锁；
-      # 10min 双 tap（selectTime 幂等）+ checkbox 双 tap 归零 waitSongEnd +
-      # 自定义 1 分钟链覆盖 arm（输入即生效），等待 100s 断言到点；
-      # 若自定义输入未生效则回落 10min 档，追加 540s 等待二次判定
+      # 开关先开（SleepTimerItem 组件在开关关闭时档位/自定义/复选框全 disabled）→
+      # 10min 档选中 → 自定义 1 分钟链覆盖 arm，等待 100s 断言到点；
+      # 若自定义输入未生效则保持 10min 档，追加 540s 等待二次判定
       - name: Sleep timer fire (custom 1 min, fallback 10 min)
         if: ${{ inputs.login_mode == true }}
         run: |
@@ -458,6 +461,8 @@ jobs:
           SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play/timer"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
           sleep 15
           xcrun simctl io "$DEVICE" screenshot artifacts/18_timer_arm_page.png || true
+          idb ui tap 366 100 --udid "$DEVICE" || true
+          sleep 2
           idb ui tap 81 295 --udid "$DEVICE" || true
           sleep 1
           idb ui tap 81 295 --udid "$DEVICE" || true
@@ -509,6 +514,10 @@ jobs:
           SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play/timer"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
           sleep 15
           xcrun simctl io "$DEVICE" screenshot artifacts/21_wse_page.png || true
+          idb ui tap 366 100 --udid "$DEVICE" || true
+          sleep 2
+          idb ui tap 81 295 --udid "$DEVICE" || true
+          sleep 2
           idb ui tap 201 443 --udid "$DEVICE" || true
           sleep 2
           idb ui tap 201 500 --udid "$DEVICE" || true
