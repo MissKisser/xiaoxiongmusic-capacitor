@@ -16,7 +16,8 @@ concurrency:
 jobs:
   tests:
     name: CapApp-SPM Unit Tests
-    runs-on: macos-15
+    # 无坐标依赖，跟随 _latest；Xcode 26 的包自动 scheme 含 test action
+    runs-on: macos-latest
     timeout-minutes: 30
     steps:
       - name: Checkout repository
@@ -57,8 +58,8 @@ jobs:
 
       - name: Run package unit tests
         run: |
-          echo "{\"platform\":\"iOS Simulator\",\"id\":\"${{ steps.device.outputs.id }}\"}" > /tmp/dest.json
           cd ios/App/CapApp-SPM
-          # swift test 经 destination JSON 直跑 iOS 模拟器，不依赖 xcodebuild 的包 scheme 自动生成
-          # （macos-15/Xcode 16 的自动 scheme 不含 test action）
-          swift test --destination /tmp/dest.json
+          xcodebuild test \
+            -scheme CapApp-SPM \
+            -destination "platform=iOS Simulator,id=${{ steps.device.outputs.id }}" \
+            -quiet
