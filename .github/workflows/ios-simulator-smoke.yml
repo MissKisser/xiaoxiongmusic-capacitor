@@ -474,8 +474,9 @@ jobs:
           if grep -q "睡眠定时器到点" artifacts/timer_fire_console.log; then
             echo "✅ 原生定时器到点日志命中（注入 1min）"
           else
-            echo "⚠️ 原生定时器到点日志未检出"
+            echo "::error::原生定时器到点日志未检出（注入链路回归）"
             grep -i "SleepTimer" artifacts/timer_fire_console.log | tail -5 || true
+            exit 1
           fi
 
       # 加分项（waitSongEnd）：主链 checkbox 双 tap 已归零，此处单次勾选状态可控；
@@ -644,8 +645,11 @@ jobs:
             echo ""
             echo "详细证据见 artifacts（截图 01~04、cache_report、app_console.log、error_lines.log）"
           } >> "$GITHUB_STEP_SUMMARY"
-          # 基线期不硬失败，只报告；链路调稳后改为硬门禁
-          exit 0
+          # 缓存未落地或进程死亡均为核心链路回归，直接判失败
+          if [ "$ALIVE" -eq 0 ] || [ "$CACHE_HITS" -eq 0 ]; then
+            echo "::error::冒烟终判失败：进程存活信号=$ALIVE，缓存文件数=$CACHE_HITS"
+            exit 1
+          fi
 
       - name: Upload smoke artifacts
         if: always()
