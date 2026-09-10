@@ -21,8 +21,7 @@ concurrency:
 jobs:
   tests:
     name: CapApp-SPM Unit Tests
-    # 无坐标依赖，跟随 _latest；测试入口依赖仓库内共享 scheme（.swiftpm/xcschemes），
-    # 不依赖 Xcode 自动生成（Xcode 26 起 CLI 不再为 SPM 包生成 scheme）
+    # 无坐标依赖，跟随 _latest；scheme 依赖 Package.swift 内 testTarget 声明（sync 后补回）
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
@@ -50,29 +49,25 @@ jobs:
           pnpm build
           npx cap sync ios
 
-      - name: Select available iPhone simulator
-        id: device
+      - name: Run package unit tests on iOS simulator
         run: |
+          set -euo pipefail
+          # cap sync 按模板重写 Package.swift 时会丢弃 testTarget 声明，测试前补回（幂等）
+          if ! grep -q "testTarget" ios/App/CapApp-SPM/Package.swift; then
+            perl -0pi -e 's/\n        \)\n    \]\n\)/\n        ),\n        .testTarget(\n            name: "CapApp-SPMTests",\n            dependencies: ["CapApp-SPM"]\n        )\n    ]\n)/' ios/App/CapApp-SPM/Package.swift
+          fi
+          grep -q "testTarget" ios/App/CapApp-SPM/Package.swift || {
+            echo "::error::testTarget 补回失败，请检查 cap sync 生成的 Package.swift 结构" >&2
+            exit 1
+          }
           DEVICE_ID=$(xcrun simctl list devices available | grep -m1 "iPhone" | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')
           if [ -z "$DEVICE_ID" ]; then
             echo "::error::未找到可用 iPhone 模拟器，请检查 runner 镜像设备列表" >&2
-            xcrun simctl list devices available
             exit 1
           fi
-          echo "id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
           echo "Selected simulator: $DEVICE_ID"
-
-      - name: Run package unit tests on iOS simulator
-        working-directory: ios/App/CapApp-SPM
-        run: |
-          set -uo pipefail
-          DEST="platform=iOS Simulator,id=${{ steps.device.outputs.id }}"
-          # 包模式下 name 型 destination 依赖 buildable 平台解析（不可靠），UDID 直达设备
-          if xcodebuild test -scheme CapApp-SPM -destination "$DEST" -quiet; then
-            echo "共享 scheme 路径通过"
-            exit 0
-          fi
-          echo "=== 共享 scheme 失败，退回自动 scheme 重试 ==="
-          rm -rf .swiftpm
-          xcodebuild -list
-          xcodebuild test -scheme CapApp-SPM -destination "$DEST"
+          cd ios/App/CapApp-SPM
+          xcodebuild test \
+            -scheme CapApp-SPM \
+            -destination "platform=iOS Simulator,id=$DEVICE_ID" \
+            -quiet
