@@ -27,7 +27,7 @@ concurrency:
 jobs:
   smoke:
     name: Simulator Smoke (boot/play/cache)
-    runs-on: macos-latest
+    runs-on: macos-15
     timeout-minutes: 75
     steps:
       - name: Checkout repository
@@ -66,7 +66,12 @@ jobs:
         run: |
           # 优先锁定 iPhone 16 Pro：冒烟坐标均按其 402x874pt 实测，镜像更新引入新机型
           # （如 iPhone 17 Pro）时 HID 触摸坐标映射不一致，禁止盲选第一台 iPhone
-          DEVICE_LINE=$(xcrun simctl list devices available | grep -m1 "iPhone 16 Pro"           || xcrun simctl list devices available | grep -m1 "iPhone")
+          DEVICE_LINE=$(xcrun simctl list devices available | grep -m1 "iPhone 16 Pro")
+          if [ -z "$DEVICE_LINE" ]; then
+            echo "::error::iPhone 16 Pro 不可用：冒烟坐标按 402x874pt 实测，改选其他机型将致 HID 坐标失准，禁止静默继续"
+            xcrun simctl list devices available
+            exit 1
+          fi
           DEVICE_ID=$(echo "$DEVICE_LINE" | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')
           if [ -z "$DEVICE_ID" ]; then
             echo "::error::No available iPhone simulator found"
@@ -289,52 +294,6 @@ jobs:
           idb ui swipe 201 640 201 200 --udid "$DEVICE" || true
           sleep 2
           xcrun simctl io "$DEVICE" screenshot artifacts/11_play_2.png || true
-
-      # 登录测试模式：启动环境变量经 DEBUG 注入钩子写入影子库（MUSIC_U 来自 Secrets），
-      # 此步仅做登录态验证（沙盒 Cookie 检出 + 截图），后续 VIP 歌步骤即为登录态复测
-      - name: Verify injected login state
-        if: ${{ inputs.login_mode == true }}
-        run: |
-          DEVICE="${{ steps.device.outputs.id }}"
-          DATA=$(xcrun simctl get_app_container "$DEVICE" com.xiaoxiong.music data 2>/dev/null || true)
-          FOUND=0
-          for i in 1 2 3 4 5 6; do
-            if [ -n "$DATA" ] && grep -rla "MUSIC_U" "$DATA/Library" 2>/dev/null | head -1 | grep -q .; then
-              FOUND=1
-              echo "登录态注入验证通过（MUSIC_U 已落地 Cookie 存储）"
-              break
-            fi
-            echo "verify $i: Cookie 未检出，等待后重试"
-            sleep 5
-          done
-          echo "LOGIN_FOUND=$FOUND" >> "$GITHUB_ENV"
-          xcrun simctl io "$DEVICE" screenshot artifacts/05_login_verify.png || true
-
-      # 登录态功能巡检：私人 FM（纯登录态功能）真实播放 + 个人主页用户数据渲染
-      # a11y 取证 + 截图双重验证；坐标兜底基于 402x874pt（iPhone 16 Pro）
-      - name: Logged-in feature sweep (FM / profile)
-        if: ${{ inputs.login_mode == true }}
-        run: |
-          DEVICE="${{ steps.device.outputs.id }}"
-          # 弹窗与协议均为延迟出现，巡检前先做一轮强制清理
-          for i in 1 2 3; do
-            python3 tap_button.py "$DEVICE" label "Don't Allow|Allow" || true
-            for j in 1 2 3; do idb ui swipe 201 620 201 160 --udid "$DEVICE" || true; sleep 1; done
-            python3 tap_button.py "$DEVICE" label "同意" || true
-            idb ui tap 201 699 --udid "$DEVICE" || true
-            sleep 3
-          done
-          A11Y_DUMP=artifacts/a11y_fm.json python3 tap_button.py "$DEVICE" label "私人FM"             || python3 tap_button.py "$DEVICE" coord 0.829 0.676 || true
-          sleep 12
-          xcrun simctl io "$DEVICE" screenshot artifacts/06_fm.png || true
-          A11Y_DUMP=artifacts/a11y_profile.json python3 tap_button.py "$DEVICE" coord 0.901 0.1085 || true
-          sleep 6
-          xcrun simctl io "$DEVICE" screenshot artifacts/07_profile.png || true
-          {
-            echo "## 登录态功能巡检"
-            echo ""
-            echo "- 私人 FM 与个人主页截图见 artifacts（06_fm / 07_profile），a11y 树见 a11y_fm / a11y_profile"
-          } >> "$GITHUB_STEP_SUMMARY"
 
       # 设置页巡检：terminate 后带 SIM_ROUTE 重启直达 /settings，分段截图全量设置项
       - name: Settings page sweep

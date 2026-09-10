@@ -16,7 +16,7 @@ concurrency:
 jobs:
   tests:
     name: CapApp-SPM Unit Tests
-    runs-on: macos-latest
+    runs-on: macos-15
     timeout-minutes: 30
     steps:
       - name: Checkout repository
@@ -33,9 +33,15 @@ jobs:
           node-version: 22
           cache: 'pnpm'
 
-      # 包内 testTarget 依赖 node_modules 下的本地 path 插件包，需先安装依赖
+      # 包内 testTarget 依赖 node_modules 下的本地 path 插件包，需先安装依赖；
+      # 依赖升级分支（如 capacitor 组 bump）需重建 web 资产与 iOS 同步产物后 SPM 才能解析
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Build web assets and sync Capacitor iOS
+        run: |
+          pnpm build
+          npx cap sync ios
 
       - name: Select available iPhone simulator
         id: device
