@@ -59,8 +59,7 @@ public final class AudioProxySchemeHandler: NSObject, WKURLSchemeHandler {
             return
         }
 
-        let fullPath = "\(components.host ?? "")\(components.path)"
-        guard fullPath == "proxy/audio" || components.path == "/proxy/audio" else {
+        guard ProxyRequestValidator.isProxyAudioPath(host: components.host, path: components.path) else {
             failTask(urlSchemeTask, statusCode: 404)
             return
         }
@@ -76,8 +75,7 @@ public final class AudioProxySchemeHandler: NSObject, WKURLSchemeHandler {
             failTask(urlSchemeTask, statusCode: 400)
             return
         }
-        guard let scheme = targetUrl.scheme?.lowercased(),
-              scheme == "http" || scheme == "https" else {
+        guard ProxyRequestValidator.isAllowedUpstreamScheme(targetUrl.scheme) else {
             failTask(urlSchemeTask, statusCode: 403)
             return
         }
