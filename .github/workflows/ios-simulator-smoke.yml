@@ -448,39 +448,22 @@ jobs:
           sleep 12
           xcrun simctl io "$DEVICE" screenshot artifacts/15_timer_persist.png || true
 
-      # 睡眠定时器到点暂停（P1-5 行为断言）：免费歌起播避开 VIP 取源失败连锁；
-      # 开关先开（SleepTimerItem 组件在开关关闭时档位/自定义/复选框全 disabled）→
-      # 10min 档选中 → 自定义 1 分钟链覆盖 arm，等待 100s 断言到点；
-      # 若自定义输入未生效则保持 10min 档，追加 540s 等待二次判定
-      - name: Sleep timer fire (custom 1 min, fallback 10 min)
+      # 睡眠定时器到点暂停（P1-5 行为断言）：注入驱动绕过 UI 交互（坐标在 iOS 18.x
+      # 定时器页不稳定），通过 SIM_AUTOCLOSE_MIN 环境变量 → AppDelegate 写入
+      # localStorage["sim-autoclose"] → PlayerController 启动时读取并挂载原生定时器。
+      # 免费歌起播，等 100s 后取证原生 NSLog
+      - name: Sleep timer fire (injection-driven, 1 min)
         if: ${{ inputs.login_mode == true }}
         run: |
           DEVICE="${{ steps.device.outputs.id }}"
           xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
           sleep 2
-          SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play/timer"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
-          sleep 15
-          xcrun simctl io "$DEVICE" screenshot artifacts/18_timer_arm_page.png || true
-          idb ui tap 343 232 --udid "$DEVICE" || true
-          sleep 2
-          idb ui tap 81 295 --udid "$DEVICE" || true
-          sleep 1
-          idb ui tap 81 295 --udid "$DEVICE" || true
-          sleep 2
-          idb ui tap 201 443 --udid "$DEVICE" || true
-          sleep 2
-          idb ui tap 201 500 --udid "$DEVICE" || true
-          sleep 1
-          idb ui text "1" --udid "$DEVICE" || true
-          sleep 2
-          xcrun simctl io "$DEVICE" screenshot artifacts/18_timer_armed.png || true
+          # 注入 1 分钟定时器 + 深链起播免费歌
           URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.free_song_id || '347230' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
+          SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_AUTOCLOSE_MIN="1"           SIMCTL_CHILD_SIM_AUTOCLOSE_WAIT_SONG_END="0"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
+          sleep 8
           xcrun simctl openurl "$DEVICE" "$URL"
           sleep 5
-          python3 tap_button.py "$DEVICE" label "Open" || python3 tap_button.py "$DEVICE" coord 0.695 0.542 || true
-          sleep 15
-          xcrun simctl openurl "$DEVICE" "$URL" || true
-          sleep 4
           python3 tap_button.py "$DEVICE" label "Open" || python3 tap_button.py "$DEVICE" coord 0.695 0.542 || true
           sleep 15
           xcrun simctl io "$DEVICE" screenshot artifacts/18_timer_before.png || true
@@ -489,62 +472,35 @@ jobs:
           xcrun simctl io "$DEVICE" screenshot artifacts/18_timer_after.png || true
           xcrun simctl spawn "$DEVICE" log show --last 6m --info --debug --style compact             --predicate 'process == "App"' > artifacts/timer_fire_console.log 2>&1 || true
           if grep -q "睡眠定时器到点" artifacts/timer_fire_console.log; then
-            echo "✅ 原生定时器到点日志命中（1min 档）"
+            echo "✅ 原生定时器到点日志命中（注入 1min）"
           else
-            echo "1min 档未检出，回落等待 10min 档（540 秒）..."
-            sleep 540
-            xcrun simctl io "$DEVICE" screenshot artifacts/18_timer_after_10min.png || true
-            xcrun simctl spawn "$DEVICE" log show --last 14m --info --debug --style compact               --predicate 'process == "App"' > artifacts/timer_fire_console.log 2>&1 || true
-            grep -q "睡眠定时器到点" artifacts/timer_fire_console.log             && echo "✅ 原生定时器到点日志命中（10min 档）" || echo "⚠️ 原生定时器到点日志未检出"
+            echo "⚠️ 原生定时器到点日志未检出"
+            grep -i "SleepTimer" artifacts/timer_fire_console.log | tail -5 || true
           fi
-          xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
-          sleep 2
-          SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play/timer"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
-          sleep 12
-          xcrun simctl io "$DEVICE" screenshot artifacts/20_timer_reset.png || true
 
       # 加分项（waitSongEnd）：主链 checkbox 双 tap 已归零，此处单次勾选状态可控；
       # 勾选后经自定义 1 分钟链 arm，到点后歌曲应继续播放（原生不发 pause）
-      - name: Sleep timer waitSongEnd (bonus)
+      # 加分项：waitSongEnd=1 注入，到点后歌曲应继续播放（原生不发 pause）
+      - name: Sleep timer waitSongEnd (bonus, injection-driven)
         if: ${{ inputs.login_mode == true }}
         run: |
           DEVICE="${{ steps.device.outputs.id }}"
           xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
           sleep 2
-          SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play/timer"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
-          sleep 15
-          xcrun simctl io "$DEVICE" screenshot artifacts/21_wse_page.png || true
-          idb ui tap 343 232 --udid "$DEVICE" || true
-          sleep 2
-          idb ui tap 81 295 --udid "$DEVICE" || true
-          sleep 2
-          idb ui tap 201 443 --udid "$DEVICE" || true
-          sleep 2
-          idb ui tap 201 500 --udid "$DEVICE" || true
-          sleep 1
-          idb ui text "1" --udid "$DEVICE" || true
-          sleep 2
-          # 主链已输出 waitSongEnd 实际值：为 true 则不再勾选（保持），为 false 则翻转勾选
-          if grep -q "waitSongEnd=true" artifacts/timer_fire_console.log 2>/dev/null; then
-            echo "主链 waitSongEnd=true，保持现状"
-          else
-            idb ui tap 201 520 --udid "$DEVICE" || true
-          fi
-          sleep 2
-          xcrun simctl io "$DEVICE" screenshot artifacts/21_wse_armed.png || true
           URL=$(python3 -c "import base64,json;print('orpheus://'+base64.b64encode(json.dumps({'type':'song','id':'${{ inputs.free_song_id || '347230' }}','cmd':'play'},separators=(',',':')).encode()).decode())")
+          SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_AUTOCLOSE_MIN="1"           SIMCTL_CHILD_SIM_AUTOCLOSE_WAIT_SONG_END="1"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
+          sleep 8
           xcrun simctl openurl "$DEVICE" "$URL"
           sleep 5
           python3 tap_button.py "$DEVICE" label "Open" || python3 tap_button.py "$DEVICE" coord 0.695 0.542 || true
           sleep 15
           xcrun simctl io "$DEVICE" screenshot artifacts/21_wse_before.png || true
-          echo "等待 100 秒验证 1 分钟定时器到点后歌曲继续..."
+          echo "等待 100 秒验证 waitSongEnd=true 定时器到点后歌曲继续..."
           sleep 100
           xcrun simctl io "$DEVICE" screenshot artifacts/21_wse_after.png || true
           xcrun simctl spawn "$DEVICE" log show --last 6m --info --debug --style compact             --predicate 'process == "App"' > artifacts/wse_console.log 2>&1 || true
           grep -q "睡眠定时器到点" artifacts/wse_console.log && echo "✅ waitSongEnd 到点事件命中" || echo "⚠️ waitSongEnd 到点事件未检出"
 
-      # Cookie 自然持久化（P4-1）：不带注入环境变量重启，验证登录态由 App 自身持久化保持
       - name: Cookie persistence check (no injection)
         if: ${{ inputs.login_mode == true }}
         run: |

@@ -65,6 +65,8 @@ class MainViewController: CAPBridgeViewController {
      * SIM_ROUTE：目标 hash 路由，页面 load 后直达。
      * SIM_SETTING_OVERRIDES：设置项覆盖 JSON（如 {"audioEngine":"ffmpeg"}），documentStart 阶段
      * 合并进 localStorage["setting-store"]，供无 UI 入口的设置项（引擎切换等）自动化验证。
+     * SIM_AUTOCLOSE_MIN / SIM_AUTOCLOSE_WAIT_SONG_END：睡眠定时器注入（分钟数 / 是否等曲终），
+     * 写入 localStorage["sim-autoclose"]，由 PlayerController 启动时消费并挂载原生定时器。
      * 仅 DEBUG 构建生效，正式产物不受影响。
      */
     private func injectSimLoginCookie() {
@@ -73,7 +75,9 @@ class MainViewController: CAPBridgeViewController {
         let raw = env["SIM_LOGIN_COOKIE"] ?? ""
         let route = env["SIM_ROUTE"] ?? ""
         let settingsOverrides = env["SIM_SETTING_OVERRIDES"] ?? ""
-        guard !raw.isEmpty || !route.isEmpty || !settingsOverrides.isEmpty else { return }
+        let autoCloseMin = env["SIM_AUTOCLOSE_MIN"] ?? ""
+        let autoCloseWait = env["SIM_AUTOCLOSE_WAIT_SONG_END"] ?? ""
+        guard !raw.isEmpty || !route.isEmpty || !settingsOverrides.isEmpty || !autoCloseMin.isEmpty else { return }
         let escaped = raw
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "'", with: "\\'")
@@ -102,6 +106,13 @@ class MainViewController: CAPBridgeViewController {
           if (route) {
             window.addEventListener('load', function(){ location.hash = route; });
           }
+          var acMin = '__SIM_AC_MIN__';
+          if (acMin) {
+            localStorage.setItem('sim-autoclose', JSON.stringify({
+              min: Number(acMin) || 0,
+              waitSongEnd: '__SIM_AC_WAIT__' === '1'
+            }));
+          }
           var settingsRaw = '__SIM_SETTINGS__';
           if (settingsRaw) {
             try {
@@ -117,6 +128,8 @@ class MainViewController: CAPBridgeViewController {
         let finalSource = source
             .replacingOccurrences(of: "__SIM_ROUTE__", with: route.replacingOccurrences(of: "'", with: ""))
             .replacingOccurrences(of: "__SIM_SETTINGS__", with: settingsOverrides.replacingOccurrences(of: "'", with: ""))
+          .replacingOccurrences(of: "__SIM_AC_MIN__", with: autoCloseMin)
+          .replacingOccurrences(of: "__SIM_AC_WAIT__", with: autoCloseWait)
         let script = WKUserScript(source: finalSource, injectionTime: .atDocumentStart, forMainFrameOnly: true)
         webView?.configuration.userContentController.addUserScript(script)
         #endif
