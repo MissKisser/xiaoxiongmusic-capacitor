@@ -434,7 +434,9 @@ jobs:
           SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play/timer"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
           sleep 12
           xcrun simctl io "$DEVICE" screenshot artifacts/15_timer_page.png || true
-          python3 tap_button.py "$DEVICE" coord 0.1866 0.3121 || true
+          # 10min 档位 chip 实测中心 (81,295)：iOS 18.5/18.6 下页面较 C3 时代下移，
+          # 旧坐标 (75,273) 落在档位行上方空白带（截图哈希全同证零状态变化）
+          python3 tap_button.py "$DEVICE" coord 0.2015 0.3375 || true
           sleep 2
           xcrun simctl io "$DEVICE" screenshot artifacts/15_timer_set.png || true
           xcrun simctl terminate "$DEVICE" com.xiaoxiong.music || true
@@ -456,9 +458,9 @@ jobs:
           SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play/timer"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
           sleep 15
           xcrun simctl io "$DEVICE" screenshot artifacts/18_timer_arm_page.png || true
-          idb ui tap 75 273 --udid "$DEVICE" || true
+          idb ui tap 81 295 --udid "$DEVICE" || true
           sleep 1
-          idb ui tap 75 273 --udid "$DEVICE" || true
+          idb ui tap 81 295 --udid "$DEVICE" || true
           sleep 2
           idb ui tap 201 443 --udid "$DEVICE" || true
           sleep 2
@@ -568,7 +570,7 @@ jobs:
           python3 tap_button.py "$DEVICE" coord 0.695 0.542 || true
           sleep 16
           xcrun simctl io "$DEVICE" screenshot artifacts/22_home_miniplayer.png || true
-          idb ui tap 181 769 --udid "$DEVICE" || true
+          idb ui tap 201 800 --udid "$DEVICE" || true
           sleep 5
           xcrun simctl io "$DEVICE" screenshot artifacts/22_player_full.png || true
           idb ui tap 201 320 --udid "$DEVICE" || true
