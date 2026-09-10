@@ -44,35 +44,17 @@ jobs:
           pnpm build
           npx cap sync ios
 
-      - name: Select available iPhone simulator
-        id: device
+      - name: Run package unit tests on iOS simulator
         run: |
-          DEVICE_ID=$(xcrun simctl list devices available | grep -m1 "iPhone" | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')
-          if [ -z "$DEVICE_ID" ]; then
-            echo "::error::No available iPhone simulator found"
-            xcrun simctl list devices available
-            exit 1
-          fi
-          echo "id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
-          echo "Selected simulator: $DEVICE_ID"
-
-      - name: Run package unit tests
-        run: |
+          # Xcode 26 起不再为 SPM 包自动生成含 test action 的 scheme，
+          # 改用 swift test 的 destination 描述文件直跑 iOS 模拟器（swift.org CI 文档模式）
+          cat > /tmp/dest.json <<EOF
+          {
+            "version": 1,
+            "sdkRoot": "$(xcrun --sdk iphonesimulator --show-sdk-path)",
+            "targetPlatform": "ios",
+            "arch": "$(uname -m)"
+          }
+          EOF
           cd ios/App/CapApp-SPM
-          echo "=== 可用 schemes ==="
-          xcodebuild -list 2>&1 | tee /tmp/schemes.txt
-          SCHEMES=$(sed -n '/Schemes:/,$p' /tmp/schemes.txt | grep -E '^[[:space:]]{4}[^[:space:]]' | sed 's/^ *//;s/ *$//')
-          if [ -z "$SCHEMES" ]; then
-            echo "::error::包无可用 scheme"; exit 1
-          fi
-          for SCHEME in $SCHEMES; do
-            echo "=== 尝试 scheme: $SCHEME ==="
-            if xcodebuild test \
-              -scheme "$SCHEME" \
-              -destination "platform=iOS Simulator,id=${{ steps.device.outputs.id }}" \
-              -quiet; then
-              echo "✅ 测试经 scheme '$SCHEME' 通过"; exit 0
-            fi
-          done
-          echo "::error::所有 scheme 均未配置可用的 test action"
-          exit 1
+          swift test --destination /tmp/dest.json
