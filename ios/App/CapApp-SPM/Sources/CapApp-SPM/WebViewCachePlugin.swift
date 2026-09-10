@@ -103,17 +103,9 @@ public class WebViewCachePlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func checkVersionAndClear(_ call: CAPPluginCall) {
         let currentVersion = currentAppVersion
         let previousVersion = UserDefaults.standard.string(forKey: versionKey) ?? ""
+        let decision = CacheVersionPolicy.evaluate(currentVersion: currentVersion, previousVersion: previousVersion)
 
-        if currentVersion.isEmpty {
-            call.resolve([
-                "cleared": false,
-                "previousVersion": previousVersion,
-                "currentVersion": ""
-            ])
-            return
-        }
-
-        if previousVersion != currentVersion {
+        if decision.shouldClearAndPersist {
             performClearCache { [weak self] in
                 guard let self = self else { return }
                 self.performClearAppCaches()
