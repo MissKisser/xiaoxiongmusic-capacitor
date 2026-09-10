@@ -56,9 +56,12 @@ jobs:
       - name: Install UI automation tool (idb)
         run: |
           brew tap facebook/fb
+          # 2026-09-08 起的公式（1.5.3+）要求 Xcode 26 源码编译，macos-15（Xcode 16）
+          # 须钉回 1.5.2 修订，与 2026-09-05 冒烟绿灯组合（Xcode 16 + idb 1.5.2）一致
+          git -C "$(brew --repository facebook/fb)" checkout --quiet 28de056321
           brew trust --formula facebook/fb/idb-companion || brew trust facebook/fb || true
-          brew install idb-companion
-          python3 -m pip install --break-system-packages fb-idb || python3 -m pip install fb-idb
+          HOMEBREW_NO_INSTALL_FROM_API=1 brew install facebook/fb/idb-companion
+          python3 -m pip install --break-system-packages fb-idb==1.5.2 || python3 -m pip install fb-idb==1.5.2 || python3 -m pip install fb-idb
           idb --help > /dev/null 2>&1 && echo "idb CLI ready"
 
       - name: Select available iPhone simulator
@@ -637,6 +640,7 @@ jobs:
       - name: Collect evidence (cache / process / logs)
         if: always()
         run: |
+          mkdir -p artifacts
           DEVICE="${{ steps.device.outputs.id }}"
           DATA_DIR=$(xcrun simctl get_app_container "$DEVICE" com.xiaoxiong.music data 2>/dev/null || true)
           echo "=== App data container: $DATA_DIR ===" | tee artifacts/cache_report.txt
