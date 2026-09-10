@@ -435,9 +435,9 @@ jobs:
           sleep 12
           xcrun simctl io "$DEVICE" screenshot artifacts/15_timer_page.png || true
           # 组件层守卫：开关未开启时档位/自定义/复选框全部 disabled（SleepTimerItem.vue），
-          # 必须先点开关（实测中心 (366,100)）再选档位（10min chip 实测中心 (81,295)，
+          # 必须先点开关（实测中心 (343,232)）再选档位（10min chip 实测中心 (81,295)，
           # iOS 18.5/18.6 下页面较 C3 时代下移，旧坐标落在档位行上方空白带）
-          python3 tap_button.py "$DEVICE" coord 0.9104 0.1144 || true
+          python3 tap_button.py "$DEVICE" coord 0.8532 0.2654 || true
           sleep 2
           python3 tap_button.py "$DEVICE" coord 0.2015 0.3375 || true
           sleep 2
@@ -461,7 +461,7 @@ jobs:
           SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play/timer"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
           sleep 15
           xcrun simctl io "$DEVICE" screenshot artifacts/18_timer_arm_page.png || true
-          idb ui tap 366 100 --udid "$DEVICE" || true
+          idb ui tap 343 232 --udid "$DEVICE" || true
           sleep 2
           idb ui tap 81 295 --udid "$DEVICE" || true
           sleep 1
@@ -514,7 +514,7 @@ jobs:
           SIMCTL_CHILD_SIM_LOGIN_COOKIE="MUSIC_U=${{ secrets.NETEASE_MUSIC_U }}; __csrf=${{ secrets.NETEASE_CSRF }}"           SIMCTL_CHILD_SIM_ROUTE="#/settings/play/timer"             xcrun simctl launch "$DEVICE" com.xiaoxiong.music
           sleep 15
           xcrun simctl io "$DEVICE" screenshot artifacts/21_wse_page.png || true
-          idb ui tap 366 100 --udid "$DEVICE" || true
+          idb ui tap 343 232 --udid "$DEVICE" || true
           sleep 2
           idb ui tap 81 295 --udid "$DEVICE" || true
           sleep 2
