@@ -50,17 +50,29 @@ jobs:
           pnpm build
           npx cap sync ios
 
+      - name: Select available iPhone simulator
+        id: device
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available | grep -m1 "iPhone" | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')
+          if [ -z "$DEVICE_ID" ]; then
+            echo "::error::未找到可用 iPhone 模拟器，请检查 runner 镜像设备列表" >&2
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
+          echo "Selected simulator: $DEVICE_ID"
+
       - name: Run package unit tests on iOS simulator
         working-directory: ios/App/CapApp-SPM
         run: |
-          set -euo pipefail
-          # 镜像设备组合随版本漂移（iPhone 16 Pro → 17 Pro），动态取首个可用 iPhone，缺失即报错
-          DEVICE=$(xcrun simctl list devices available | grep -m1 -oE 'iPhone [^(]+' | sed 's/[[:space:]]*$//')
-          if [ -z "$DEVICE" ]; then
-            echo "::error::未找到可用 iPhone 模拟器，请检查 runner 镜像设备列表" >&2
-            exit 1
+          set -uo pipefail
+          DEST="platform=iOS Simulator,id=${{ steps.device.outputs.id }}"
+          # 包模式下 name 型 destination 依赖 buildable 平台解析（不可靠），UDID 直达设备
+          if xcodebuild test -scheme CapApp-SPM -destination "$DEST" -quiet; then
+            echo "共享 scheme 路径通过"
+            exit 0
           fi
-          echo "使用模拟器: $DEVICE"
-          xcodebuild test \
-            -scheme CapApp-SPM \
-            -destination "platform=iOS Simulator,name=$DEVICE"
+          echo "=== 共享 scheme 失败，退回自动 scheme 重试 ==="
+          rm -rf .swiftpm
+          xcodebuild -list
+          xcodebuild test -scheme CapApp-SPM -destination "$DEST"
