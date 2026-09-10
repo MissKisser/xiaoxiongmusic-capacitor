@@ -5,6 +5,11 @@ on:
   push:
     paths:
       - 'ios/**'
+  pull_request:
+    paths:
+      - 'ios/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
 
 permissions:
   contents: read
