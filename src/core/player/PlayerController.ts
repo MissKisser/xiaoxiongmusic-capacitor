@@ -70,6 +70,29 @@ class PlayerController {
     // [SleepTimer] 监听原生层定时器完成事件
     if (isCapacitor) {
       this.listenNativeSleepTimer();
+      this.applySimAutoCloseInjection();
+    }
+  }
+
+  /**
+   * [SleepTimer] 消费模拟器注入的定时器配置
+   * 读取 localStorage["sim-autoclose"]（{ min: 分钟数, waitSongEnd: 是否等曲终 }），
+   * 直接挂载原生睡眠定时器，供无 UI 交互通道的自动化验证使用
+   */
+  private applySimAutoCloseInjection() {
+    const raw = localStorage.getItem("sim-autoclose");
+    if (!raw) return;
+    try {
+      const cfg = JSON.parse(raw) as { min?: number; waitSongEnd?: boolean };
+      localStorage.removeItem("sim-autoclose");
+      if (cfg && cfg.min && cfg.min > 0) {
+        const statusStore = useStatusStore();
+        statusStore.autoClose.waitSongEnd = !!cfg.waitSongEnd;
+        this.startAutoCloseTimer(cfg.min, cfg.min * 60);
+        console.log(`[SleepTimer] 模拟器注入已挂载 ${cfg.min} 分钟定时器（waitSongEnd=${!!cfg.waitSongEnd}）`);
+      }
+    } catch (err) {
+      console.warn("[SleepTimer] 模拟器注入配置解析失败:", err);
     }
   }
 
