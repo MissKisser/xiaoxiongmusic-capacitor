@@ -147,9 +147,15 @@ class SongManager {
    * Web 端 URL 统一处理：通过代理转发
    * Electron 端：直接返回原始 URL
    * @param url 原始 URL
+   * @param cacheKey 缓存 Key (如歌曲 ID)
+   * @param referer 可选的防盗链 Referer
    * @returns 处理后的 URL
    */
-  private processUrlForWeb(url: string | null | undefined, cacheKey?: string | number): string | null | undefined {
+  private processUrlForWeb(
+    url: string | null | undefined,
+    cacheKey?: string | number,
+    referer?: string,
+  ): string | null | undefined {
     if (!url) return url;
 
     // 空字符串或无效 URL，返回 undefined
@@ -158,20 +164,38 @@ class SongManager {
       return undefined;
     }
 
+    // 对 music.126.net 域的 http:// 直链在送入代理前统一提升为 https://
+    let targetUrl = url.trim();
+    try {
+      const parsed = new URL(targetUrl);
+      if (
+        parsed.protocol === "http:" &&
+        (parsed.hostname === "music.126.net" || parsed.hostname.endsWith(".music.126.net"))
+      ) {
+        parsed.protocol = "https:";
+        targetUrl = parsed.toString();
+      }
+    } catch {
+      // 若 URL 解析异常保持原样
+    }
+
     // 已经是代理 URL 或本地文件，直接返回
-    if (url.startsWith("/api/proxy/audio") || url.startsWith("file://")) {
-      return url;
+    if (targetUrl.startsWith("/api/proxy/audio") || targetUrl.startsWith("file://")) {
+      return targetUrl;
     }
 
     // Capacitor 环境：通过本地代理转发（NanoHTTPD 在手机本地运行，添加 CORS 头）
     // 不消耗远程服务器带宽，同时保证 Web Audio API（均衡器、频谱）正常工作
     if (isCapacitor) {
       let proxyUrl = isIos
-        ? `capacitor-audio://proxy/audio?url=${encodeURIComponent(url)}`
-        : `http://localhost:18520/proxy/audio?url=${encodeURIComponent(url)}`;
+        ? `capacitor-audio://proxy/audio?url=${encodeURIComponent(targetUrl)}`
+        : `http://localhost:18520/proxy/audio?url=${encodeURIComponent(targetUrl)}`;
       // 传递稳定的缓存 key（歌曲 ID），避免 URL 中的时间戳/token 变化导致缓存失效
       if (cacheKey) {
         proxyUrl += `&key=${encodeURIComponent(String(cacheKey))}`;
+      }
+      if (isIos && referer) {
+        proxyUrl += `&referer=${encodeURIComponent(referer)}`;
       }
       console.log(`🌐 [Capacitor] 使用本地代理转发音频`);
       return proxyUrl;
@@ -179,11 +203,11 @@ class SongManager {
 
     // Web 端：通过代理转发，解决 CORS 问题
     try {
-      const urlObj = new URL(url);
+      const urlObj = new URL(targetUrl);
       // 只对 HTTP/HTTPS URL 进行代理
       if (urlObj.protocol === "http:" || urlObj.protocol === "https:") {
         // Web 环境：使用相对路径（通过 Vite 代理或 nginx 转发）
-        const proxyUrl = `/api/proxy/audio?url=${encodeURIComponent(url)}`;
+        const proxyUrl = `/api/proxy/audio?url=${encodeURIComponent(targetUrl)}`;
         console.log(`🌐 [Web] 使用代理转发音频`);
         return proxyUrl;
       }
@@ -192,7 +216,7 @@ class SongManager {
       return undefined;
     }
 
-    return url;
+    return targetUrl;
   }
 
   /**
@@ -272,33 +296,42 @@ class SongManager {
       return { id: songId, url: undefined };
     }
 
-    // 解锁服务优先级顺序：网易云 -> 波点音乐 -> 歌曲宝 -> 酷我音乐
-    const priorityOrder = [
+    // 解锁服务默认优先级顺序：网易云 -> 波点音乐 -> 歌曲宝 -> 酷我音乐
+    const defaultPriorityOrder = [
       SongUnlockServer.NETEASE,
       SongUnlockServer.BODIAN,
       SongUnlockServer.GEQUBAO,
       SongUnlockServer.KUWO,
     ];
 
-    // 获取启用的音源列表，并按优先级排序
-    const enabledServers = settingStore.songUnlockServer
-      .filter((s) => s.enabled)
-      .map((s) => s.key);
+    // 读取用户配置的解锁服务顺序与启用状态，未配置或为空时回落默认
+    const configServers = settingStore.songUnlockServer;
+    let sortedServers: SongUnlockServer[] = [];
 
-    if (enabledServers.length === 0) {
+    if (Array.isArray(configServers) && configServers.length > 0) {
+      // 按照用户在设置页拖拽配置的顺序提取已启用的服务
+      sortedServers = configServers
+        .filter((s) => s.enabled)
+        .map((s) => s.key);
+    } else {
+      sortedServers = [...defaultPriorityOrder];
+    }
+
+    if (sortedServers.length === 0) {
       return { id: songId, url: undefined };
     }
 
-    // 按优先级顺序排序启用的服务器
-    const sortedServers = priorityOrder.filter((server) => enabledServers.includes(server));
+    const enabledServers = sortedServers;
 
     // 按顺序请求，一旦成功就返回
     console.log(`[UNLOCK] [${songId}] 开始按优先级尝试解锁服务`);
     console.log(`[UNLOCK] [${songId}] 启用的服务: ${enabledServers.map(s => this.getUnlockSourceName(s)).join(', ')}`);
     console.log(`[UNLOCK] [${songId}] 优先级顺序: ${sortedServers.map(s => this.getUnlockSourceName(s)).join(' -> ')}`);
 
-    // 检查是否有服务被跳过（在优先级列表中但未启用）
-    const skippedServers = priorityOrder.filter((server) => !enabledServers.includes(server));
+    // 检查是否有服务被跳过（在配置列表中但未启用）
+    const skippedServers = Array.isArray(configServers) && configServers.length > 0
+      ? configServers.filter((s) => !s.enabled).map((s) => s.key)
+      : [];
     if (skippedServers.length > 0) {
       console.log(`[UNLOCK] [${songId}] 跳过的服务（未启用）: ${skippedServers.map(s => this.getUnlockSourceName(s)).join(', ')}`);
     }
@@ -319,7 +352,9 @@ class SongManager {
 
           // Web 端：统一通过代理转发（与 Electron 端逻辑对齐）
           // Electron 端：直接使用原始 URL（MPV 不受浏览器限制）
-          const unlockUrl = this.processUrlForWeb(originalUrl, songId);
+          // 歌曲宝源需传入防盗链 Referer
+          const referer = server === SongUnlockServer.GEQUBAO ? "https://gequbao.com/" : undefined;
+          const unlockUrl = this.processUrlForWeb(originalUrl, songId, referer);
           if (!isElectron) {
             console.log(`[UNLOCK] [${songId}] Web 端处理后的 URL:`, unlockUrl ? sanitizeUrlForLog(unlockUrl) : "null/undefined");
           }

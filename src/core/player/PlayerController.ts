@@ -250,26 +250,7 @@ class PlayerController {
       // 更新通知栏信息（歌曲切换时）
       // 延迟更新，确保歌曲信息已加载
       setTimeout(async () => {
-        try {
-          const { updateMusicControls } = await import('@/utils/musicControls');
-          const song = musicStore.playSong;
-          const album = song?.album;
-          const artists = song?.artists;
-          const artistName = Array.isArray(artists)
-            ? artists.map(a => a.name).join(', ')
-            : (artists || '未知艺术家');
-          await updateMusicControls({
-            track: song?.name || '未知歌曲',
-            artist: artistName,
-            album: typeof album === 'object' ? album.name : (album || ''),
-            cover: musicStore.getSongCover('m'),
-            isPlaying: statusStore.playStatus,
-            duration: Math.floor(this.getDuration() / 1000),
-            elapsed: Math.floor(statusStore.currentTime / 1000),
-          });
-        } catch (error) {
-          console.warn('[PlayerController] 更新通知栏失败:', error);
-        }
+        await this.reportNativePlaybackState(statusStore.playStatus);
       }, 100);
       // 后置处理
       await this.afterPlaySetup(playSongData);
@@ -468,6 +449,31 @@ class PlayerController {
   }
 
   /**
+   * 向原生通知栏上报播放状态（不改变应用内 playStatus）
+   * @param isPlaying 是否播放中
+   */
+  private async reportNativePlaybackState(isPlaying: boolean) {
+    try {
+      const { updateMusicControls } = await import("@/utils/musicControls");
+      const musicStore = useMusicStore();
+      const statusStore = useStatusStore();
+      const { name, artist, album } = getPlayerInfoObj() || {};
+
+      await updateMusicControls({
+        track: name || "未知歌曲",
+        artist: artist || "未知艺术家",
+        album: album || "",
+        cover: musicStore.getSongCover("m"),
+        isPlaying,
+        duration: Math.floor(this.getDuration() / 1000),
+        elapsed: Math.floor(statusStore.currentTime / 1000),
+      });
+    } catch (error) {
+      console.warn("[PlayerController] 上报原生通知栏状态失败:", error);
+    }
+  }
+
+  /**
    * 统一音频事件绑定
    */
   private bindAudioEvents() {
@@ -481,6 +487,19 @@ class PlayerController {
     // 加载状态
     audioManager.addEventListener("loadstart", () => {
       statusStore.playLoading = true;
+    });
+
+    // 缓冲事件：仅向原生上报暂停态，避免锁屏进度虚进，不修改应用内 statusStore.playStatus
+    const handleBuffering = () => {
+      this.reportNativePlaybackState(false);
+    };
+
+    audioManager.addEventListener("waiting", handleBuffering);
+    audioManager.addEventListener("stalled", handleBuffering);
+
+    // 恢复播放事件：按 statusStore.playStatus 真实值恢复上报原生通知栏
+    audioManager.addEventListener("playing", () => {
+      this.reportNativePlaybackState(statusStore.playStatus);
     });
 
     // 加载完成
@@ -527,21 +546,7 @@ class PlayerController {
       playerIpc.sendTaskbarProgress(statusStore.progress);
       // 更新通知栏（播放时）
       setTimeout(async () => {
-        try {
-          const { updateMusicControls } = await import('@/utils/musicControls');
-          const album = musicStore.playSong?.album;
-          await updateMusicControls({
-            track: name || '未知歌曲',
-            artist: artist || '未知艺术家',
-            album: typeof album === 'object' ? album.name : (album || ''),
-            cover: musicStore.getSongCover('m'),
-            isPlaying: true,
-            duration: Math.floor(this.getDuration() / 1000),
-            elapsed: Math.floor(statusStore.currentTime / 1000),
-          });
-        } catch (error) {
-          console.warn('[PlayerController] 更新通知栏失败:', error);
-        }
+        await this.reportNativePlaybackState(true);
       }, 100);
       console.log(`▶️ [${musicStore.playSong?.id}] 歌曲播放:`, name);
     });
@@ -557,23 +562,7 @@ class PlayerController {
       playerIpc.sendTaskbarProgress(statusStore.progress);
       // 更新通知栏（暂停时）
       setTimeout(async () => {
-        try {
-          const { updateMusicControls } = await import('@/utils/musicControls');
-          const song = musicStore.playSong;
-          const album = song?.album;
-          const artists = song?.artists;
-          await updateMusicControls({
-            track: song?.name || '未知歌曲',
-            artist: Array.isArray(artists) ? artists.map(a => a.name).join(', ') : (artists || '未知艺术家'),
-            album: typeof album === 'object' ? album.name : (album || ''),
-            cover: musicStore.getSongCover('m'),
-            isPlaying: false,
-            duration: Math.floor(this.getDuration() / 1000),
-            elapsed: Math.floor(statusStore.currentTime / 1000),
-          });
-        } catch (error) {
-          console.warn('[PlayerController] 更新通知栏失败:', error);
-        }
+        await this.reportNativePlaybackState(false);
       }, 100);
       lastfmScrobbler.pause();
       console.log(`⏸️ [${musicStore.playSong?.id}] 歌曲暂停`);

@@ -110,6 +110,17 @@ class AudioManager extends TypedEventTarget<AudioEventMap> implements IPlaybackE
   }
 
   /**
+   * 确保播放继续（应用从后台切回前台时调用）
+   */
+  public async ensurePlayback(): Promise<void> {
+    if (this.engine.ensurePlayback) {
+      await this.engine.ensurePlayback();
+    } else {
+      await this.engine.resume();
+    }
+  }
+
+  /**
    * 暂停音频
    */
   public pause(options?: PauseOptions): Promise<void> {

@@ -88,7 +88,8 @@ public final class AudioProxySchemeHandler: NSObject, WKURLSchemeHandler {
             return
         }
 
-        handleCacheMiss(urlSchemeTask, targetUrl: targetUrl, cacheKey: cacheKey)
+        let refererParam = queryItems.first(where: { $0.name == "referer" })?.value
+        handleCacheMiss(urlSchemeTask, targetUrl: targetUrl, cacheKey: cacheKey, referer: refererParam)
     }
 
     /**
@@ -231,7 +232,7 @@ public final class AudioProxySchemeHandler: NSObject, WKURLSchemeHandler {
         }
     }
 
-    private func handleCacheMiss(_ task: WKURLSchemeTask, targetUrl: URL, cacheKey: String) {
+    private func handleCacheMiss(_ task: WKURLSchemeTask, targetUrl: URL, cacheKey: String, referer: String?) {
         var upstreamRequest = URLRequest(url: targetUrl)
         upstreamRequest.timeoutInterval = 30.0
 
@@ -250,8 +251,8 @@ public final class AudioProxySchemeHandler: NSObject, WKURLSchemeHandler {
             "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
             forHTTPHeaderField: "User-Agent"
         )
-        if let scheme = targetUrl.scheme, let host = targetUrl.host {
-            upstreamRequest.setValue("\(scheme)://\(host)/", forHTTPHeaderField: "Referer")
+        if let referer = referer, !referer.isEmpty {
+            upstreamRequest.setValue(referer, forHTTPHeaderField: "Referer")
         }
         var tempUrl: URL?
         var tempHandle: FileHandle?
