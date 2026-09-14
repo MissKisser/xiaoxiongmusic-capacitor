@@ -386,6 +386,15 @@ jobs:
             || python3 tap_button.py "${{ steps.device.outputs.id }}" coord 0.695 0.542 || true
           sleep 30
           xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/02_free_song.png
+          # 真实播放门禁：深链起播后 3 分钟内必须出现原生播放状态上报（isPlaying=true），
+          # 缺失说明取歌/代理/播放任一环断裂（截图与缓存均无法单独证明播放链活着）
+          xcrun simctl spawn "${{ steps.device.outputs.id }}" log show --last 3m --info --style compact             --predicate 'process == "App"' > artifacts/free_play_console.log 2>&1 || true
+          if ! grep -q "播放状态上报 isPlaying=true" artifacts/free_play_console.log; then
+            echo "::error::免费歌深链起播后未检出原生播放状态上报（取歌/代理/播放链断裂）"
+            grep -iE "Unblock|proxy|error" artifacts/free_play_console.log | tail -10 || true
+            exit 1
+          fi
+          echo "✅ 免费歌播放链门禁通过（原生状态上报命中）"
 
       - name: Play VIP song via deep link
         run: |

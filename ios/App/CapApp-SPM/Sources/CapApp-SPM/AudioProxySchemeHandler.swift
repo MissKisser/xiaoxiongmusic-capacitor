@@ -253,6 +253,8 @@ public final class AudioProxySchemeHandler: NSObject, WKURLSchemeHandler {
         )
         if let referer = referer, !referer.isEmpty {
             upstreamRequest.setValue(referer, forHTTPHeaderField: "Referer")
+        } else if let scheme = targetUrl.scheme, let host = targetUrl.host {
+            upstreamRequest.setValue("\(scheme)://\(host)/", forHTTPHeaderField: "Referer")
         }
         var tempUrl: URL?
         var tempHandle: FileHandle?
