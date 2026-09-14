@@ -229,6 +229,8 @@ public final class MediaNotificationRuntime: NSObject {
      *   - duration: 音频总时长（单位：秒）
      */
     public func updateMetadata(title: String, artist: String, album: String?, coverUrl: String?, duration: Double?) {
+        try? AVAudioSession.sharedInstance().setActive(true)
+        isSessionActive = true
         currentNowPlayingInfo[MPNowPlayingInfoPropertyMediaType] = MPNowPlayingInfoMediaType.audio.rawValue
         currentNowPlayingInfo[MPMediaItemPropertyTitle] = title
         currentNowPlayingInfo[MPMediaItemPropertyArtist] = artist
@@ -313,6 +315,7 @@ public final class MediaNotificationRuntime: NSObject {
             try? AVAudioSession.sharedInstance().setActive(true)
             isSessionActive = true
         }
+        NSLog("[MediaNotificationRuntime] 播放状态上报 isPlaying=\(isPlaying)")
         self.isPlaying = isPlaying
         currentNowPlayingInfo[MPNowPlayingInfoPropertyMediaType] = MPNowPlayingInfoMediaType.audio.rawValue
         currentNowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
