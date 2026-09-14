@@ -82,6 +82,11 @@ export interface IPlaybackEngine {
    */
   seek(time: number): void;
 
+  /**
+   * 确保播放状态正常（回前台时恢复播放）
+   */
+  ensurePlayback?(): Promise<void>;
+
   // ========== 状态属性 ==========
 
   /** 音频总时长（秒） */

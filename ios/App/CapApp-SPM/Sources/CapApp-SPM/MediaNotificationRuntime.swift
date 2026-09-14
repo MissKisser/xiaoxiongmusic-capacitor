@@ -30,6 +30,7 @@ public final class MediaNotificationRuntime: NSObject {
     private override init() {
         super.init()
         setupInterruptionListener()
+        setupRouteChangeListener()
     }
 
     /**
@@ -38,20 +39,19 @@ public final class MediaNotificationRuntime: NSObject {
     public func initialize() {
         configureAudioSession()
         setupInterruptionListener()
+        setupRouteChangeListener()
         setupRemoteCommands()
     }
 
     /**
-     * 激活系统音频会话
+     * 配置系统音频会话分类与模式（不在此处激活，由播放时按需激活）
      */
     private func configureAudioSession() {
         do {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playback, mode: .default, options: [])
-            try session.setActive(true)
-            isSessionActive = true
         } catch {
-            NSLog("[MediaNotificationRuntime] 激活音频会话失败: \(error)")
+            NSLog("[MediaNotificationRuntime] 配置音频会话失败: \(error)")
         }
     }
 
@@ -64,6 +64,19 @@ public final class MediaNotificationRuntime: NSObject {
             self,
             selector: #selector(handleAudioInterruption(_:)),
             name: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance()
+        )
+    }
+
+    /**
+     * 监听系统音频线路变更事件（如拔出耳机或断开蓝牙）
+     */
+    private func setupRouteChangeListener() {
+        NotificationCenter.default.removeObserver(self, name: AVAudioSession.routeChangeNotification, object: nil)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioRouteChange(_:)),
+            name: AVAudioSession.routeChangeNotification,
             object: AVAudioSession.sharedInstance()
         )
     }
@@ -88,11 +101,30 @@ public final class MediaNotificationRuntime: NSObject {
             if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
                 let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
                 if options.contains(.shouldResume) {
+                    try? AVAudioSession.sharedInstance().setActive(true)
+                    isSessionActive = true
                     eventHandler?("play", [:])
                 }
             }
         @unknown default:
             break
+        }
+    }
+
+    /**
+     * 处理音频线路变更事件
+     *
+     * - Parameter notification: 线路变更通知对象
+     */
+    @objc private func handleAudioRouteChange(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else {
+            return
+        }
+
+        if reason == .oldDeviceUnavailable {
+            eventHandler?("pause", [:])
         }
     }
 
@@ -197,6 +229,7 @@ public final class MediaNotificationRuntime: NSObject {
      *   - duration: 音频总时长（单位：秒）
      */
     public func updateMetadata(title: String, artist: String, album: String?, coverUrl: String?, duration: Double?) {
+        currentNowPlayingInfo[MPNowPlayingInfoPropertyMediaType] = MPNowPlayingInfoMediaType.audio.rawValue
         currentNowPlayingInfo[MPMediaItemPropertyTitle] = title
         currentNowPlayingInfo[MPMediaItemPropertyArtist] = artist
 
@@ -276,7 +309,12 @@ public final class MediaNotificationRuntime: NSObject {
      * - Parameter isPlaying: 是否正在播放
      */
     public func updatePlaybackState(isPlaying: Bool) {
+        if isPlaying {
+            try? AVAudioSession.sharedInstance().setActive(true)
+            isSessionActive = true
+        }
         self.isPlaying = isPlaying
+        currentNowPlayingInfo[MPNowPlayingInfoPropertyMediaType] = MPNowPlayingInfoMediaType.audio.rawValue
         currentNowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
         currentNowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = lastPosition
         if lastDuration > 0 {
@@ -349,6 +387,7 @@ public final class MediaNotificationRuntime: NSObject {
     public func destroy() {
         isSessionActive = false
         NotificationCenter.default.removeObserver(self, name: AVAudioSession.interruptionNotification, object: nil)
+        NotificationCenter.default.removeObserver(self, name: AVAudioSession.routeChangeNotification, object: nil)
         clearSleepTimer()
         removeRemoteCommands()
         currentNowPlayingInfo.removeAll()

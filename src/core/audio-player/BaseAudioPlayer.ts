@@ -1,5 +1,6 @@
 import { AudioEffectManager } from "./AudioEffectManager";
 import type { EngineCapabilities, IPlaybackEngine } from "./IPlaybackEngine";
+import { isIos } from "@/utils/env";
 
 /** 扩充 AudioContext 接口以支持 setSinkId (实验性 API) */
 export interface IExtendedAudioContext extends AudioContext {
@@ -19,6 +20,9 @@ export const AUDIO_EVENTS = {
   ERROR: "error",
   CAN_PLAY: "canplay",
   LOAD_START: "loadstart",
+  WAITING: "waiting",
+  STALLED: "stalled",
+  PLAYING: "playing",
 } as const;
 
 export type AudioEventType = (typeof AUDIO_EVENTS)[keyof typeof AUDIO_EVENTS];
@@ -158,11 +162,11 @@ export abstract class BaseAudioPlayer extends EventTarget implements IPlaybackEn
 
     if (!shouldPlay) return;
 
-    if (this.audioCtx?.state === "suspended") {
+    if (!isIos && this.audioCtx?.state === "suspended") {
       await this.audioCtx.resume();
     }
 
-    const duration = options.fadeIn ? (options.fadeDuration ?? 0.5) : 0;
+    const duration = !isIos && options.fadeIn ? (options.fadeDuration ?? 0.5) : 0;
     this.applyFadeTo(this.volume, duration);
 
     try {
@@ -177,15 +181,36 @@ export abstract class BaseAudioPlayer extends EventTarget implements IPlaybackEn
     await this.play(undefined, options);
   }
 
+  /**
+   * 确保播放继续（应用从后台切回前台时调用）
+   * iOS 旁路路径调用底层 element.play()，非 iOS 同时恢复 AudioContext
+   */
+  public async ensurePlayback(): Promise<void> {
+    if (!isIos && this.audioCtx && this.audioCtx.state === "suspended") {
+      try {
+        await this.audioCtx.resume();
+      } catch (e) {
+        console.warn("恢复 AudioContext 失败", e);
+      }
+    }
+    if (this.src) {
+      try {
+        await this.doPlay();
+      } catch (e) {
+        console.warn("恢复播放失败", e);
+      }
+    }
+  }
+
   public async pause(options: { fadeOut?: boolean; fadeDuration?: number } = {}) {
     this.cancelPendingPause();
 
-    const duration = options.fadeOut ? (options.fadeDuration ?? 0.5) : 0;
+    const duration = !isIos && options.fadeOut ? (options.fadeDuration ?? 0.5) : 0;
 
     const performPause = async () => {
       this.doPause();
 
-      if (this.audioCtx && this.audioCtx.state === "running") {
+      if (!isIos && this.audioCtx && this.audioCtx.state === "running") {
         try {
           await this.audioCtx.suspend();
         } catch (e) {
@@ -215,6 +240,10 @@ export abstract class BaseAudioPlayer extends EventTarget implements IPlaybackEn
     this.cancelPendingPause();
     // 如果已经暂停，直接跳转
     if (this.paused) {
+      this.doSeek(time);
+      return;
+    }
+    if (isIos) {
       this.doSeek(time);
       return;
     }

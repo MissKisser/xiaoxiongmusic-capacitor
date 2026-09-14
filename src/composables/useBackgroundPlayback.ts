@@ -2,6 +2,7 @@ import { watch } from 'vue';
 import { useStatusStore, useMusicStore } from '@/stores';
 import { Capacitor } from '@capacitor/core';
 import { isCapacitor } from '@/utils/env';
+import { useAudioManager } from '@/core/player/AudioManager';
 
 /**
  * 后台播放和熄屏播放管理
@@ -64,10 +65,19 @@ export function useBackgroundPlayback() {
       const { App } = await import('@capacitor/app');
 
       // 统一的应用状态监听
-      App.addListener('appStateChange', (state) => {
+      App.addListener('appStateChange', async (state) => {
         if (state.isActive) {
           // 应用在前台
           console.log('[BackgroundPlayback] App is active');
+          // 若处于播放中状态，确保底层播放继续
+          if (statusStore.playStatus) {
+            try {
+              const audioManager = useAudioManager();
+              await audioManager.ensurePlayback();
+            } catch (error) {
+              console.warn('[BackgroundPlayback] 回前台恢复播放失败:', error);
+            }
+          }
         } else {
           // 应用在后台
           if (statusStore.playStatus) {
