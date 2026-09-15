@@ -583,6 +583,7 @@ class SongManager {
 
       // 对于灰色歌曲，如果启用了解锁，优先使用解锁服务，跳过官方链接
       if (isGraySong && canUnlock) {
+        diagLog(`取歌路由 灰色歌 id=${songId} free=${song.free} → 解锁`);
         console.log(`[UNLOCK] [${songId}] 检测到灰色歌曲（free=${song.free}），强制使用解锁服务...`);
         const unlockResult = await this.getUnlockSongUrl(song);
         console.log(`[UNLOCK] [${songId}] 灰色歌曲解锁结果:`, {
@@ -600,6 +601,7 @@ class SongManager {
 
       // 优先尝试获取官方链接（对齐 SPlayer 逻辑，避免免费歌曲被第三方翻唱替换）
       const { url: officialUrl, isTrial, quality } = await this.getOnlineUrl(songId, !!song.pc);
+      diagLog(`官方链接 id=${songId} 结果=${officialUrl ? "有" : "无"} 试听=${isTrial}`);
       console.log(`[SONG] [${songId}] 官方链接获取结果:`, { url: officialUrl, isTrial, quality });
 
       // 如果官方链接有效且非试听（或者用户接受试听），直接使用官方链接
