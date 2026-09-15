@@ -44,7 +44,7 @@ public final class MediaNotificationRuntime: NSObject {
     }
 
     /**
-     * 配置系统音频会话分类与模式（不在此处激活，由播放时按需激活）
+     * 配置并激活系统音频会话（启动即激活，播放时幂等重试）
      */
     private func configureAudioSession() {
         do {
@@ -105,8 +105,12 @@ public final class MediaNotificationRuntime: NSObject {
             if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
                 let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
                 if options.contains(.shouldResume) {
-                    try? AVAudioSession.sharedInstance().setActive(true)
-                    isSessionActive = true
+                    do {
+                        try AVAudioSession.sharedInstance().setActive(true)
+                        isSessionActive = true
+                    } catch {
+                        NSLog("[MediaNotificationRuntime] 中断恢复激活会话失败: \(error)")
+                    }
                     eventHandler?("play", [:])
                 }
             }
