@@ -131,7 +131,7 @@ jobs:
           [ "$HTTP" = "200" ] || { echo "::error::推送失败 HTTP=$HTTP"; exit 1; }
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: xiaoxiongmusic-release-${{ inputs.version }}
           path: release_out/
