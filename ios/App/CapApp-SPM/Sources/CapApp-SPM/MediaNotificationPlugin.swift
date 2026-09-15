@@ -18,7 +18,8 @@ public class MediaNotificationPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "updatePosition", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "destroy", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setSleepTimer", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "clearSleepTimer", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "clearSleepTimer", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "diag", returnType: CAPPluginReturnPromise)
     ]
 
     private let runtime = MediaNotificationRuntime.shared
@@ -64,6 +65,16 @@ public class MediaNotificationPlugin: CAPPlugin, CAPBridgedPlugin {
     /**
      * 更新播放状态
      */
+    /**
+     * 前端诊断日志写入沙盒 diag.log
+     */
+    @objc func diag(_ call: CAPPluginCall) {
+        if let line = call.getString("line"), !line.isEmpty {
+            DiagLog.write("JS", line)
+        }
+        call.resolve()
+    }
+
     @objc func updatePlaybackState(_ call: CAPPluginCall) {
         guard let isPlaying = call.getBool("isPlaying") else {
             call.reject("缺少必填参数: isPlaying")

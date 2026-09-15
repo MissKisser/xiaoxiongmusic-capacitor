@@ -1,3 +1,4 @@
+import { diagLog } from "@/utils/diag";
 import {
   AUDIO_EVENTS,
   AudioErrorCode,
@@ -222,6 +223,12 @@ export class AudioElementPlayer extends BaseAudioPlayer {
    * 将 HTMLAudioElement 的事件转换为 BaseAudioPlayer 的统一事件格式
    */
   private bindInternalEvents() {
+    this.audioElement.addEventListener("error", () => {
+      const mediaErr = this.audioElement.error;
+      diagLog(
+        `audio元素错误 code=${mediaErr?.code} message=${mediaErr?.message ?? ""} networkState=${this.audioElement.networkState} readyState=${this.audioElement.readyState}`,
+      );
+    });
     const events: AudioEventType[] = Object.values(AUDIO_EVENTS);
 
     events.forEach((eventType) => {

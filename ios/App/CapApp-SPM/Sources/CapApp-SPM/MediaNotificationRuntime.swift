@@ -54,8 +54,10 @@ public final class MediaNotificationRuntime: NSObject {
             // WebKit 自身会话管理竞态导致静默失败（时钟冻结且通知栏不出现）
             try session.setActive(true)
             isSessionActive = true
+            DiagLog.write("SESSION", "启动激活成功 category=\(session.category.rawValue) otherAudioPlaying=\(session.isOtherAudioPlaying)")
         } catch {
             NSLog("[MediaNotificationRuntime] 音频会话配置或激活失败: \(error)")
+            DiagLog.write("SESSION", "启动配置或激活失败 error=\(error)")
         }
     }
 
@@ -131,6 +133,7 @@ public final class MediaNotificationRuntime: NSObject {
             return
         }
 
+        DiagLog.write("SESSION", "线路变更 reason=\(reason.rawValue)")
         if reason == .oldDeviceUnavailable {
             eventHandler?("pause", [:])
         }
@@ -332,6 +335,7 @@ public final class MediaNotificationRuntime: NSObject {
             }
         }
         NSLog("[MediaNotificationRuntime] 播放状态上报 isPlaying=\(isPlaying)")
+        DiagLog.write("MEDIA", "状态上报 isPlaying=\(isPlaying)")
         self.isPlaying = isPlaying
         currentNowPlayingInfo[MPNowPlayingInfoPropertyMediaType] = MPNowPlayingInfoMediaType.audio.rawValue
         currentNowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
@@ -354,6 +358,7 @@ public final class MediaNotificationRuntime: NSObject {
         // 进度心跳：媒体时钟推进才会触发本方法，每 10 秒边界记一条供自动化断言播放真实进行
         if position.truncatingRemainder(dividingBy: 10) < 1 {
             NSLog("[MediaNotificationRuntime] 进度心跳 position=\(Int(position))")
+            DiagLog.write("MEDIA", "进度心跳 position=\(Int(position))")
         }
         if duration > 0 {
             lastDuration = duration

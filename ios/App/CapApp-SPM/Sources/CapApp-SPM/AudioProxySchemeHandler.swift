@@ -82,8 +82,10 @@ public final class AudioProxySchemeHandler: NSObject, WKURLSchemeHandler {
 
         let keyParam = queryItems.first(where: { $0.name == "key" })?.value
         let cacheKey = (keyParam != nil && !keyParam!.isEmpty) ? keyParam! : targetUrlStr
+        DiagLog.write("PROXY", "请求 host=\(targetUrl.host ?? "?") scheme=\(targetUrl.scheme ?? "?") range=\(urlSchemeTask.request.value(forHTTPHeaderField: "Range") ?? "无")")
 
         if let cachedFile = cacheManager.getCachedFileURL(for: cacheKey) {
+            DiagLog.write("PROXY", "缓存命中 key=\(String(cacheKey.suffix(12)))")
             handleCacheHit(urlSchemeTask, fileUrl: cachedFile)
             return
         }
@@ -322,6 +324,7 @@ extension AudioProxySchemeHandler: URLSessionDataDelegate {
         }
 
         context.expectedContentLength = httpResponse.expectedContentLength
+        DiagLog.write("PROXY", "上游响应 status=\(httpResponse.statusCode) contentLength=\(httpResponse.expectedContentLength)")
 
         var headers = corsHeaders
         for (k, v) in httpResponse.allHeaderFields {
@@ -389,6 +392,12 @@ extension AudioProxySchemeHandler: URLSessionDataDelegate {
         taskContextsLock.unlock()
 
         guard let context = matchingContext else { return }
+
+        if let error = error {
+            DiagLog.write("PROXY", "上游传输失败 error=\(error.localizedDescription)")
+        } else {
+            DiagLog.write("PROXY", "上游传输完成 bytes=\(context.totalBytesWritten)")
+        }
 
         fileIOQueue.async { [weak self] in
             guard let self = self else { return }

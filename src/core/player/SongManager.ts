@@ -1,3 +1,4 @@
+import { diagLog } from "@/utils/diag";
 import { personalFm, personalFmToTrash } from "@/api/rec";
 import { songUrl, unlockSongUrl } from "@/api/song";
 import {
@@ -197,6 +198,9 @@ class SongManager {
       if (isIos && referer) {
         proxyUrl += `&referer=${encodeURIComponent(referer)}`;
       }
+      let diagHost = "?";
+      try { diagHost = new URL(targetUrl).host; } catch { /* 解析失败保持占位 */ }
+      diagLog(`代理URL构建 host=${diagHost}`);
       console.log(`🌐 [Capacitor] 使用本地代理转发音频`);
       return proxyUrl;
     }
@@ -352,6 +356,7 @@ class SongManager {
 
           // Web 端：统一通过代理转发（与 Electron 端逻辑对齐）
           // Electron 端：直接使用原始 URL（MPV 不受浏览器限制）
+          diagLog(`解锁尝试 源=${server} 歌曲id=${songId}`);
           // 歌曲宝源需传入防盗链 Referer
           const referer = server === SongUnlockServer.GEQUBAO ? "https://gequbao.com/" : undefined;
           const unlockUrl = this.processUrlForWeb(originalUrl, songId, referer);
