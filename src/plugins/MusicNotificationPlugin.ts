@@ -36,6 +36,11 @@ export interface MusicNotificationPlugin {
     }): Promise<void>;
 
     /**
+     * 写入设备侧诊断日志（沙盒 Documents/diag.log）
+     */
+    diag(options: { line: string }): Promise<void>;
+
+    /**
      * 销毁通知
      */
     destroy(): Promise<void>;

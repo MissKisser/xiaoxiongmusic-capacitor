@@ -21,6 +21,10 @@ export class MusicNotificationWeb extends WebPlugin implements MusicNotification
         // Web 平台不需要实现
     }
 
+    async diag(): Promise<void> {
+        // Web 平台不需要实现
+    }
+
     async destroy(): Promise<void> {
         // Web 平台不需要实现
     }

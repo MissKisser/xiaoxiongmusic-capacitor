@@ -1,3 +1,4 @@
+import { diagLog } from "@/utils/diag";
 import { AudioErrorCode } from "@/core/audio-player/BaseAudioPlayer";
 import { useBlobURLManager } from "@/core/resource/BlobURLManager";
 import { useDataStore, useMusicStore, useSettingStore, useStatusStore } from "@/stores";
@@ -491,6 +492,7 @@ class PlayerController {
 
     // 缓冲事件：仅向原生上报暂停态，避免锁屏进度虚进，不修改应用内 statusStore.playStatus
     const handleBuffering = () => {
+      diagLog(`缓冲 waiting/stalled currentTime=${Math.floor(statusStore.currentTime / 1000)}`);
       this.reportNativePlaybackState(false);
     };
 
@@ -499,6 +501,7 @@ class PlayerController {
 
     // 恢复播放事件：按 statusStore.playStatus 真实值恢复上报原生通知栏
     audioManager.addEventListener("playing", () => {
+      diagLog("播放开始 playing 事件 currentTime=" + Math.floor(statusStore.currentTime / 1000));
       this.reportNativePlaybackState(statusStore.playStatus);
     });
 
@@ -548,6 +551,7 @@ class PlayerController {
       setTimeout(async () => {
         await this.reportNativePlaybackState(true);
       }, 100);
+      diagLog(`play事件 id=${musicStore.playSong?.id} currentTime=${Math.floor(statusStore.currentTime / 1000)}`);
       console.log(`▶️ [${musicStore.playSong?.id}] 歌曲播放:`, name);
     });
 
@@ -639,6 +643,7 @@ class PlayerController {
 
     // 错误处理
     audioManager.addEventListener("error", (e) => {
+      diagLog(`error事件 code=${e.detail?.errorCode} currentTime=${Math.floor(statusStore.currentTime / 1000)}`);
       const errCode = e.detail.errorCode;
       this.handlePlaybackError(errCode, this.getSeek());
     });
