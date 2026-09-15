@@ -6,7 +6,6 @@ import {
   type AudioEventType,
 } from "./BaseAudioPlayer";
 import type { EngineCapabilities } from "./IPlaybackEngine";
-import { isIos } from "@/utils/env";
 
 /**
  * 基于 HTMLAudioElement 的播放器实现
@@ -38,9 +37,6 @@ export class AudioElementPlayer extends BaseAudioPlayer {
     this.audioElement = new Audio();
     this.audioElement.crossOrigin = "anonymous";
     this.audioElement.preload = "metadata"; // 优化预加载，减少缓冲
-    if (isIos) {
-      this.audioElement.volume = this.volume;
-    }
     this.bindInternalEvents();
 
     this.audioElement.addEventListener("seeked", () => {
@@ -54,7 +50,6 @@ export class AudioElementPlayer extends BaseAudioPlayer {
    * iOS 环境下旁路 Web Audio 图谱，直接经 HTMLMediaElement 输出
    */
   protected onGraphInitialized(): void {
-    if (isIos) return;
     if (!this.audioCtx || !this.inputNode) return;
 
     try {
@@ -64,20 +59,6 @@ export class AudioElementPlayer extends BaseAudioPlayer {
     } catch (error) {
       console.error("[AudioElementPlayer] SourceNode 创建失败", error);
     }
-  }
-
-  /**
-   * 应用音量或渐变
-   * iOS 环境下绕过 Web Audio 图谱，直接控制 Audio 元素音量，淡入淡出退化为直接赋值
-   * @param targetValue 目标音量 (0.0 - 1.0)
-   * @param duration 渐变时长（秒）
-   */
-  protected override applyFadeTo(targetValue: number, duration: number): void {
-    if (isIos) {
-      this.audioElement.volume = Math.max(0, Math.min(1, targetValue));
-      return;
-    }
-    super.applyFadeTo(targetValue, duration);
   }
 
   /**
@@ -92,9 +73,6 @@ export class AudioElementPlayer extends BaseAudioPlayer {
 
     // 设置新的音频源
     this.audioElement.src = url;
-    if (isIos) {
-      this.audioElement.volume = this.volume;
-    }
     this.audioElement.load();
   }
 
