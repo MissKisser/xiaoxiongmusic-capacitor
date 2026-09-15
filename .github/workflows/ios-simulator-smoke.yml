@@ -386,9 +386,10 @@ jobs:
             || python3 tap_button.py "${{ steps.device.outputs.id }}" coord 0.695 0.542 || true
           sleep 30
           xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/02_free_song.png
-          # 真实播放门禁：深链起播后 3 分钟内必须出现原生播放状态上报（isPlaying=true），
-          # 缺失说明取歌/代理/播放任一环断裂（截图与缓存均无法单独证明播放链活着）
-          xcrun simctl spawn "${{ steps.device.outputs.id }}" log show --last 3m --info --style compact             --predicate 'process == "App"' > artifacts/free_play_console.log 2>&1 || true
+          # 真实播放门禁：深链起播后 6 分钟内必须出现原生播放状态上报（isPlaying=true），
+          # 缺失说明取歌/代理/播放任一环断裂（截图与缓存均无法单独证明播放链活着）；
+          # 解锁 API 带音质参数后响应变慢 + 深链二次拉起，取证窗需覆盖慢速取歌
+          xcrun simctl spawn "${{ steps.device.outputs.id }}" log show --last 6m --info --style compact             --predicate 'process == "App"' > artifacts/free_play_console.log 2>&1 || true
           if ! grep -q "播放状态上报 isPlaying=true" artifacts/free_play_console.log; then
             echo "::error::免费歌深链起播后未检出原生播放状态上报（取歌/代理/播放链断裂）"
             grep -iE "Unblock|proxy|error" artifacts/free_play_console.log | tail -10 || true
@@ -421,7 +422,7 @@ jobs:
           xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/03_vip_song.png
           # VIP 双门禁：状态上报 + 进度推进（CI 注入的是 VIP 登录态官方兜底链，
           # 第三方解锁链的服务可用性属设备侧环境，此门禁不背书）
-          xcrun simctl spawn "${{ steps.device.outputs.id }}" log show --last 3m --info --style compact             --predicate 'process == "App"' > artifacts/vip_play_console.log 2>&1 || true
+          xcrun simctl spawn "${{ steps.device.outputs.id }}" log show --last 6m --info --style compact             --predicate 'process == "App"' > artifacts/vip_play_console.log 2>&1 || true
           if ! grep -q "播放状态上报 isPlaying=true" artifacts/vip_play_console.log; then
             echo "::error::VIP 歌深链起播后未检出原生播放状态上报"
             grep -iE "Unblock|proxy|error" artifacts/vip_play_console.log | tail -10 || true
