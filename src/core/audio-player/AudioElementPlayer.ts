@@ -1,3 +1,4 @@
+import { isIos } from "@/utils/env";
 import { diagLog } from "@/utils/diag";
 import {
   AUDIO_EVENTS,
@@ -49,13 +50,27 @@ export class AudioElementPlayer extends BaseAudioPlayer {
    * 创建 MediaElementAudioSourceNode 并连接到输入节点
    * iOS 环境下旁路 Web Audio 图谱，直接经 HTMLMediaElement 输出
    */
+  /** iOS 懒挂接标记：直出与图谱两种拓扑的切换依据 */
+  private graphAttached = false;
+
   protected onGraphInitialized(): void {
-    if (!this.audioCtx || !this.inputNode) return;
+    // iOS 保持元素直出，待用户手势激活音频上下文后再懒挂接图谱
+    if (isIos) return;
+    this.attachGraphSource();
+  }
+
+  /**
+   * 挂接 Web Audio 图谱（元素输出改经增益/均衡链）
+   * 仅在音频上下文处于运行态（存在有效用户手势）时调用，挂接后音量交回增益链
+   */
+  private attachGraphSource(): void {
+    if (this.graphAttached || !this.audioCtx || !this.inputNode) return;
 
     try {
       this.sourceNode = this.audioCtx.createMediaElementSource(this.audioElement);
-
       this.sourceNode.connect(this.inputNode);
+      this.audioElement.volume = 1;
+      this.graphAttached = true;
     } catch (error) {
       console.error("[AudioElementPlayer] SourceNode 创建失败", error);
     }
@@ -83,7 +98,32 @@ export class AudioElementPlayer extends BaseAudioPlayer {
   protected async doPlay(): Promise<void> {
     // 播放时重置 seek 状态，防止卡在 seeking 状态
     this.isInternalSeeking = false;
+    // iOS：尝试激活音频上下文，成功（存在用户手势）则切换到图谱拓扑获得稳定媒体时钟
+    if (isIos && !this.graphAttached && this.audioCtx) {
+      try {
+        await this.audioCtx.resume();
+      } catch {
+        // 无用户手势环境（自动化起播）保持元素直出
+      }
+      if (this.audioCtx.state === "running") {
+        this.attachGraphSource();
+      }
+    }
     return this.audioElement.play();
+  }
+
+  /**
+   * 应用音量或渐变
+   * iOS 未挂接图谱（直出模式）时直接控制元素音量，淡入淡出退化为直接赋值
+   * @param targetValue 目标音量 (0.0 - 1.0)
+   * @param duration 渐变时长（秒）
+   */
+  protected override applyFadeTo(targetValue: number, duration: number): void {
+    if (isIos && !this.graphAttached) {
+      this.audioElement.volume = Math.max(0, Math.min(1, targetValue));
+      return;
+    }
+    super.applyFadeTo(targetValue, duration);
   }
 
   /**

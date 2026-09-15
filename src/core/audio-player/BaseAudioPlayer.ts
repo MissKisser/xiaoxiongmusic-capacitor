@@ -162,7 +162,11 @@ export abstract class BaseAudioPlayer extends EventTarget implements IPlaybackEn
     if (!shouldPlay) return;
 
     if (this.audioCtx?.state === "suspended") {
-      await this.audioCtx.resume();
+      try {
+        await this.audioCtx.resume();
+      } catch {
+        // 无用户手势环境激活失败不阻断播放（元素直出拓扑仍可发声）
+      }
     }
 
     const duration = options.fadeIn ? (options.fadeDuration ?? 0.5) : 0;
