@@ -1,6 +1,5 @@
 import { AudioEffectManager } from "./AudioEffectManager";
 import type { EngineCapabilities, IPlaybackEngine } from "./IPlaybackEngine";
-import { isIos } from "@/utils/env";
 
 /** 扩充 AudioContext 接口以支持 setSinkId (实验性 API) */
 export interface IExtendedAudioContext extends AudioContext {
@@ -162,11 +161,11 @@ export abstract class BaseAudioPlayer extends EventTarget implements IPlaybackEn
 
     if (!shouldPlay) return;
 
-    if (!isIos && this.audioCtx?.state === "suspended") {
+    if (this.audioCtx?.state === "suspended") {
       await this.audioCtx.resume();
     }
 
-    const duration = !isIos && options.fadeIn ? (options.fadeDuration ?? 0.5) : 0;
+    const duration = options.fadeIn ? (options.fadeDuration ?? 0.5) : 0;
     this.applyFadeTo(this.volume, duration);
 
     try {
@@ -182,11 +181,10 @@ export abstract class BaseAudioPlayer extends EventTarget implements IPlaybackEn
   }
 
   /**
-   * 确保播放继续（应用从后台切回前台时调用）
-   * iOS 旁路路径调用底层 element.play()，非 iOS 同时恢复 AudioContext
+   * 确保播放继续（应用从后台切回前台时调用），恢复挂起的音频上下文与底层播放
    */
   public async ensurePlayback(): Promise<void> {
-    if (!isIos && this.audioCtx && this.audioCtx.state === "suspended") {
+    if (this.audioCtx && this.audioCtx.state === "suspended") {
       try {
         await this.audioCtx.resume();
       } catch (e) {
@@ -205,12 +203,12 @@ export abstract class BaseAudioPlayer extends EventTarget implements IPlaybackEn
   public async pause(options: { fadeOut?: boolean; fadeDuration?: number } = {}) {
     this.cancelPendingPause();
 
-    const duration = !isIos && options.fadeOut ? (options.fadeDuration ?? 0.5) : 0;
+    const duration = options.fadeOut ? (options.fadeDuration ?? 0.5) : 0;
 
     const performPause = async () => {
       this.doPause();
 
-      if (!isIos && this.audioCtx && this.audioCtx.state === "running") {
+      if (this.audioCtx && this.audioCtx.state === "running") {
         try {
           await this.audioCtx.suspend();
         } catch (e) {
@@ -240,10 +238,6 @@ export abstract class BaseAudioPlayer extends EventTarget implements IPlaybackEn
     this.cancelPendingPause();
     // 如果已经暂停，直接跳转
     if (this.paused) {
-      this.doSeek(time);
-      return;
-    }
-    if (isIos) {
       this.doSeek(time);
       return;
     }
