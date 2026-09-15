@@ -52,6 +52,8 @@ export class AudioElementPlayer extends BaseAudioPlayer {
    */
   /** iOS 懒挂接标记：直出与图谱两种拓扑的切换依据 */
   private graphAttached = false;
+  /** iOS 图谱可用性缓存（真机二进制才挂图谱，模拟器保持元素直出） */
+  private static graphAllowedPromise: Promise<boolean> | null = null;
 
   protected onGraphInitialized(): void {
     // iOS 保持元素直出，待用户手势激活音频上下文后再懒挂接图谱
@@ -95,15 +97,29 @@ export class AudioElementPlayer extends BaseAudioPlayer {
    * 执行底层播放
    * @returns 播放 Promise
    */
+  /**
+   * 解析 iOS 是否允许挂接图谱：真机二进制返回真（用户手势环境，图谱时钟已验证），
+   * 模拟器二进制返回假（无头起播，元素直出已验证）
+   */
+  private static resolveGraphAllowed(): Promise<boolean> {
+    if (!AudioElementPlayer.graphAllowedPromise) {
+      AudioElementPlayer.graphAllowedPromise = import("@/plugins/MusicNotificationPlugin")
+        .then(({ MusicNotification }) => MusicNotification.runtimeInfo())
+        .then((info) => !info.simulator)
+        .catch(() => false);
+    }
+    return AudioElementPlayer.graphAllowedPromise;
+  }
+
   protected async doPlay(): Promise<void> {
     // 播放时重置 seek 状态，防止卡在 seeking 状态
     this.isInternalSeeking = false;
-    // iOS：尝试激活音频上下文，成功（存在用户手势）则切换到图谱拓扑获得稳定媒体时钟
-    if (isIos && !this.graphAttached && this.audioCtx) {
+    // iOS：真机二进制在播放时激活音频上下文并切换图谱拓扑获得稳定媒体时钟
+    if (isIos && !this.graphAttached && this.audioCtx && (await AudioElementPlayer.resolveGraphAllowed())) {
       try {
         await this.audioCtx.resume();
       } catch {
-        // 无用户手势环境（自动化起播）保持元素直出
+        // 激活失败保持元素直出
       }
       if (this.audioCtx.state === "running") {
         this.attachGraphSource();
