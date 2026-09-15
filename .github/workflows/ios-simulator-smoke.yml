@@ -394,7 +394,20 @@ jobs:
             grep -iE "Unblock|proxy|error" artifacts/free_play_console.log | tail -10 || true
             exit 1
           fi
-          echo "✅ 免费歌播放链门禁通过（原生状态上报命中）"
+          # 进度推进门禁：提取心跳位置，最大最小差须 >=5 秒（时间轴未走=未真实播放）
+          POSITIONS=$(grep -oE "进度心跳 position=[0-9]+" artifacts/free_play_console.log | grep -oE "[0-9]+" | sort -n)
+          if [ -n "$POSITIONS" ]; then
+            P_MIN=$(echo "$POSITIONS" | head -1)
+            P_MAX=$(echo "$POSITIONS" | tail -1)
+            if [ $((P_MAX - P_MIN)) -lt 5 ]; then
+              echo "::error::免费歌进度未推进（min=$P_MIN max=$P_MAX），播放未真实进行"
+              exit 1
+            fi
+            echo "✅ 免费歌播放链门禁通过（状态上报 + 进度推进 ${P_MIN}s→${P_MAX}s）"
+          else
+            echo "::error::免费歌未检出进度心跳（媒体时钟未推进）"
+            exit 1
+          fi
 
       - name: Play VIP song via deep link
         run: |
@@ -406,6 +419,27 @@ jobs:
             || python3 tap_button.py "${{ steps.device.outputs.id }}" coord 0.695 0.542 || true
           sleep 40
           xcrun simctl io "${{ steps.device.outputs.id }}" screenshot artifacts/03_vip_song.png
+          # VIP 双门禁：状态上报 + 进度推进（CI 注入的是 VIP 登录态官方兜底链，
+          # 第三方解锁链的服务可用性属设备侧环境，此门禁不背书）
+          xcrun simctl spawn "${{ steps.device.outputs.id }}" log show --last 3m --info --style compact             --predicate 'process == "App"' > artifacts/vip_play_console.log 2>&1 || true
+          if ! grep -q "播放状态上报 isPlaying=true" artifacts/vip_play_console.log; then
+            echo "::error::VIP 歌深链起播后未检出原生播放状态上报"
+            grep -iE "Unblock|proxy|error" artifacts/vip_play_console.log | tail -10 || true
+            exit 1
+          fi
+          V_POSITIONS=$(grep -oE "进度心跳 position=[0-9]+" artifacts/vip_play_console.log | grep -oE "[0-9]+" | sort -n)
+          if [ -n "$V_POSITIONS" ]; then
+            V_MIN=$(echo "$V_POSITIONS" | head -1)
+            V_MAX=$(echo "$V_POSITIONS" | tail -1)
+            if [ $((V_MAX - V_MIN)) -lt 5 ]; then
+              echo "::error::VIP 歌进度未推进（min=$V_MIN max=$V_MAX）"
+              exit 1
+            fi
+            echo "✅ VIP 歌播放门禁通过（状态上报 + 进度推进 ${V_MIN}s→${V_MAX}s）"
+          else
+            echo "::error::VIP 歌未检出进度心跳（媒体时钟未推进）"
+            exit 1
+          fi
 
       - name: Replay free song (cache hit path)
         run: |

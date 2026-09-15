@@ -335,6 +335,10 @@ public final class MediaNotificationRuntime: NSObject {
      */
     public func updatePosition(position: Double, duration: Double) {
         lastPosition = position
+        // 进度心跳：媒体时钟推进才会触发本方法，每 10 秒边界记一条供自动化断言播放真实进行
+        if position.truncatingRemainder(dividingBy: 10) < 1 {
+            NSLog("[MediaNotificationRuntime] 进度心跳 position=\(Int(position))")
+        }
         if duration > 0 {
             lastDuration = duration
             currentNowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = duration
