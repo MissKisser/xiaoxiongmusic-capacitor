@@ -41,6 +41,11 @@ export interface MusicNotificationPlugin {
     diag(options: { line: string }): Promise<void>;
 
     /**
+     * 返回运行环境信息（是否模拟器二进制）
+     */
+    runtimeInfo(): Promise<{ simulator: boolean }>;
+
+    /**
      * 销毁通知
      */
     destroy(): Promise<void>;

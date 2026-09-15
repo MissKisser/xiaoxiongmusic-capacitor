@@ -19,7 +19,8 @@ public class MediaNotificationPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "destroy", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setSleepTimer", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearSleepTimer", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "diag", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "diag", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "runtimeInfo", returnType: CAPPluginReturnPromise)
     ]
 
     private let runtime = MediaNotificationRuntime.shared
@@ -68,6 +69,18 @@ public class MediaNotificationPlugin: CAPPlugin, CAPBridgedPlugin {
     /**
      * 前端诊断日志写入沙盒 diag.log
      */
+    /**
+     * 返回运行环境信息（是否模拟器二进制），供前端按环境选择音频拓扑
+     */
+    @objc func runtimeInfo(_ call: CAPPluginCall) {
+        #if targetEnvironment(simulator)
+        let simulator = true
+        #else
+        let simulator = false
+        #endif
+        call.resolve(["simulator": simulator])
+    }
+
     @objc func diag(_ call: CAPPluginCall) {
         if let line = call.getString("line"), !line.isEmpty {
             DiagLog.write("JS", line)

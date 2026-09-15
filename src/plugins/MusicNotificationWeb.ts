@@ -25,6 +25,10 @@ export class MusicNotificationWeb extends WebPlugin implements MusicNotification
         // Web 平台不需要实现
     }
 
+    async runtimeInfo(): Promise<{ simulator: boolean }> {
+        return { simulator: false };
+    }
+
     async destroy(): Promise<void> {
         // Web 平台不需要实现
     }
