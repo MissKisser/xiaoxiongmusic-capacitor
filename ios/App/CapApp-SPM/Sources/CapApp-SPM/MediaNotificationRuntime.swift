@@ -50,8 +50,12 @@ public final class MediaNotificationRuntime: NSObject {
         do {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playback, mode: .default, options: [])
+            // 启动即激活：真机上 WKWebView 媒体渲染依赖活跃会话，延迟激活会与
+            // WebKit 自身会话管理竞态导致静默失败（时钟冻结且通知栏不出现）
+            try session.setActive(true)
+            isSessionActive = true
         } catch {
-            NSLog("[MediaNotificationRuntime] 配置音频会话失败: \(error)")
+            NSLog("[MediaNotificationRuntime] 音频会话配置或激活失败: \(error)")
         }
     }
 
@@ -229,8 +233,12 @@ public final class MediaNotificationRuntime: NSObject {
      *   - duration: 音频总时长（单位：秒）
      */
     public func updateMetadata(title: String, artist: String, album: String?, coverUrl: String?, duration: Double?) {
-        try? AVAudioSession.sharedInstance().setActive(true)
-        isSessionActive = true
+        do {
+            try AVAudioSession.sharedInstance().setActive(true)
+            isSessionActive = true
+        } catch {
+            NSLog("[MediaNotificationRuntime] 元数据更新时激活会话失败: \(error)")
+        }
         currentNowPlayingInfo[MPNowPlayingInfoPropertyMediaType] = MPNowPlayingInfoMediaType.audio.rawValue
         currentNowPlayingInfo[MPMediaItemPropertyTitle] = title
         currentNowPlayingInfo[MPMediaItemPropertyArtist] = artist
@@ -312,8 +320,12 @@ public final class MediaNotificationRuntime: NSObject {
      */
     public func updatePlaybackState(isPlaying: Bool) {
         if isPlaying {
-            try? AVAudioSession.sharedInstance().setActive(true)
-            isSessionActive = true
+            do {
+                try AVAudioSession.sharedInstance().setActive(true)
+                isSessionActive = true
+            } catch {
+                NSLog("[MediaNotificationRuntime] 播放时激活会话失败: \(error)")
+            }
         }
         NSLog("[MediaNotificationRuntime] 播放状态上报 isPlaying=\(isPlaying)")
         self.isPlaying = isPlaying
