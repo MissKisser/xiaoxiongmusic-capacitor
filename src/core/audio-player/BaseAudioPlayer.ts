@@ -1,3 +1,4 @@
+import { diagLog } from "@/utils/diag";
 import { AudioEffectManager } from "./AudioEffectManager";
 import type { EngineCapabilities, IPlaybackEngine } from "./IPlaybackEngine";
 
@@ -164,8 +165,9 @@ export abstract class BaseAudioPlayer extends EventTarget implements IPlaybackEn
     if (this.audioCtx?.state === "suspended") {
       try {
         await this.audioCtx.resume();
-      } catch {
-        // 无用户手势环境激活失败不阻断播放（元素直出拓扑仍可发声）
+        diagLog(`音频上下文激活成功 state=${this.audioCtx.state}`);
+      } catch (e) {
+        diagLog(`音频上下文激活失败 error=${e}`);
       }
     }
 
@@ -182,26 +184,6 @@ export abstract class BaseAudioPlayer extends EventTarget implements IPlaybackEn
 
   public async resume(options?: { fadeIn?: boolean; fadeDuration?: number }): Promise<void> {
     await this.play(undefined, options);
-  }
-
-  /**
-   * 确保播放继续（应用从后台切回前台时调用），恢复挂起的音频上下文与底层播放
-   */
-  public async ensurePlayback(): Promise<void> {
-    if (this.audioCtx && this.audioCtx.state === "suspended") {
-      try {
-        await this.audioCtx.resume();
-      } catch (e) {
-        console.warn("恢复 AudioContext 失败", e);
-      }
-    }
-    if (this.src) {
-      try {
-        await this.doPlay();
-      } catch (e) {
-        console.warn("恢复播放失败", e);
-      }
-    }
   }
 
   public async pause(options: { fadeOut?: boolean; fadeDuration?: number } = {}) {

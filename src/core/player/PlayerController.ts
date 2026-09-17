@@ -568,6 +568,7 @@ class PlayerController {
       setTimeout(async () => {
         await this.reportNativePlaybackState(false);
       }, 100);
+      diagLog(`pause事件 currentTime=${Math.floor(statusStore.currentTime / 1000)}`);
       lastfmScrobbler.pause();
       console.log(`⏸️ [${musicStore.playSong?.id}] 歌曲暂停`);
     });
@@ -720,6 +721,7 @@ class PlayerController {
       }
       if (this.retryInfo.count === 1) {
         statusStore.playLoading = true;
+        diagLog(`看门狗触发 恢复 currentTime=${Math.floor(statusStore.currentTime / 1000)} playStatus=${statusStore.playStatus}`);
         window.$message.warning("播放异常，正在尝试恢复...");
       }
       await this.playSong({ autoPlay: true, seek: currentSeek });
