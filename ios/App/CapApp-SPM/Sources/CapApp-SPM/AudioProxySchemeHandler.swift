@@ -275,6 +275,8 @@ public final class AudioProxySchemeHandler: NSObject, WKURLSchemeHandler {
             tempHandle: tempHandle
         )
         context.elementRangeHeader = rangeHeader
+        // 缓存型（从头含探针）请求走窗口转换；偏移请求透传上游 206
+        context.elementWindowed = canCache && rangeHeader?.hasPrefix("bytes=") == true
 
         let dataTask = urlSession.dataTask(with: upstreamRequest)
         context.dataTask = dataTask
@@ -296,8 +298,11 @@ private final class SchemeTaskContext {
     var dataTask: URLSessionDataTask?
     var expectedContentLength: Int64 = -1
     var totalBytesWritten: Int64 = 0
-    // 元素侧窗口语义（WebKit 要求 Range 请求必须回 206+Content-Range，否则时钟冻结）
+    // 元素侧窗口语义（WebKit 要求 Range 请求必须回 206+Content-Range，否则时钟冻结）。
+    // 仅缓存型请求（从头下载、上游回 200 全量）需要窗口转换；偏移 Range 请求
+    // 已向上游转发，上游 206 即元素正确答案，走原样透传
     var elementRangeHeader: String?
+    var elementWindowed = false
     var elementWindowStart: Int64 = 0
     var elementWindowEnd: Int64 = -1
     var elementServed: Int64 = 0
@@ -351,16 +356,14 @@ extension AudioProxySchemeHandler: URLSessionDataDelegate {
             headers["Content-Type"] = "audio/mpeg"
         }
 
-        // 元素侧窗口语义：上游总长确定后，按元素的 Range 头构造 206+Content-Range 响应。
-        // WebKit 媒体栈收到 200 全量会判定资源不可 seek，元素时钟冻结且不报错
-        var total = httpResponse.expectedContentLength
-        if total <= 0, let contentRange = headers["Content-Range"] as? String,
-           contentRange.hasPrefix("bytes "), let slashIdx = contentRange.lastIndex(of: "/"),
-           let parsed = Int64(contentRange[contentRange.index(after: slashIdx)...]) {
-            total = parsed
-        }
+        // 元素侧窗口语义：缓存型请求上游回 200 全量，expectedContentLength 即文件总长，
+        // 按元素的 Range 头构造 206+Content-Range。WebKit 媒体栈收到 200 全量会判定
+        // 资源不可 seek，元素时钟冻结且不报错；偏移请求（非窗口型）透传上游 206，
+        // 其分片语义已是元素所需答案，直接采用可避免把分片长度误当总长
+        let total = httpResponse.expectedContentLength
 
-        if let elementRange = context.elementRangeHeader, elementRange.hasPrefix("bytes="), total > 0 {
+        if context.elementWindowed, let elementRange = context.elementRangeHeader,
+           elementRange.hasPrefix("bytes="), total > 0 {
             let resolution = AudioRangeParser.resolve(rangeHeader: elementRange, totalSize: total)
             if resolution.isUnsatisfiable {
                 var unsatHeaders = corsHeaders
@@ -448,8 +451,7 @@ extension AudioProxySchemeHandler: URLSessionDataDelegate {
                 }
                 context.schemeTask = nil
             }
-        } else if context.elementResponded, context.elementWindowEnd < 0,
-                  let schemeTask = context.schemeTask {
+        } else if !context.elementWindowed, let schemeTask = context.schemeTask {
             DispatchQueue.main.async {
                 guard !schemeTask.isStopped else { return }
                 schemeTask.didReceive(data)
