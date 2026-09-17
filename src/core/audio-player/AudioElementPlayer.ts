@@ -1,4 +1,3 @@
-import { isIos } from "@/utils/env";
 import { diagLog } from "@/utils/diag";
 import {
   AUDIO_EVENTS,
@@ -48,32 +47,17 @@ export class AudioElementPlayer extends BaseAudioPlayer {
   /**
    * 当音频图谱初始化完成时调用
    * 创建 MediaElementAudioSourceNode 并连接到输入节点
-   * iOS 环境下旁路 Web Audio 图谱，直接经 HTMLMediaElement 输出
    */
-  /** iOS 懒挂接标记：直出与图谱两种拓扑的切换依据 */
-  private graphAttached = false;
-  /** iOS 图谱可用性缓存（真机二进制才挂图谱，模拟器保持元素直出） */
-  private static graphAllowedPromise: Promise<boolean> | null = null;
-
   protected onGraphInitialized(): void {
-    // iOS 保持元素直出，待用户手势激活音频上下文后再懒挂接图谱
-    if (isIos) return;
-    this.attachGraphSource();
-  }
-
-  /**
-   * 挂接 Web Audio 图谱（元素输出改经增益/均衡链）
-   * 仅在音频上下文处于运行态（存在有效用户手势）时调用，挂接后音量交回增益链
-   */
-  private attachGraphSource(): void {
-    if (this.graphAttached || !this.audioCtx || !this.inputNode) return;
+    if (!this.audioCtx || !this.inputNode) return;
 
     try {
       this.sourceNode = this.audioCtx.createMediaElementSource(this.audioElement);
+
       this.sourceNode.connect(this.inputNode);
-      this.audioElement.volume = 1;
-      this.graphAttached = true;
+      diagLog(`图谱挂接成功 ctxState=${this.audioCtx.state}`);
     } catch (error) {
+      diagLog(`图谱挂接失败 error=${error}`);
       console.error("[AudioElementPlayer] SourceNode 创建失败", error);
     }
   }
@@ -97,49 +81,10 @@ export class AudioElementPlayer extends BaseAudioPlayer {
    * 执行底层播放
    * @returns 播放 Promise
    */
-  /**
-   * 解析 iOS 是否允许挂接图谱：真机二进制返回真（用户手势环境，图谱时钟已验证），
-   * 模拟器二进制返回假（无头起播，元素直出已验证）
-   */
-  private static resolveGraphAllowed(): Promise<boolean> {
-    if (!AudioElementPlayer.graphAllowedPromise) {
-      AudioElementPlayer.graphAllowedPromise = import("@/plugins/MusicNotificationPlugin")
-        .then(({ MusicNotification }) => MusicNotification.runtimeInfo())
-        .then((info) => !info.simulator)
-        .catch(() => false);
-    }
-    return AudioElementPlayer.graphAllowedPromise;
-  }
-
   protected async doPlay(): Promise<void> {
     // 播放时重置 seek 状态，防止卡在 seeking 状态
     this.isInternalSeeking = false;
-    // iOS：真机二进制在播放时激活音频上下文并切换图谱拓扑获得稳定媒体时钟
-    if (isIos && !this.graphAttached && this.audioCtx && (await AudioElementPlayer.resolveGraphAllowed())) {
-      try {
-        await this.audioCtx.resume();
-      } catch {
-        // 激活失败保持元素直出
-      }
-      if (this.audioCtx.state === "running") {
-        this.attachGraphSource();
-      }
-    }
     return this.audioElement.play();
-  }
-
-  /**
-   * 应用音量或渐变
-   * iOS 未挂接图谱（直出模式）时直接控制元素音量，淡入淡出退化为直接赋值
-   * @param targetValue 目标音量 (0.0 - 1.0)
-   * @param duration 渐变时长（秒）
-   */
-  protected override applyFadeTo(targetValue: number, duration: number): void {
-    if (isIos && !this.graphAttached) {
-      this.audioElement.volume = Math.max(0, Math.min(1, targetValue));
-      return;
-    }
-    super.applyFadeTo(targetValue, duration);
   }
 
   /**
@@ -257,12 +202,6 @@ export class AudioElementPlayer extends BaseAudioPlayer {
    * 将 HTMLAudioElement 的事件转换为 BaseAudioPlayer 的统一事件格式
    */
   private bindInternalEvents() {
-    this.audioElement.addEventListener("error", () => {
-      const mediaErr = this.audioElement.error;
-      diagLog(
-        `audio元素错误 code=${mediaErr?.code} message=${mediaErr?.message ?? ""} networkState=${this.audioElement.networkState} readyState=${this.audioElement.readyState}`,
-      );
-    });
     const events: AudioEventType[] = Object.values(AUDIO_EVENTS);
 
     events.forEach((eventType) => {
