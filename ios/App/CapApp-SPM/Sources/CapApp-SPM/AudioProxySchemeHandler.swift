@@ -274,6 +274,7 @@ public final class AudioProxySchemeHandler: NSObject, WKURLSchemeHandler {
             tempUrl: tempUrl,
             tempHandle: tempHandle
         )
+        context.elementRangeHeader = rangeHeader
 
         let dataTask = urlSession.dataTask(with: upstreamRequest)
         context.dataTask = dataTask
@@ -295,6 +296,13 @@ private final class SchemeTaskContext {
     var dataTask: URLSessionDataTask?
     var expectedContentLength: Int64 = -1
     var totalBytesWritten: Int64 = 0
+    // 元素侧窗口语义（WebKit 要求 Range 请求必须回 206+Content-Range，否则时钟冻结）
+    var elementRangeHeader: String?
+    var elementWindowStart: Int64 = 0
+    var elementWindowEnd: Int64 = -1
+    var elementServed: Int64 = 0
+    var elementResponded = false
+    var elementFinished = false
 
     init(taskId: ObjectIdentifier, schemeTask: WKURLSchemeTask, cacheKey: String, tempUrl: URL?, tempHandle: FileHandle?) {
         self.taskId = taskId
@@ -343,7 +351,54 @@ extension AudioProxySchemeHandler: URLSessionDataDelegate {
             headers["Content-Type"] = "audio/mpeg"
         }
 
-        if let schemeTask = context.schemeTask, let requestUrl = schemeTask.request.url {
+        // 元素侧窗口语义：上游总长确定后，按元素的 Range 头构造 206+Content-Range 响应。
+        // WebKit 媒体栈收到 200 全量会判定资源不可 seek，元素时钟冻结且不报错
+        var total = httpResponse.expectedContentLength
+        if total <= 0, let contentRange = headers["Content-Range"] as? String,
+           contentRange.hasPrefix("bytes "), let slashIdx = contentRange.lastIndex(of: "/"),
+           let parsed = Int64(contentRange[contentRange.index(after: slashIdx)...]) {
+            total = parsed
+        }
+
+        if let elementRange = context.elementRangeHeader, elementRange.hasPrefix("bytes="), total > 0 {
+            let resolution = AudioRangeParser.resolve(rangeHeader: elementRange, totalSize: total)
+            if resolution.isUnsatisfiable {
+                var unsatHeaders = corsHeaders
+                unsatHeaders["Content-Range"] = "bytes */\(total)"
+                unsatHeaders["Accept-Ranges"] = "bytes"
+                if let schemeTask = context.schemeTask, let requestUrl = schemeTask.request.url,
+                   let response = HTTPURLResponse(url: requestUrl, statusCode: 416, httpVersion: "HTTP/1.1", headerFields: unsatHeaders) {
+                    context.elementResponded = true
+                    context.elementFinished = true
+                    DispatchQueue.main.async {
+                        guard !schemeTask.isStopped else { return }
+                        schemeTask.isStopped = true
+                        schemeTask.didReceive(response)
+                        schemeTask.didFinish()
+                    }
+                }
+                completionHandler(.cancel)
+                return
+            }
+            context.elementWindowStart = resolution.startOffset
+            context.elementWindowEnd = resolution.endOffset
+            let windowLength = max(0, resolution.endOffset - resolution.startOffset + 1)
+            var elementHeaders = corsHeaders
+            elementHeaders["Content-Type"] = (headers["Content-Type"] as? String) ?? "audio/mpeg"
+            elementHeaders["Accept-Ranges"] = "bytes"
+            elementHeaders["Content-Length"] = "\(windowLength)"
+            elementHeaders["Content-Range"] = "bytes \(resolution.startOffset)-\(resolution.endOffset)/\(total)"
+            elementHeaders["X-Cache"] = "MISS"
+            if let schemeTask = context.schemeTask, let requestUrl = schemeTask.request.url,
+               let response = HTTPURLResponse(url: requestUrl, statusCode: 206, httpVersion: "HTTP/1.1", headerFields: elementHeaders) {
+                context.elementResponded = true
+                DispatchQueue.main.async {
+                    guard !schemeTask.isStopped else { return }
+                    schemeTask.didReceive(response)
+                }
+            }
+        } else if let schemeTask = context.schemeTask, let requestUrl = schemeTask.request.url {
+            context.elementResponded = true
             let proxyResponse = HTTPURLResponse(
                 url: requestUrl,
                 statusCode: httpResponse.statusCode,
@@ -367,7 +422,34 @@ extension AudioProxySchemeHandler: URLSessionDataDelegate {
 
         guard let context = matchingContext else { return }
 
-        if let schemeTask = context.schemeTask {
+        // 元素窗口切片：仅供给 [start, end] 区间字节，窗口满即结束元素任务；
+        // 缓存写盘继续完整下载，不受窗口影响
+        if context.elementResponded, context.elementWindowEnd >= 0, !context.elementFinished,
+           let schemeTask = context.schemeTask {
+            let windowLength = context.elementWindowEnd - context.elementWindowStart + 1
+            let remaining = windowLength - context.elementServed
+            if remaining <= 0 {
+                // 窗口已满但上游仍在传输（缓存下载中）：不再向元素供给
+            } else if data.count <= remaining {
+                context.elementServed += Int64(data.count)
+                DispatchQueue.main.async {
+                    guard !schemeTask.isStopped else { return }
+                    schemeTask.didReceive(data)
+                }
+            } else {
+                let sliced = data.prefix(Int(remaining))
+                context.elementServed += remaining
+                context.elementFinished = true
+                DispatchQueue.main.async {
+                    guard !schemeTask.isStopped else { return }
+                    schemeTask.didReceive(Data(sliced))
+                    schemeTask.isStopped = true
+                    schemeTask.didFinish()
+                }
+                context.schemeTask = nil
+            }
+        } else if context.elementResponded, context.elementWindowEnd < 0,
+                  let schemeTask = context.schemeTask {
             DispatchQueue.main.async {
                 guard !schemeTask.isStopped else { return }
                 schemeTask.didReceive(data)
@@ -420,7 +502,7 @@ extension AudioProxySchemeHandler: URLSessionDataDelegate {
             }
         }
 
-        if let schemeTask = context.schemeTask {
+        if !context.elementFinished, let schemeTask = context.schemeTask {
             DispatchQueue.main.async {
                 guard !schemeTask.isStopped else { return }
                 schemeTask.isStopped = true
@@ -430,6 +512,7 @@ extension AudioProxySchemeHandler: URLSessionDataDelegate {
                     schemeTask.didFinish()
                 }
             }
+            context.schemeTask = nil
         }
     }
 }

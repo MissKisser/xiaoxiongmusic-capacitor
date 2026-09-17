@@ -1,3 +1,4 @@
+import { isIos } from "@/utils/env";
 import { diagLog } from "@/utils/diag";
 import {
   AUDIO_EVENTS,
@@ -49,6 +50,9 @@ export class AudioElementPlayer extends BaseAudioPlayer {
    * 创建 MediaElementAudioSourceNode 并连接到输入节点
    */
   protected onGraphInitialized(): void {
+    // iOS 走元素直出（配合代理 206 窗口语义），图谱模式下 WebKit 退后台
+    // 会挂起 AudioContext 导致播放冻结；直出的媒体管线原生支持后台
+    if (isIos) return;
     if (!this.audioCtx || !this.inputNode) return;
 
     try {
@@ -60,6 +64,20 @@ export class AudioElementPlayer extends BaseAudioPlayer {
       diagLog(`图谱挂接失败 error=${error}`);
       console.error("[AudioElementPlayer] SourceNode 创建失败", error);
     }
+  }
+
+  /**
+   * 应用音量或渐变
+   * iOS 直出模式下 Web Audio 增益链不生效，直接控制元素音量，淡入淡出退化为直接赋值
+   * @param targetValue 目标音量 (0.0 - 1.0)
+   * @param duration 渐变时长（秒）
+   */
+  protected override applyFadeTo(targetValue: number, duration: number): void {
+    if (isIos) {
+      this.audioElement.volume = Math.max(0, Math.min(1, targetValue));
+      return;
+    }
+    super.applyFadeTo(targetValue, duration);
   }
 
   /**
