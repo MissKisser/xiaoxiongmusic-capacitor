@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import axios from 'axios';
+import api from '@/utils/api';
 import packageJson from '@/../package.json';
 import { isCapacitor, isIos } from '@/utils/env';
 
@@ -68,7 +68,7 @@ export const useVersionStore = defineStore('version', {
             this.isChecking = true;
             this.errorMessage = null;
             try {
-                const response = await axios.get('/api/version/check', {
+                const response = await api.get('/version/check', {
                     params: {
                         platform: 'android',
                         version: this.currentVersion,
