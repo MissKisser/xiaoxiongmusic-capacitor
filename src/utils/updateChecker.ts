@@ -14,6 +14,7 @@ export interface VersionInfo {
     version: string;
     buildNumber: number;
     apkUrl: string;
+    downloadUrl?: string;
     description: string;
     isForce: boolean;
 }
@@ -93,7 +94,8 @@ export async function checkForUpdates(): Promise<CheckResult> {
                 versionInfo: {
                     version: data.version,
                     buildNumber: data.buildNumber,
-                    apkUrl: data.apkUrl,
+                    apkUrl: data.apkUrl || data.downloadUrl || '',
+                    downloadUrl: data.downloadUrl || data.apkUrl || '',
                     description: data.description || '',
                     isForce: !!data.isForce
                 }

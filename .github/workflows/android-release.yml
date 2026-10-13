@@ -115,7 +115,15 @@ jobs:
             -d "{\"username\":\"${{ secrets.SERVER_API_USERNAME }}\",\"password\":\"${{ secrets.SERVER_API_PASSWORD }}\"}" \
             | python3 -c "import json,sys;print(json.load(sys.stdin)['data']['token'])")
           test -n "$TOKEN" || { echo "::error::登录失败"; exit 1; }
-          APK_URL="https://slink.viaxv.top/music/"
+          APK_PATH="release_out/xiaoxiongmusic-release-${{ inputs.version }}.apk"
+          UPLOAD_RESP=$(curl -s --max-time 120 -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -F "file=@$APK_PATH" \
+            -F "version=${{ inputs.version }}" \
+            https://music.viaxv.top/api/admin/versions/upload)
+          echo "Upload response: $UPLOAD_RESP"
+          APK_URL=$(echo "$UPLOAD_RESP" | jq -r '.data.url // empty')
+          test -n "$APK_URL" || { echo "::error::上传 APK 失败，未获取到下载直链: $UPLOAD_RESP"; exit 1; }
           DESC=$(printf '## v%s\n\n- 详细变更见 [GitHub Release](https://github.com/%s/releases/tag/v%s)' "${{ inputs.version }}" "${{ github.repository }}" "${{ inputs.version }}")
           jq -n --arg v "${{ inputs.version }}" \
                 --argjson bn "${{ github.run_number }}" \

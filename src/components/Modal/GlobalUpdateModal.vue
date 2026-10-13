@@ -1,8 +1,8 @@
 <template>
   <n-modal
     v-model:show="showModal"
-    :mask-closable="!versionStore.versionInfo?.isForce"
-    :close-on-esc="!versionStore.versionInfo?.isForce"
+    :mask-closable="!versionStore.versionInfo?.isForce && !versionStore.isDownloading"
+    :close-on-esc="!versionStore.versionInfo?.isForce && !versionStore.isDownloading"
     :closable="false"
     :show-icon="false"
     preset="card"
@@ -47,6 +47,16 @@
         style="margin-bottom: 16px;"
       />
 
+      <!-- 安装权限提示 -->
+      <div
+        v-if="versionStore.isDownloading || versionStore.downloadStatus === 'completed'"
+        class="install-tip"
+      >
+        <n-text :depth="3">
+          首次安装若系统弹出提示，请开启“允许安装未知应用”
+        </n-text>
+      </div>
+
       <!-- 错误提示 -->
       <n-alert
         v-if="versionStore.errorMessage"
@@ -59,6 +69,15 @@
 
       <!-- 操作按钮 -->
       <n-flex justify="end" :size="12">
+        <!-- 降级通道：原生下载失败或报错时展示 -->
+        <n-button
+          v-if="versionStore.downloadStatus === 'error' || versionStore.errorMessage"
+          quaternary
+          type="info"
+          @click="handleBrowserDownload"
+        >
+          浏览器下载
+        </n-button>
         <n-button
           v-if="!versionStore.versionInfo?.isForce"
           secondary
@@ -70,9 +89,10 @@
         <n-button
           type="primary"
           :loading="versionStore.isDownloading"
+          :disabled="versionStore.isDownloading"
           @click="handleUpdate"
         >
-          {{ versionStore.isDownloading ? `下载中 ${versionStore.downloadProgress}%` : '立即更新' }}
+          {{ buttonText }}
         </n-button>
       </n-flex>
     </div>
@@ -94,16 +114,36 @@ const renderedDescription = computed(() => {
   return marked.parse(versionStore.versionInfo.description);
 });
 
-// 监听更新状态
-watch(() => versionStore.hasUpdate, (hasUpdate) => {
-  if (hasUpdate && versionStore.versionInfo) {
-    showModal.value = true;
+// 操作按钮文案
+const buttonText = computed(() => {
+  if (versionStore.isDownloading) {
+    return `下载中 ${versionStore.downloadProgress}%`;
   }
-}, { immediate: true });
+  if (versionStore.downloadStatus === 'completed') {
+    return '安装更新';
+  }
+  return '立即更新';
+});
 
-// 开始更新
+// 监听更新状态
+watch(
+  () => versionStore.hasUpdate,
+  (hasUpdate) => {
+    if (hasUpdate && versionStore.versionInfo) {
+      showModal.value = true;
+    }
+  },
+  { immediate: true }
+);
+
+// 开始更新或重新拉起安装
 const handleUpdate = async () => {
   await versionStore.downloadUpdate();
+};
+
+// 降级使用浏览器下载
+const handleBrowserDownload = () => {
+  versionStore.downloadViaBrowser();
 };
 
 // 跳过更新
@@ -135,6 +175,12 @@ const handleSkip = () => {
       color: var(--n-text-color-3);
       padding: 20px 0;
     }
+  }
+
+  .install-tip {
+    font-size: 12px;
+    margin-bottom: 14px;
+    text-align: center;
   }
 
   :deep(.markdown-body) {

@@ -1,6 +1,6 @@
 {
     "name": "splayer-mobile",
-    "version": "4.8.6",
+    "version": "4.9.1",
     "description": "SPlayer Mobile - 前端独立版本",
     "type": "module",
     "scripts": {
@@ -25,6 +25,7 @@
         "@capacitor/app": "^8.0.0",
         "@capacitor/cli": "^8.0.2",
         "@capacitor/core": "^8.0.2",
+        "@capacitor/file-transfer": "^2.0.6",
         "@capacitor/filesystem": "^8.1.0",
         "@capacitor/ios": "^8.5.1",
         "@capacitor/local-notifications": "^8.0.0",
@@ -80,6 +81,7 @@
         "@types/lodash-es": "^4.17.12",
         "@types/md5": "^2.3.6",
         "@types/node": "^24.10.1",
+        "@types/sortablejs": "^1.15.9",
         "@vitejs/plugin-vue": "^6.0.2",
         "change-case": "^5.4.4",
         "fastify": "^5.6.2",

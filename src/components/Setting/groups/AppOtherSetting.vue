@@ -111,6 +111,14 @@
         </div>
         <n-text class="arrow" depth="3">›</n-text>
       </n-card>
+      <n-card class="set-item" @click="handleCheckUpdate">
+        <div class="label">
+          <n-text class="name">检查更新</n-text>
+          <n-text class="tip" :depth="3"> 当前版本 v{{ versionStore.currentVersion }} </n-text>
+        </div>
+        <n-spin v-if="isCheckingUpdate || versionStore.isChecking" size="small" />
+        <n-text v-else class="arrow" depth="3">›</n-text>
+      </n-card>
       <!-- 自定义代码注入（Electron 专属，Capacitor 端不显示）
       <n-card class="set-item" @click="openCustomCode()">
         <div class="label">
@@ -125,7 +133,7 @@
 </template>
 
 <script setup lang="ts">
-import { useSettingStore } from "@/stores";
+import { useSettingStore, useVersionStore } from "@/stores";
 import { isCapacitor } from "@/utils/env";
 import { registerPlugin } from "@capacitor/core";
 import {
@@ -136,8 +144,29 @@ import {
 } from "@/utils/modal";
 
 const settingStore = useSettingStore();
+const versionStore = useVersionStore();
 const cacheSize = ref("0");
 const cacheCount = ref(0);
+const isCheckingUpdate = ref(false);
+
+/**
+ * 手动检查应用版本更新
+ */
+const handleCheckUpdate = async () => {
+  if (isCheckingUpdate.value || versionStore.isChecking) return;
+  isCheckingUpdate.value = true;
+  try {
+    const { performVersionCheck } = await import("@/utils/updateChecker");
+    const hasUpdate = await performVersionCheck();
+    if (!hasUpdate) {
+      window.$message.info("已是最新版本");
+    }
+  } catch (error) {
+    window.$message.error("检查更新失败，请稍后重试");
+  } finally {
+    isCheckingUpdate.value = false;
+  }
+};
 
 // === 性能设置 ===
 const handleBlurToggle = (enabled: boolean) => {
