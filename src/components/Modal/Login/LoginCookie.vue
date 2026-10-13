@@ -6,7 +6,7 @@
       </template>
       可在官方的
       <n-a href="https://music.163.com/" target="_blank">网页端</n-a>
-      或点击下方的自动获取，只需要 Cookie 中的 <code>MUSIC_U</code> 字段即可，例如：
+      <template v-if="isElectron">或点击下方的自动获取</template>，只需要 Cookie 中的 <code>MUSIC_U</code> 字段即可，例如：
       <code>MUSIC_U=00C7...;</code><br />请注意：必须以 <code>;</code> 结束
     </n-alert>
     <n-input

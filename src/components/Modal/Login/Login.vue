@@ -1,12 +1,18 @@
 <template>
   <div class="login">
     <img src="/images/logo.png?asset" alt="logo" class="logo" style="border-radius: 50%;" />
-    <!-- 登录方式：仅扫码登录 -->
+    <!-- 登录方式 -->
     <n-tabs class="login-tabs" default-value="login-qr" type="segment" animated>
       <n-tab-pane name="login-qr" tab="扫码登录">
         <LoginQRCode :pause="qrPause" @saveLogin="saveLogin" />
       </n-tab-pane>
     </n-tabs>
+    <!-- 其他方式 -->
+    <n-flex align="center" class="other">
+      <n-button :focusable="false" size="small" quaternary round @click="cookieLogin">
+        Cookie 登录
+      </n-button>
+    </n-flex>
     <!-- 关闭登录 -->
     <n-button :focusable="false" class="close" strong secondary round @click="emit('close')">
       <template #icon>
@@ -22,6 +28,7 @@ import { setCookies } from "@/utils/cookie";
 import { updateUserData } from "@/utils/auth";
 import { useDataStore } from "@/stores";
 import { LoginType } from "@/types/main";
+import LoginCookie from "./LoginCookie.vue";
 
 const emit = defineEmits<{
   close: [];
@@ -81,6 +88,27 @@ onBeforeMount(() => {
     emit("close");
   }
 });
+
+// Cookie 登录
+const cookieLogin = () => {
+  qrPause.value = true;
+  const loginModal = window.$modal.create({
+    title: "Cookie 登录",
+    preset: "card",
+    transformOrigin: "center",
+    style: { width: "400px" },
+    content: () => {
+      return h(LoginCookie, {
+        onClose: () => loginModal.destroy(),
+        onSaveLogin: saveLogin,
+      });
+    },
+    onClose: () => {
+      qrPause.value = false;
+      loginModal.destroy();
+    },
+  });
+};
 </script>
 
 <style lang="scss" scoped>
@@ -94,6 +122,12 @@ onBeforeMount(() => {
     width: 60px;
     height: 60px;
     margin: 20px auto 30px auto;
+  }
+  .other {
+    margin: 20px 0;
+    .n-button {
+      width: 140px;
+    }
   }
   .close {
     margin-bottom: 8px;
