@@ -45,7 +45,7 @@ export const useVersionStore = defineStore('version', {
         downloadedFilePath: null,
         versionInfo: null,
         errorMessage: null,
-        currentVersion: packageJson.version || '4.9.1',
+        currentVersion: packageJson.version || '4.9.2',
     }),
 
     actions: {

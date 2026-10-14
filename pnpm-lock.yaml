@@ -205,7 +205,7 @@ importers:
         specifier: ^5.6.2
         version: 5.7.2
       naive-ui:
-        specifier: ^2.43.2
+        specifier: 2.45.3
         version: 2.45.3(vue@3.5.27(typescript@5.9.3))
       pnpm:
         specifier: ^10.28.2
@@ -2197,8 +2197,8 @@ packages:
     resolution: {integrity: sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==}
     hasBin: true
 
-  highlight.js@11.11.1:
-    resolution: {integrity: sha512-Xwwo44whKBVCYoliBQwaPvtd/2tYFkRQtXDWj1nackaV2JPXx3L0+Jvd8/qCJ2p+ML0/XVkJ2q+Mr+UVdpJK5w==}
+  highlight.js@11.12.0:
+    resolution: {integrity: sha512-nbfWpyRMcMrPMmDwJB+dhX/eiaPKtc2RB+0QZskqJ3WjRA/FDS0e9hZrx8EC/lbEv8gXy98FcDbNa/dspAaJMg==}
     engines: {node: '>=12.0.0'}
 
   hookable@5.5.3:
@@ -5353,7 +5353,7 @@ snapshots:
 
   he@1.2.0: {}
 
-  highlight.js@11.11.1: {}
+  highlight.js@11.12.0: {}
 
   hookable@5.5.3: {}
 
@@ -5753,7 +5753,7 @@ snapshots:
       date-fns: 4.1.0
       date-fns-tz: 3.2.0(date-fns@4.1.0)
       evtd: 0.2.4
-      highlight.js: 11.11.1
+      highlight.js: 11.12.0
       lodash: 4.17.23
       lodash-es: 4.17.23
       seemly: 0.3.10

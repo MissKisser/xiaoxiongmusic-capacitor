@@ -111,7 +111,7 @@ onMounted(getTopPlaylistData);
     height: 140px;
     border-radius: 12px;
     cursor: pointer;
-    :deep(.n-card__content) {
+    :deep(.n-card-content) {
       display: flex;
       height: 100%;
       padding: 12px;

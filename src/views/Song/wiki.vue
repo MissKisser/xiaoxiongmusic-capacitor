@@ -772,7 +772,7 @@ onBeforeRouteUpdate((to) => {
             padding: 12px 14px;
             font-size: 14px;
           }
-          .n-card__content {
+          .n-card-content {
             padding: 12px 14px;
           }
           .n-card-footer {

@@ -161,7 +161,7 @@ const resetBackground = () => {
   }
 
   .background-item {
-    :deep(.n-card__content) {
+    :deep(.n-card-content) {
       flex-direction: column;
       align-items: flex-start;
     }

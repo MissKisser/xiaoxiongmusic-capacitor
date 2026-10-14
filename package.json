@@ -1,6 +1,6 @@
 {
     "name": "splayer-mobile",
-    "version": "4.9.1",
+    "version": "4.9.2",
     "description": "SPlayer Mobile - 前端独立版本",
     "type": "module",
     "scripts": {
@@ -85,7 +85,7 @@
         "@vitejs/plugin-vue": "^6.0.2",
         "change-case": "^5.4.4",
         "fastify": "^5.6.2",
-        "naive-ui": "^2.43.2",
+        "naive-ui": "2.45.3",
         "pnpm": "^10.28.2",
         "rollup": "^4.57.0",
         "sass": "^1.94.2",

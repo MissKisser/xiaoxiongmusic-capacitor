@@ -130,7 +130,7 @@ onMounted(() => songManager.initPersonalFM());
   border-radius: 16px;
   overflow: hidden;
   cursor: pointer;
-  :deep(.n-card__content) {
+  :deep(.n-card-content) {
     display: flex;
     align-items: center;
     padding: 20px;
@@ -261,7 +261,7 @@ onMounted(() => songManager.initPersonalFM());
     // 首页大卡片比例缩放（跟随布局模式/自定义滑块），按钮保持可点击尺寸
     --s: var(--home-card-scale, 1);
     height: max(100px, calc(120px * var(--s)));
-    :deep(.n-card__content) {
+    :deep(.n-card-content) {
       padding: max(10px, calc(20px * var(--s)));
       // 标题与封面顶部对齐
       align-items: flex-start;

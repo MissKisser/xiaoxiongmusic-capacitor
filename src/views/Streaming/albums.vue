@@ -130,7 +130,7 @@ onMounted(async () => {
     height: max-content;
     border: 2px solid rgba(var(--primary), 0.12);
     cursor: pointer;
-    :deep(.n-card__content) {
+    :deep(.n-card-content) {
       display: flex;
       padding: 12px;
     }

@@ -210,7 +210,7 @@ const handleNavHeightChange = (value: number) => {
   // 滑块卡片：描述在上、滑块在下从左到右满宽（窄屏不被挤压，宽度恒定避免拖动跳转）
   .preview-card,
   .nav-card {
-    :deep(.n-card__content) {
+    :deep(.n-card-content) {
       flex-direction: column !important;
       align-items: stretch !important;
       gap: 12px;

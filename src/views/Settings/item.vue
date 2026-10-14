@@ -159,7 +159,7 @@ const itemTitle = computed(() => titles[item.value] || "设置");
       border-radius: 8px;
       margin-bottom: 12px;
 
-      .n-card__content {
+      .n-card-content {
         display: flex;
         flex-direction: row;
         align-items: center;

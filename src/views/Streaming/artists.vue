@@ -118,7 +118,7 @@ onMounted(async () => {
     border-radius: 8px;
     border: 2px solid rgba(var(--primary), 0.12);
     cursor: pointer;
-    :deep(.n-card__content) {
+    :deep(.n-card-content) {
       display: flex;
       flex-direction: column;
       padding: 12px 16px;

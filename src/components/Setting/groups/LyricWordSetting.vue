@@ -64,7 +64,7 @@ const settingStore = useSettingStore();
 <style lang="scss" scoped>
 // 歌词来源优先级：按钮较多，描述与按钮分行显示，避免挤压
 .priority-item {
-  :deep(.n-card__content) {
+  :deep(.n-card-content) {
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 10px !important;
