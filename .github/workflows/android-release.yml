@@ -53,19 +53,24 @@ jobs:
 
       - name: Restore signing key from secrets
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/splayer-release-key.jks
-          cat > android/keystore.properties <<EOF
+          mkdir -p android/app
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/splayer-release-key.jks
+          cat > android/app/keystore.properties <<EOF
           storeFile=splayer-release-key.jks
           storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
           keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
           EOF
-          test -s android/splayer-release-key.jks || { echo "::error::keystore 解码失败"; exit 1; }
+          cp android/app/splayer-release-key.jks android/splayer-release-key.jks
+          cp android/app/keystore.properties android/keystore.properties
+          test -s android/app/splayer-release-key.jks || { echo "::error::keystore 解码失败"; exit 1; }
 
       - name: Bump version
         run: |
           cd android/app
-          sed -i.bak 's/versionCode [0-9]*/versionCode ${{ github.run_number }}/' build.gradle
+          CURRENT_VC=$(grep -oE 'versionCode [0-9]+' build.gradle | awk '{print $2}')
+          TARGET_VC=$(( CURRENT_VC > 20 ? CURRENT_VC : 20 + ${{ github.run_number }} ))
+          sed -i.bak "s/versionCode [0-9]*/versionCode $TARGET_VC/" build.gradle
           sed -i.bak 's/versionName "[^"]*"/versionName "${{ inputs.version }}"/' build.gradle
           rm -f build.gradle.bak
           grep -E "versionCode|versionName" build.gradle
