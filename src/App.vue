@@ -9,6 +9,7 @@ import { useStatusStore, useAuthStore, useVersionStore, useSettingStore } from "
 import GlobalUpdateModal from "@/components/Modal/GlobalUpdateModal.vue";
 import GlobalAuthModal from "@/components/Modal/GlobalAuthModal.vue";
 import { WebViewCache } from "@/plugins/WebViewCache";
+import { importDebugCredentials } from "@/utils/platform/credentialImport";
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -146,6 +147,13 @@ onMounted(async () => {
   
   if (isCapacitor) {
     console.log("📱 Capacitor 环境检测成功，平台:", Capacitor.getPlatform());
+
+    // 调试期第三方音源平台会话导入（受编译期门禁约束，生产构建为空操作）
+    try {
+      await importDebugCredentials();
+    } catch {
+      // 失败静默降级，不阻断正常启动流程
+    }
 
     // 应用启动时同步 Cookie 到原生层（先同步，避免缓存清除影响）
     // 这确保了之前登录保存的 Cookie 能在新会话中使用

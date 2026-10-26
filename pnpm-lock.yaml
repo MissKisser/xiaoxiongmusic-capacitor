@@ -33,7 +33,7 @@ importers:
         specifier: ^2.0.6
         version: 2.0.6(@capacitor/core@8.0.2)
       '@capacitor/filesystem':
-        specifier: ^8.1.0
+        specifier: 8.1.0
         version: 8.1.0(@capacitor/core@8.0.2)
       '@capacitor/ios':
         specifier: ^8.5.1

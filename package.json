@@ -6,6 +6,7 @@
     "scripts": {
         "dev": "vite --host",
         "build": "vite build",
+        "build:debug": "vite build --mode debug",
         "build:check": "vue-tsc --noEmit && vite build",
         "preview": "vite preview --host",
         "cap:sync": "cap sync",
@@ -27,7 +28,7 @@
         "@capacitor/cli": "^8.0.2",
         "@capacitor/core": "^8.0.2",
         "@capacitor/file-transfer": "^2.0.6",
-        "@capacitor/filesystem": "^8.1.0",
+        "@capacitor/filesystem": "8.1.0",
         "@capacitor/ios": "^8.5.1",
         "@capacitor/local-notifications": "^8.0.0",
         "@capacitor/share": "^8.0.1",
