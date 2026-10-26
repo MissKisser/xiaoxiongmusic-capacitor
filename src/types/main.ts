@@ -1,10 +1,25 @@
 import { songLevelData } from "@/utils/meta";
+import type { ApiPlatform } from "@/types/shared";
 
 export type MetaData = {
   id: number;
   name: string;
   cover?: string;
   alias?: string[];
+  /**
+   * 平台内字符串主键
+   *
+   * QQ 音乐为 mid，酷狗为平台数字 id 的字符串形式；
+   * `id` 仍是平台数字 ID，两者并存构成平台条目的双 id 口径。
+   */
+  platformId?: string;
+  /**
+   * 来源平台
+   *
+   * 缺省为网易云；第三方平台的歌手条目会带上该字段，
+   * 歌手详情页据此选择对应的数据源。
+   */
+  platform?: ApiPlatform;
 };
 
 export type DjData = {
@@ -101,6 +116,14 @@ export type SongType = {
    * song: 歌曲 | radio: 电台 | streaming: 流媒体
    */
   type: "song" | "radio" | "streaming";
+  /**
+   * 内容形态标记
+   *
+   * 酷狗听书章节标记为 `audiobook`：它按酷狗普通歌曲形态参与播放，
+   * 界面据此把副标题显示为「听书」，并在取链时带上专辑号与章节号。
+   * 网易云播客走的是另一套 `type: "radio"` 语义，两者互不影响。
+   */
+  mediaKind?: "audiobook";
   /** 流媒体播放 URL */
   streamUrl?: string;
   /** 原始 ID（流媒体服务器的 ID） */
@@ -111,6 +134,18 @@ export type SongType = {
   serverId?: string;
   /** 来源标记 */
   source?: "streaming";
+  /**
+   * 来源平台
+   *
+   * 缺省为网易云，向后兼容既有数据。
+   */
+  platform?: ApiPlatform;
+  /**
+   * 平台内字符串主键
+   *
+   * QQ 音乐为 mid，酷狗为 hash；`id` 仍是平台数字 ID。
+   */
+  platformId?: string;
 };
 
 // Cover
@@ -140,6 +175,26 @@ export type CoverType = {
     first: string;
     second: string;
   }[];
+  /**
+   * 来源平台
+   *
+   * 缺省为网易云；第三方平台的歌单 / 专辑条目会带上该字段，
+   * 详情页据此选择对应的数据源。
+   */
+  platform?: ApiPlatform;
+  /**
+   * 平台内字符串主键
+   *
+   * QQ 音乐为 mid，酷狗为歌单号 / 专辑号；`id` 仍是平台数字 ID。
+   */
+  platformId?: string;
+  /**
+   * 收藏歌单的源歌单是否可读
+   *
+   * 酷狗收藏歌单的曲目在源歌单里；源歌单已删除或未公开时曲目为空，
+   * 该字段为 false，详情页据此给出明确说明而不是当成空歌单。
+   */
+  sourceReadable?: boolean;
 };
 
 /** 本地歌单类型 */
@@ -173,6 +228,19 @@ export type ArtistType = {
   musicSize?: number;
   mvSize?: number;
   fansSize?: number;
+  /**
+   * 来源平台
+   *
+   * 缺省为网易云；第三方平台的歌手条目会带上该字段，
+   * 详情页据此选择对应的数据源。
+   */
+  platform?: ApiPlatform;
+  /**
+   * 平台内字符串主键
+   *
+   * QQ 音乐为歌手 mid，酷狗为 author_id；`id` 仍是平台数字 ID。
+   */
+  platformId?: string;
 };
 
 // Comment
