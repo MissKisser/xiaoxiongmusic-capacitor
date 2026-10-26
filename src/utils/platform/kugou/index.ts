@@ -67,7 +67,14 @@ const NON_CACHEABLE: ReadonlySet<string> = new Set([
   "user_detail",
   "user_profile",
   "song_url",
+  "comment",
   "search",
+  "leaderboard_list",
+  "leaderboard_detail",
+  "hot_artists",
+  "songfm",
+  "home/album",
+  "home/theme",
   "playlist_detail",
   "user_playlist_list",
 ]);
@@ -82,6 +89,7 @@ const isEmptyResult = (value: unknown): boolean => {
   const v = value as Record<string, unknown>;
   if (Array.isArray(v.songs) && v.songs.length === 0) return true;
   if (Array.isArray(v.albums) && v.albums.length === 0) return true;
+  if (Array.isArray(v.chapters) && v.chapters.length === 0) return true;
   if (Array.isArray(v.artists) && v.artists.length === 0) return true;
   if (Array.isArray(v.playlists) && v.playlists.length === 0) return true;
   return false;

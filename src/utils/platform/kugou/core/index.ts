@@ -15,3 +15,5 @@ export * from "./request";
 export * from "./cloud";
 export * from "./song_title";
 export * from "./song_url";
+export * from "./krc";
+export * from "./audiobook";
