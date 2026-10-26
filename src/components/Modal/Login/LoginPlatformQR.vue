@@ -98,8 +98,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import type { ApiPlatform } from "@/types/shared";
 import { platformCall } from "@/api/platform/music";
 import { usePlatformStore } from "@/stores";
-import { Filesystem, Directory } from "@capacitor/filesystem";
-import { isCapacitor } from "@/utils/env";
+import { saveImageToGallery } from "@/utils/saveImageToGallery";
 import SvgIcon from "@/components/Global/SvgIcon.vue";
 
 const props = defineProps<{
@@ -278,65 +277,27 @@ const checkQrStatus = async () => {
 };
 
 /**
- * 保存二维码到系统相册（失败降级保存到文档目录）
+ * 保存二维码到系统相册
  */
 const saveQrToAlbum = async () => {
-  if (!qrContent.value) return;
+  if (!qrContent.value || isSaving.value) return;
   isSaving.value = true;
   try {
     let base64Data = "";
     if (isImageQr.value) {
-      const commaIdx = qrContent.value.indexOf(",");
-      base64Data = commaIdx >= 0 ? qrContent.value.slice(commaIdx + 1) : qrContent.value;
+      base64Data = qrContent.value;
     } else {
       const qrEl = document.querySelector(".platform-login .qr");
       const canvas = qrEl?.querySelector("canvas");
       if (canvas) {
-        const dataUrl = canvas.toDataURL("image/png");
-        const commaIdx = dataUrl.indexOf(",");
-        base64Data = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl;
+        base64Data = canvas.toDataURL("image/png");
       } else {
         throw new Error("无法读取二维码图像");
       }
     }
 
     const fileName = `xiaoxiong_qr_${props.platform}_${Date.now()}.png`;
-
-    if (isCapacitor) {
-      try {
-        // 先尝试写 Directory.Photos（部分平台支持），失败降级 Directory.Documents 并提示路径
-        const photosDir = (Directory as any).Photos;
-        if (!photosDir) {
-          throw new Error("Photos directory not supported");
-        }
-        await Filesystem.writeFile({
-          path: fileName,
-          data: base64Data,
-          directory: photosDir,
-        });
-        window.$message.success("二维码已保存到系统相册");
-      } catch (err) {
-        console.warn("保存到相册失败，降级保存到文档目录:", err);
-        try {
-          const res = await Filesystem.writeFile({
-            path: fileName,
-            data: base64Data,
-            directory: Directory.Documents,
-          });
-          const uri = res?.uri || fileName;
-          window.$message.info(`已保存到文档目录: ${uri}`);
-        } catch (fallbackErr) {
-          console.error("保存到文档目录失败:", fallbackErr);
-          window.$message.error("保存失败，请检查存储权限");
-        }
-      }
-    } else {
-      const a = document.createElement("a");
-      a.href = `data:image/png;base64,${base64Data}`;
-      a.download = fileName;
-      a.click();
-      window.$message.success("二维码已下载");
-    }
+    await saveImageToGallery({ base64: base64Data, fileName });
   } catch (error: any) {
     console.error("保存二维码出错:", error);
     window.$message.error(error?.message || "保存二维码失败");

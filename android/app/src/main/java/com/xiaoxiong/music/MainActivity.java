@@ -43,10 +43,12 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AudioCachePlugin.class);
         registerPlugin(WebViewCachePlugin.class);
         registerPlugin(DesktopLyricPlugin.class);
+        registerPlugin(MediaSavePlugin.class);
         Log.d("MainActivity", "✅ MusicNotificationPlugin registered");
         Log.d("MainActivity", "✅ AudioCachePlugin registered");
         Log.d("MainActivity", "✅ WebViewCachePlugin registered");
         Log.d("MainActivity", "✅ DesktopLyricPlugin registered");
+        Log.d("MainActivity", "✅ MediaSavePlugin registered");
 
         super.onCreate(savedInstanceState);
 
