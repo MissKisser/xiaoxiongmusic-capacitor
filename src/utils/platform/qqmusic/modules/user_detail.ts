@@ -91,12 +91,13 @@ export const user_detail: QMModule = async () => {
 
   const avatarUrl = creator?.headpic?.replace(/^http:\/\//, "https://");
   const vip = normalizeQQMusicVip(vipData);
+  const nickname = (creator?.nick ?? "").trim() || uin;
   return {
     code: 200,
     loggedIn: true,
     profile: {
       userId: uin,
-      nickname: creator?.nick || "",
+      nickname,
       avatarUrl: avatarUrl || "",
       isVip: vip.isVip,
       vipLevel: vip.vipLevel,

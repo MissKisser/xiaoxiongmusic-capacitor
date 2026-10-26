@@ -10,7 +10,6 @@ export const QM_API_URL = "https://u.y.qq.com/cgi-bin/musicu.fcg";
 /** 模拟移动端的默认请求头 */
 export const QM_HEADERS: Record<string, string> = {
   "Content-Type": "application/json",
-  "Accept-Encoding": "gzip",
   "User-Agent": "QQMusic 14090008(android 15)",
   Referer: "https://y.qq.com",
 };

@@ -83,7 +83,7 @@ export const getKugouLoginVersion = (): "standard" | "concept" => {
   } catch {
     // 忽略异常
   }
-  return "concept";
+  return "standard";
 };
 
 /**

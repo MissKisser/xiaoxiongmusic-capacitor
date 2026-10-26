@@ -200,6 +200,13 @@ export const executeCredentialImport = async (
 
     if (hasKugou && payload.kugou) {
       saveSessionCookies("kugou", payload.kugou);
+      if (payload.kugou.login_version && typeof localStorage !== "undefined") {
+        try {
+          localStorage.setItem("system.kugouLoginVersion", payload.kugou.login_version);
+        } catch {
+          // 忽略存储异常
+        }
+      }
       console.log(
         `[CredentialImport] 平台 kugou 导入成功，包含键: ${Object.keys(payload.kugou).sort().join(", ")}`,
       );

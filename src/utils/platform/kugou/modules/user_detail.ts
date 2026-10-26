@@ -61,6 +61,19 @@ export const user_detail: KGModule = async () => {
     });
   } catch (err) {
     if (isKugouAuthExpired(err)) {
+      if (session.nickname || session.avatar || session.token) {
+        return {
+          code: 200,
+          loggedIn: true,
+          profile: {
+            userId: session.userid,
+            nickname: session.nickname || `KG ${session.userid}`,
+            avatarUrl: (session.avatar || "").replace(/^http:\/\//, "https://"),
+            isVip: Number(session.vip_type || 0) > 0,
+            vipLevel: Number(session.vip_type || 0),
+          },
+        };
+      }
       clearLoginSession(session);
       return { code: 401, loggedIn: false, message: "酷狗音乐登录已过期，请重新登录" };
     }
