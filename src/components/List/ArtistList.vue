@@ -9,7 +9,12 @@
           @click="
             router.push({
               name: 'artist',
-              query: { id: item.id },
+              query: {
+                id: item.platformId ?? item.id,
+                ...(item.platform && item.platform !== 'netease'
+                  ? { platform: item.platform }
+                  : {}),
+              },
             })
           "
         >

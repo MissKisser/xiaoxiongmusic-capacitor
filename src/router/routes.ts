@@ -200,6 +200,12 @@ const appRoutes: Array<RouteRecordRaw> = [
     meta: { needLogin: true },
     component: () => import("@/views/DailySongs.vue"),
   },
+  // 平台每日推荐（QQ 音乐 / 酷狗音乐）
+  {
+    path: "/platform-daily-songs",
+    name: "platform-daily-songs",
+    component: () => import("@/views/PlatformDailySongs.vue"),
+  },
   // 收藏
   {
     path: "/like",

@@ -1,13 +1,14 @@
+<!-- 收藏主页容器（支持网易云与第三方音源平台） -->
 <template>
   <div class="like">
     <div class="title">
       <n-text class="keyword">我的收藏</n-text>
-      <n-flex v-if="dataStore.loginType !== 'uid'" class="status">
+      <n-flex v-if="showStatus" class="status">
         <div
           v-for="(item, index) in likeData"
           :key="index"
           class="item"
-          @click="router.push({ name: item.name })"
+          @click="router.push({ name: item.name, query: item.query })"
         >
           <SvgIcon :name="item.icon" :depth="3" />
           <n-number-animation :from="0" :to="item.length" />
@@ -16,18 +17,16 @@
     </div>
     <!-- 标签页 -->
     <n-tabs
-      v-if="dataStore.loginType !== 'uid'"
+      v-if="showStatus"
       v-model:value="likeType"
       :type="isSmall ? 'line' : 'segment'"
       class="tabs"
       justify-content="space-evenly"
       @update:value="(name: string) => router.push({ name })"
     >
-      <n-tab name="like-playlists"> 歌单 </n-tab>
-      <n-tab name="like-albums"> 专辑 </n-tab>
-      <n-tab name="like-artists"> 歌手 </n-tab>
-      <n-tab name="like-videos"> 视频 </n-tab>
-      <n-tab name="like-radios"> 播客 </n-tab>
+      <n-tab v-for="tab in visibleTabs" :key="tab.name" :name="tab.name">
+        {{ tab.label }}
+      </n-tab>
     </n-tabs>
     <!-- 路由 -->
     <RouterView v-slot="{ Component }">
@@ -42,45 +41,52 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed, watch, onUnmounted } from "vue";
+import { useRouter } from "vue-router";
 import { useMobile } from "@/composables/useMobile";
-import { useDataStore, useSettingStore } from "@/stores";
+import { useLikeStats } from "@/composables/useLikeStats";
+import { onPlatformChange, useDataStore, usePlatformStore, useSettingStore } from "@/stores";
+import { LIKE_TABS } from "@/api/platform/capability";
+import SvgIcon from "@/components/Global/SvgIcon.vue";
 
 const router = useRouter();
 const dataStore = useDataStore();
+const platformStore = usePlatformStore();
 const settingStore = useSettingStore();
 
 const { isSmall } = useMobile();
 
+/** 收藏页统计条目 */
+interface LikeDataItem {
+  icon: string;
+  name: string;
+  length: number;
+  query?: Record<string, string>;
+}
+
 const likeType = ref<string>((router.currentRoute.value?.name as string) || "like-playlists");
 
+// 是否为第三方平台（QQ 音乐 / 酷狗）
+const isPlatformSource = computed<boolean>(() => platformStore.currentPlatform !== "netease");
+
+// 是否展示收藏统计与子页（第三方平台的收藏不受网易云登录方式影响）
+const showStatus = computed<boolean>(() => isPlatformSource.value || dataStore.loginType !== "uid");
+
+// 当前平台可见的子页（平台不支持的子页隐藏）
+const visibleTabs = computed(() => LIKE_TABS[platformStore.currentPlatform] ?? []);
+
+// 收藏统计条目
+const likeStats = useLikeStats();
+
 // 喜欢数据
-const likeData = computed(() => [
-  {
-    icon: "MusicList",
-    name: "like-playlists",
-    length: dataStore.userLikeData.playlists?.length || 0,
-  },
-  {
-    icon: "Album",
-    name: "like-albums",
-    length: dataStore.userLikeData.albums?.length || 0,
-  },
-  {
-    icon: "Artist",
-    name: "like-artists",
-    length: dataStore.userLikeData.artists?.length || 0,
-  },
-  {
-    icon: "Video",
-    name: "like-videos",
-    length: dataStore.userLikeData.mvs?.length || 0,
-  },
-  {
-    icon: "Record",
-    name: "like-radios",
-    length: dataStore.userLikeData.djs?.length || 0,
-  },
-]);
+const likeData = computed<LikeDataItem[]>(() =>
+  likeStats.value.map((item) => ({
+    icon: item.icon,
+    name: item.name,
+    length: item.length,
+    query: item.query,
+  })),
+);
 
 // 监听路由变化
 watch(
@@ -91,6 +97,20 @@ watch(
     }
   },
 );
+
+// 平台切换：当前所在子页在目标平台不可见时回到首个可见子页
+const stopPlatformWatch = onPlatformChange(() => {
+  const name = router.currentRoute.value.name?.toString() ?? "";
+  if (!name) return;
+  if (visibleTabs.value.some((tab) => tab.name === name)) return;
+  const fallback = visibleTabs.value[0];
+  if (!fallback) return;
+  router.push({ name: fallback.name });
+});
+
+onUnmounted(() => {
+  stopPlatformWatch();
+});
 </script>
 
 <style lang="scss" scoped>
@@ -125,7 +145,6 @@ watch(
       }
     }
   }
-  // 512px
   @media (max-width: 512px) {
     .status {
       display: none !important;

@@ -1,5 +1,6 @@
 import { h } from "vue";
 import type { CoverType, UpdateInfoType, SettingType, SongType } from "@/types/main";
+import type { ApiPlatform } from "@/types/shared";
 import { CURRENT_AGREEMENT_VERSION } from "@/constants/agreement";
 import { NScrollbar } from "naive-ui";
 import { isLogin } from "./auth";
@@ -7,6 +8,7 @@ import { isArray, isFunction } from "lodash-es";
 import { useDataStore, useSettingStore } from "@/stores";
 import router from "@/router";
 import Login from "@/components/Modal/Login/Login.vue";
+import LoginPlatformQR from "@/components/Modal/Login/LoginPlatformQR.vue";
 import JumpArtist from "@/components/Modal/JumpArtist.vue";
 import UserAgreement from "@/components/Modal/UserAgreement.vue";
 import SongInfoEditor from "@/components/Modal/SongInfoEditor.vue";
@@ -86,6 +88,28 @@ export const openUserLogin = (showTip: boolean = false) => {
     zIndex: 3000,
     content: () => {
       return h(Login, { onClose: () => modal.destroy() });
+    },
+  });
+};
+
+/**
+ * 第三方平台扫码登录弹窗
+ * @param platform 音源平台
+ */
+export const openPlatformLogin = (platform: ApiPlatform) => {
+  const modal = window.$modal.create({
+    preset: "card",
+    transformOrigin: "center",
+    autoFocus: false,
+    maskClosable: true,
+    style: {
+      width: "380px",
+      maxWidth: "calc(100vw - 32px)",
+    },
+    zIndex: 3000,
+    title: platform === "qqmusic" ? "QQ 音乐登录" : "酷狗音乐登录",
+    content: () => {
+      return h(LoginPlatformQR, { platform, onClose: () => modal.destroy() });
     },
   });
 };
@@ -196,17 +220,26 @@ export const openCreatePlaylist = (isLocal: boolean = false) => {
 };
 
 // 编辑歌单
-export const openUpdatePlaylist = (id: number, data: CoverType, func: () => Promise<void>) => {
+export const openUpdatePlaylist = (
+  id: number | string,
+  data: CoverType,
+  func: () => Promise<void> | void,
+  platform?: ApiPlatform,
+) => {
   const modal = window.$modal.create({
     preset: "card",
     transformOrigin: "center",
     autoFocus: false,
-    style: { width: "600px" },
+    style: {
+      width: "600px",
+      maxWidth: "calc(100vw - 32px)",
+    },
     title: "编辑歌单",
     content: () => {
       return h(UpdatePlaylist, {
         id,
         data,
+        platform,
         onSuccess: () => {
           modal.destroy();
           // 触发回调

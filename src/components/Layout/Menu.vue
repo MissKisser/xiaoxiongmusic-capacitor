@@ -24,14 +24,20 @@ import {
   useDataStore,
   useLocalStore,
   useMusicStore,
+  usePlatformStore,
   useSettingStore,
   useStatusStore,
+  onPlatformChange,
+  onAccountChange,
 } from "@/stores";
 import type { CoverType } from "@/types/main";
+import type { DispatchPlaylist } from "@/api/platform/dispatch";
+import type { ApiPlatform } from "@/types/shared";
 import { isLogin } from "@/utils/auth";
 import { isElectron } from "@/utils/env";
 import { renderIcon } from "@/utils/helper";
 import { openCreatePlaylist } from "@/utils/modal";
+import { useSongFM } from "@/composables/useSongFM";
 import { debounce } from "lodash-es";
 import {
   type MenuGroupOption,
@@ -55,8 +61,10 @@ const localStore = useLocalStore();
 const musicStore = useMusicStore();
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
+const platformStore = usePlatformStore();
 const player = usePlayerController();
 const songManager = useSongManager();
+const { enterSongFM } = useSongFM();
 
 const { isDesktop } = useMobile();
 
@@ -64,6 +72,37 @@ const { isDesktop } = useMobile();
 const menuRef = ref<MenuInst | null>(null);
 const menuActiveKey = ref<string | number>((router.currentRoute.value.name as string) || "home");
 const playlistMode = ref<"online" | "local">("online");
+
+// 当前平台是否为第三方平台（QQ 音乐 / 酷狗）
+const isPlatformSource = computed<boolean>(() => platformStore.currentPlatform !== "netease");
+
+// 当前平台是否为 QQ 音乐（QQ 音乐下该入口切换为「刷歌」）
+const isQqPlatform = computed<boolean>(() => platformStore.currentPlatform === "qqmusic");
+
+// 当前平台是否为酷狗音乐（酷狗下该入口同样是「刷歌」）
+const isKugouPlatform = computed<boolean>(() => platformStore.currentPlatform === "kugou");
+
+// 支持「刷歌」的第三方平台（QQ 音乐 / 酷狗）
+const isSongFMPlatform = computed<boolean>(() => isQqPlatform.value || isKugouPlatform.value);
+
+// 当前平台是否已登录
+const isPlatformLoggedIn = computed<boolean>(
+  () => !!platformStore.platformProfiles[platformStore.currentPlatform],
+);
+
+/**
+ * 侧边栏「私人漫游 / 刷歌」入口是否可见
+ *
+ * - QQ 音乐：推荐流是登录态接口，需要登录
+ * - 酷狗：推荐流匿名可用，直接展示
+ * - 网易云：需要登录，且只在本平台下展示
+ */
+const showPersonalFMMenu = computed<boolean>(() => {
+  if (settingStore.sidebarHide.hidePersonalFM) return false;
+  if (isQqPlatform.value) return isPlatformLoggedIn.value;
+  if (isKugouPlatform.value) return true;
+  return isLogin() !== 0 && !isPlatformSource.value;
+});
 
 // 刷新私人漫游
 const handleRefreshFM = async (e: Event) => {
@@ -104,7 +143,7 @@ const menuOptions = computed<MenuOption[] | MenuGroupOption[]>(() => {
           key: "personal-fm",
           label: () =>
             h("div", { class: "user-liked roaming-label" }, [
-              h(NText, null, () => "私人漫游"),
+              h(NText, null, () => (isSongFMPlatform.value ? "刷歌" : "私人漫游")),
               h(NButton, {
                 type: "tertiary",
                 round: true,
@@ -114,7 +153,7 @@ const menuOptions = computed<MenuOption[] | MenuGroupOption[]>(() => {
                 onClick: handleRefreshFM,
               }),
             ]),
-          show: isLogin() !== 0 && !settingStore.sidebarHide.hidePersonalFM,
+          show: showPersonalFMMenu.value,
           icon: renderIcon("Radio", {
             style: {
               transform: "translateY(-1px)",
@@ -124,19 +163,17 @@ const menuOptions = computed<MenuOption[] | MenuGroupOption[]>(() => {
         {
           key: "radio-hot",
           link: "radio-hot",
-          label: "播客电台",
-          show: !settingStore.sidebarHide.hideRadioHot,
-          icon: renderIcon("Record", {
-            style: {
-              transform: "translateY(-1px)",
-            },
-          }),
+          label: isKugouPlatform.value ? "听书" : "播客电台",
+          show:
+            !settingStore.sidebarHide.hideRadioHot &&
+            (isKugouPlatform.value || !isPlatformSource.value),
+          icon: renderIcon("Record"),
         },
         {
           key: "settings",
           link: "settings",
           label: "设置",
-           icon: renderIcon("Settings"),
+          icon: renderIcon("Settings"),
         },
         {
           key: "divider",
@@ -356,8 +393,63 @@ const renderPlaylist = (playlist: CoverType[], showCover: boolean) => {
   }));
 };
 
+// 生成平台歌单列表
+const renderPlatformPlaylist = (playlist: DispatchPlaylist, showCover: boolean) => ({
+  key: `${playlist.platform}:${playlist.platformId ?? playlist.id}`,
+  label: () =>
+    showCover
+      ? h("div", { class: "pl-cover" }, [
+          h(NAvatar, {
+            src: playlist.coverSize?.s || playlist.cover,
+            fallbackSrc: "/images/album.jpg?asset",
+            lazy: true,
+          }),
+          h(NEllipsis, null, () => playlist.name),
+        ])
+      : h(NEllipsis, null, () => playlist.name),
+  icon: showCover ? undefined : renderIcon("PlayList"),
+});
+
+// 在平台歌单列表里定位歌单
+const findPlatformPlaylist = (
+  platform: string,
+  platformId: string,
+): DispatchPlaylist | undefined => {
+  const list = [...platformStore.playlists.owned, ...platformStore.playlists.favorites];
+  return list.find(
+    (playlist) =>
+      playlist.platform === platform && String(playlist.platformId ?? playlist.id) === platformId,
+  );
+};
+
+// 判断是否为平台歌单菜单项
+const isPlatformPlaylistKey = (key: string): boolean =>
+  key.startsWith("qqmusic:") || key.startsWith("kugou:");
+
+// 打开第三方平台歌单
+const openPlatformPlaylist = (key: string) => {
+  const [platform, platformId] = key.split(":");
+  const target = findPlatformPlaylist(platform, platformId);
+  router.push({
+    name: "playlist",
+    query: {
+      platform,
+      id: platformId,
+      // 自建歌单读详情需要目录号
+      ...(target?.dirId && !target.subscribed ? { dirId: String(target.dirId) } : {}),
+    },
+  });
+};
+
 // 创建的歌单
 const createPlaylist = computed<MenuOption[]>(() => {
+  // 第三方平台：展示当前平台的自建歌单
+  if (isPlatformSource.value) {
+    if (!isPlatformLoggedIn.value) return [];
+    return platformStore.playlists.owned.map((playlist) =>
+      renderPlatformPlaylist(playlist, settingStore.menuShowCover),
+    );
+  }
   const userId = dataStore.userData.userId;
   const list = dataStore.userLikeData.playlists
     .filter((playlist) => playlist?.userId === userId)
@@ -367,6 +459,13 @@ const createPlaylist = computed<MenuOption[]>(() => {
 
 // 收藏的歌单
 const likedPlaylist = computed<MenuOption[]>(() => {
+  // 第三方平台：展示当前平台的收藏歌单
+  if (isPlatformSource.value) {
+    if (!isPlatformLoggedIn.value) return [];
+    return platformStore.playlists.favorites.map((playlist) =>
+      renderPlatformPlaylist(playlist, settingStore.menuShowCover),
+    );
+  }
   const userId = dataStore.userData.userId;
   const list = dataStore.userLikeData.playlists.filter((playlist) => playlist?.userId !== userId);
   return renderPlaylist(list, settingStore.menuShowCover);
@@ -403,10 +502,19 @@ const renderMenuLabel = (option: MenuOption) => {
 };
 
 // 菜单项更改
-const menuUpdate = (key: string, item: MenuOption) => {
+const menuUpdate = async (key: string, item: MenuOption) => {
   emit("menu-click", key);
-  // 私人漫游
+  // 私人漫游 / 刷歌
   if (key === "personal-fm") {
+    if (isSongFMPlatform.value) {
+      if (!(await enterSongFM())) {
+        window.$message.error("开启刷歌出错，请重试");
+        return;
+      }
+      window.$message.info("已开启刷歌", { icon: renderIcon("Radio") });
+      return;
+    }
+    await songManager.initPersonalFM();
     if (!musicStore.personalFMSong?.id) {
       window.$message.error("开启私人漫游出错，请重试");
       return;
@@ -428,6 +536,8 @@ const menuUpdate = (key: string, item: MenuOption) => {
       name: "playlist",
       query: { id: item.key },
     });
+  } else if (typeof key === "string" && isPlatformPlaylistKey(key)) {
+    openPlatformPlaylist(key);
   } else if (typeof key === "string" && key.startsWith("local-")) {
     // 检查是否为本地歌单（16位数字ID）
     const localId = key.replace("local-", "");
@@ -507,8 +617,16 @@ const checkMenuItem = () => {
   // 高亮菜单
   switch (routerName) {
     case "playlist": {
+      const query = router.currentRoute.value.query;
+      const platform = query.platform as ApiPlatform | undefined;
+      if (platform === "qqmusic" || platform === "kugou") {
+        const platformKey = `${platform}:${query.id}`;
+        menuActiveKey.value = platformKey;
+        menuRef.value?.showOption(platformKey);
+        break;
+      }
       // 获取歌单 id
-      const playlistId = Number(router.currentRoute.value.query.id || 0);
+      const playlistId = Number(query.id || 0);
       // 是否处于用户歌单
       const isUserPlaylist = dataStore.userLikeData.playlists.some(
         (playlist) => playlist?.id === playlistId,
@@ -527,6 +645,10 @@ const checkMenuItem = () => {
       }
       break;
     }
+    case "daily-songs":
+    case "platform-daily-songs":
+      menuActiveKey.value = "home";
+      break;
     case "comment":
     case "403":
     case "404":
@@ -550,13 +672,30 @@ const openHeartMode = debounce(() => player.toggleShuffle("heartbeat"), 1000, {
   trailing: false,
 });
 
-// 本地模式下自动展开本地歌单
+// 本地模式下自动展开本地歌单，平台模式下刷新歌单
 onMounted(() => {
   if (!settingStore.useOnlineService && localPlaylistMenu.value.length > 0) {
     if (!settingStore.menuExpandedKeys.includes("local-playlists")) {
       settingStore.menuExpandedKeys.push("local-playlists");
     }
   }
+  if (platformStore.currentPlatform !== "netease") {
+    void platformStore.refreshPlaylists();
+  }
+});
+
+const offPlatformChange = onPlatformChange(({ platform }) => {
+  void platformStore.refreshPlaylists(platform);
+});
+
+const offAccountChange = onAccountChange(({ platform }) => {
+  if (platform !== platformStore.currentPlatform) return;
+  void platformStore.refreshPlaylists(platform);
+});
+
+onUnmounted(() => {
+  offPlatformChange();
+  offAccountChange();
 });
 
 // 监听路由

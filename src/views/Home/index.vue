@@ -5,19 +5,26 @@
       <n-text depth="3">由此开启好心情 ~</n-text>
     </div>
     <!-- 在线模式 -->
-    <HomeOnline v-if="settingStore.useOnlineService" />
+    <HomePlatform v-if="settingStore.useOnlineService && isPlatformSource" />
+    <HomeOnline v-else-if="settingStore.useOnlineService" />
     <!-- 本地模式 -->
     <HomeLocal v-else />
   </div>
 </template>
 
 <script setup lang="ts">
-import { useSettingStore } from "@/stores";
+import { computed } from "vue";
+import { usePlatformStore, useSettingStore } from "@/stores";
 import { getGreeting } from "@/utils/time";
 import HomeOnline from "./HomeOnline.vue";
 import HomeLocal from "./HomeLocal.vue";
+import HomePlatform from "./HomePlatform.vue";
 
 const settingStore = useSettingStore();
+const platformStore = usePlatformStore();
+
+// 是否为第三方平台（QQ 音乐 / 酷狗）
+const isPlatformSource = computed<boolean>(() => platformStore.currentPlatform !== "netease");
 
 // 问候语
 const greetings = computed(getGreeting);

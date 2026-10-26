@@ -1,7 +1,8 @@
+<!-- 用户信息与平台账号切换菜单 -->
 <template>
   <n-popover
     :show="userMenuShow"
-    style="padding: 12px; max-width: 160px"
+    style="padding: 12px; max-width: 240px"
     trigger="manual"
     @clickoutside="userMenuShow = false"
   >
@@ -13,8 +14,8 @@
       >
         <div class="avatar">
           <n-avatar
-            v-if="dataStore.userLoginStatus"
-            :src="dataStore.userData?.avatarUrl"
+            v-if="currentLoggedIn"
+            :src="currentAvatarUrl"
             fallback-src="/images/avatar.jpg?asset"
             round
           />
@@ -24,42 +25,86 @@
         </div>
         <n-flex v-if="isDesktop" class="user-data" size="small">
           <n-text class="name">
-            {{ dataStore.userLoginStatus ? dataStore.userData.name || "未知用户名" : "未登录" }}
+            {{ currentDisplayName }}
           </n-text>
           <!-- VIP -->
-          <img
-            v-if="dataStore.userLoginStatus && dataStore.userData.vipType !== 0"
-            class="vip-img"
-            src="/images/vip.png?asset"
-          />
+          <img v-if="showVipBadge" class="vip-img" src="/images/vip.png?asset" />
           <SvgIcon :class="['down', { open: userMenuShow }]" name="DropDown" :depth="3" />
         </n-flex>
       </div>
     </template>
     <div class="user-menu" @click="userMenuShow = false">
+      <!-- 平台账号 -->
+      <div class="platforms">
+        <div
+          v-for="item in platformList"
+          :key="item.platform"
+          :class="['platform-item', { active: item.active }]"
+          @click="handlePlatform(item)"
+        >
+          <n-radio
+            class="platform-radio"
+            :checked="item.active"
+            :name="item.platform"
+            @click.stop
+            @update:checked="() => handlePlatform(item)"
+          />
+          <span class="platform-badge">{{ item.short }}</span>
+          <n-text class="platform-name">{{ item.name }}</n-text>
+          <template v-if="item.loggedIn">
+            <n-avatar
+              round
+              :size="20"
+              :src="item.avatarUrl"
+              fallback-src="/images/avatar.jpg?asset"
+            />
+            <n-text class="platform-nickname" depth="3">{{ item.nickname }}</n-text>
+          </template>
+          <n-text v-else class="platform-login" depth="3">登录</n-text>
+        </div>
+      </div>
+      <n-divider />
       <!-- 用户信息 -->
       <n-flex class="user-info" align="center" justify="center" vertical>
-        <n-text class="nickname text-hidden">{{ dataStore.userData.name || "未知用户名" }}</n-text>
-        <n-flex align="center" size="small">
-          <n-tag :bordered="false" size="small" round type="warning">
-            Lv.{{ dataStore.userData.level ?? 0 }}
-          </n-tag>
-          <!-- VIP -->
-          <img
-            v-if="dataStore.userLoginStatus && dataStore.userData.vipType !== 0"
-            class="vip-img"
-            src="/images/vip.png?asset"
+        <!-- 第三方平台：头像 + 昵称 + 会员标记 -->
+        <template v-if="!isNetease">
+          <n-avatar
+            v-if="currentProfile?.avatarUrl"
+            round
+            :size="40"
+            :src="currentProfile.avatarUrl"
+            fallback-src="/images/avatar.jpg?asset"
           />
-        </n-flex>
+          <n-text class="nickname text-hidden">{{ currentProfileName }}</n-text>
+          <!-- VIP -->
+          <img v-if="currentProfile?.isVip" class="vip-img" src="/images/vip.png?asset" />
+        </template>
+        <!-- 网易云：昵称 + 等级 + 会员标记 -->
+        <template v-else>
+          <n-text class="nickname text-hidden">{{
+            dataStore.userData.name || "未知用户名"
+          }}</n-text>
+          <n-flex align="center" size="small">
+            <n-tag :bordered="false" size="small" round type="warning">
+              Lv.{{ dataStore.userData.level ?? 0 }}
+            </n-tag>
+            <!-- VIP -->
+            <img
+              v-if="dataStore.userLoginStatus && dataStore.userData.vipType !== 0"
+              class="vip-img"
+              src="/images/vip.png?asset"
+            />
+          </n-flex>
+        </template>
       </n-flex>
       <n-divider />
       <!-- 喜欢数量 -->
-      <div v-if="dataStore.loginType !== 'uid'" class="like-num">
+      <div v-if="showLikeNum" class="like-num">
         <div
           v-for="(item, index) in userLikeData"
           :key="index"
           class="num-item"
-          @click="router.push({ name: item.name })"
+          @click="router.push({ name: item.name, query: item.query })"
         >
           <n-number-animation :from="0" :to="item.value" />
           <n-text :depth="3">{{ item.label }}</n-text>
@@ -82,9 +127,18 @@
 </template>
 
 <script setup lang="ts">
-import { useDataStore } from "@/stores";
-import { openUserLogin } from "@/utils/modal";
+import { computed, ref, onBeforeMount, onUnmounted } from "vue";
+import { useRouter } from "vue-router";
+import {
+  useDataStore,
+  usePlatformStore,
+  onPlatformChange,
+  onAccountChange,
+  PLATFORM_META,
+} from "@/stores";
+import { openUserLogin, openPlatformLogin } from "@/utils/modal";
 import { getLoginState } from "@/api/login";
+import type { ApiPlatform } from "@/types/shared";
 import {
   toLogout,
   isLogin,
@@ -93,79 +147,177 @@ import {
   updateSpecialUserData,
 } from "@/utils/auth";
 import { useMobile } from "@/composables/useMobile";
+import { useLikeStats } from "@/composables/useLikeStats";
 import { whenCookiesReady } from "@/utils/cookie";
 
 const router = useRouter();
 const dataStore = useDataStore();
+const platformStore = usePlatformStore();
 
 const { isDesktop } = useMobile();
+
+// 收藏统计条目（与收藏页同一真源）
+const likeStats = useLikeStats();
+
+/** 用户喜欢数据条目 */
+interface UserLikeItem {
+  /** 数量标签 */
+  label: string;
+  /** 跳转路由名 */
+  name: string;
+  /** 数量 */
+  value: number;
+  /** 跳转时附带的查询参数 */
+  query?: Record<string, string>;
+}
 
 // 用户菜单展示
 const userMenuShow = ref<boolean>(false);
 
+// 平台账号列表
+const platformList = computed(() => {
+  const current = platformStore.currentPlatform;
+  return (Object.keys(PLATFORM_META) as ApiPlatform[]).map((platform) => {
+    if (platform === "netease") {
+      return {
+        platform,
+        name: PLATFORM_META.netease.name,
+        short: PLATFORM_META.netease.short,
+        active: current === platform,
+        loggedIn: dataStore.userLoginStatus,
+        nickname: dataStore.userData.name || "未知用户名",
+        avatarUrl: dataStore.userData?.avatarUrl ?? "",
+      };
+    }
+    const profile = platformStore.platformProfiles[platform];
+    return {
+      platform,
+      name: PLATFORM_META[platform].name,
+      short: PLATFORM_META[platform].short,
+      active: current === platform,
+      loggedIn: !!profile,
+      nickname:
+        String(profile?.nickname ?? "").trim() ||
+        String(profile?.userId ?? "").trim() ||
+        PLATFORM_META[platform].name,
+      avatarUrl: profile?.avatarUrl ?? "",
+    };
+  });
+});
+
+// 当前平台是否已登录
+const currentLoggedIn = computed(() => {
+  if (platformStore.currentPlatform === "netease") return dataStore.userLoginStatus;
+  return !!platformStore.platformProfiles[platformStore.currentPlatform];
+});
+
+/** 当前是否为网易云平台 */
+const isNetease = computed(() => platformStore.currentPlatform === "netease");
+
+/** 当前平台的账号资料（网易云走既有登录态，不经平台资料） */
+const currentProfile = computed(() =>
+  isNetease.value ? null : platformStore.platformProfiles[platformStore.currentPlatform],
+);
+
+/** 当前平台的昵称 */
+const currentProfileName = computed(() => {
+  const nickname = String(currentProfile.value?.nickname ?? "").trim();
+  if (nickname) return nickname;
+  const userId = String(currentProfile.value?.userId ?? "").trim();
+  return userId || PLATFORM_META[platformStore.currentPlatform].name;
+});
+
+/** 顶栏会员标记 */
+const showVipBadge = computed<boolean>(() => {
+  if (isNetease.value) {
+    return dataStore.userLoginStatus && dataStore.userData.vipType !== 0;
+  }
+  return !!currentProfile.value?.isVip;
+});
+
+// 当前平台头像
+const currentAvatarUrl = computed(() => {
+  if (platformStore.currentPlatform === "netease") return dataStore.userData?.avatarUrl;
+  return platformStore.platformProfiles[platformStore.currentPlatform]?.avatarUrl;
+});
+
+// 当前平台显示名
+const currentDisplayName = computed(() => {
+  if (platformStore.currentPlatform === "netease") {
+    return dataStore.userLoginStatus ? dataStore.userData.name || "未知用户名" : "未登录";
+  }
+  const profile = platformStore.platformProfiles[platformStore.currentPlatform];
+  if (!profile) return "未登录";
+  return currentProfileName.value;
+});
+
 // 开启用户菜单
 const openMenu = () => {
-  if (dataStore.userLoginStatus) {
+  if (dataStore.userLoginStatus || platformStore.loggedInPlatforms.length > 0) {
     userMenuShow.value = !userMenuShow.value;
   } else {
     openUserLogin();
   }
 };
 
+// 选择平台：已登录则切换，未登录则拉起对应平台的登录弹窗
+const handlePlatform = (item: (typeof platformList.value)[number]) => {
+  userMenuShow.value = false;
+  if (!item.loggedIn) {
+    if (item.platform === "netease") {
+      openUserLogin();
+    } else {
+      openPlatformLogin(item.platform);
+    }
+    return;
+  }
+  platformStore.switchPlatform(item.platform);
+};
+
 // 用户喜欢数据
-const userLikeData = computed(() => {
-  return [
-    {
-      label: "歌单",
-      name: "like-playlists",
-      value: dataStore.userLikeData.playlists.length,
-    },
-    {
-      label: "专辑",
-      name: "like-albums",
-      value: dataStore.userLikeData.albums.length,
-    },
-    {
-      label: "歌手",
-      name: "like-artists",
-      value: dataStore.userLikeData.artists.length,
-    },
-  ];
-});
+const userLikeData = computed<UserLikeItem[]>(() =>
+  likeStats.value.map((item) => ({
+    label: item.label,
+    name: item.name,
+    value: item.length,
+    query: item.query,
+  })),
+);
+
+/** 是否展示统计区 */
+const showLikeNum = computed<boolean>(
+  () => platformStore.currentPlatform !== "netease" || dataStore.loginType !== "uid",
+);
 
 // 检查登录状态
 const checkLoginStatus = async () => {
   console.log("🔐 [User] 开始检查登录状态...");
-  console.log("🔐 [User] 当前状态: userLoginStatus =", dataStore.userLoginStatus, ", loginType =", dataStore.loginType);
+  console.log(
+    "🔐 [User] 当前状态: userLoginStatus =",
+    dataStore.userLoginStatus,
+    ", loginType =",
+    dataStore.loginType,
+  );
 
-  // 等待 App.vue 完成原生 Cookie 同步，避免冷启动时 CapacitorHttp 拿不到 MUSIC_U
-  // 导致登录态校验误判（最多等 3 秒，超时自动放行）
   await whenCookiesReady();
-  
-  // 若为 UID 登录
+
   if (dataStore.loginType === "uid") {
     console.log("🔐 [User] UID 登录模式，更新用户数据");
     await updateSpecialUserData();
     return;
   }
-  
+
   try {
-    // 获取登录状态
     console.log("🔐 [User] 正在获取登录状态...");
     const loginState = await getLoginState();
     console.log("🔐 [User] 登录状态响应:", JSON.stringify(loginState).slice(0, 300));
-    
-    // 登录正常
+
     if (loginState.data?.profile && Object.keys(loginState.data?.profile)?.length) {
       console.log("✅ [User] 登录状态有效，profile:", loginState.data.profile.nickname);
       dataStore.userLoginStatus = true;
-      // 刷新登录
       await refreshLoginData();
-      // 获取用户信息
       await updateUserData();
-    }
-    // 若还有用户数据，则登录过期
-    else if (dataStore.userData?.userId && dataStore.userData.userId !== 0) {
+    } else if (dataStore.userData?.userId && dataStore.userData.userId !== 0) {
       dataStore.userLoginStatus = false;
       dataStore.userData.userId = 0;
       console.log("⚠️ [User] 登录已过期或未获取到 Profile");
@@ -176,15 +328,28 @@ const checkLoginStatus = async () => {
     }
   } catch (error) {
     console.error("❌ [User] 检查登录状态失败:", error);
-    // 如果请求失败但本地有登录状态，尝试继续使用
     if (dataStore.userLoginStatus && dataStore.userData?.userId) {
       console.log("⚠️ [User] 网络请求失败，但本地有缓存，继续使用本地数据");
     }
   }
 };
 
-// 退出登录
+// 退出登录（作用于当前平台）
 const isLogout = () => {
+  if (platformStore.currentPlatform !== "netease") {
+    const platform = platformStore.currentPlatform;
+    window.$dialog.warning({
+      title: "退出登录",
+      content: `确认退出${PLATFORM_META[platform].name}登录？`,
+      positiveText: "确认登出",
+      negativeText: "取消",
+      onPositiveClick: async () => {
+        await platformStore.logout(platform);
+        window.$message.success("已退出登录");
+      },
+    });
+    return;
+  }
   if (!isLogin()) {
     openUserLogin();
     return;
@@ -198,8 +363,67 @@ const isLogout = () => {
   });
 };
 
+/** 已提示过凭据失效的平台（重新登录后解除，避免重复弹窗） */
+const authExpiredNotified = new Set<ApiPlatform>();
+
+/**
+ * 提示凭据失效并拉起该平台的登录弹窗
+ * @param platform 音源平台
+ */
+const notifyAuthExpired = (platform: ApiPlatform) => {
+  if (authExpiredNotified.has(platform)) return;
+  authExpiredNotified.add(platform);
+  window.$message.warning(`${PLATFORM_META[platform].name}登录已过期，请重新登录`, {
+    duration: 3000,
+  });
+  openPlatformLogin(platform);
+};
+
+/**
+ * 刷新指定平台的账号资料
+ * @param platform 音源平台
+ */
+const refreshPlatformProfile = async (platform: ApiPlatform) => {
+  const previous = platformStore.platformProfiles[platform];
+  const profile = await platformStore.refreshProfile(platform);
+  if (platformStore.authExpired[platform]) {
+    notifyAuthExpired(platform);
+    return;
+  }
+  if (profile) {
+    authExpiredNotified.delete(platform);
+    return;
+  }
+  if (previous) {
+    platformStore.platformProfiles[platform] = previous;
+  }
+};
+
+// 平台切换：刷新目标平台的账号资料
+const stopPlatformWatch = onPlatformChange(({ platform }) => {
+  if (platform === "netease") return;
+  void refreshPlatformProfile(platform);
+});
+
+// 账号变更广播：若凭据失效则自动弹窗提示
+const stopAccountWatch = onAccountChange(({ platform, loggedIn }) => {
+  if (loggedIn) {
+    authExpiredNotified.delete(platform);
+  } else if (platform !== "netease" && platformStore.authExpired[platform]) {
+    notifyAuthExpired(platform);
+  }
+});
+
 onBeforeMount(() => {
   checkLoginStatus();
+  void platformStore.refreshAllProfiles().then((expired) => {
+    for (const platform of expired) notifyAuthExpired(platform);
+  });
+});
+
+onUnmounted(() => {
+  stopPlatformWatch();
+  stopAccountWatch();
 });
 </script>
 
@@ -232,6 +456,13 @@ onBeforeMount(() => {
     align-items: center;
     padding-left: 8px;
     max-width: 200px;
+    flex-wrap: nowrap;
+    .name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100px;
+    }
     .down {
       font-size: 26px;
       margin-right: 4px;
@@ -255,6 +486,56 @@ onBeforeMount(() => {
   display: flex;
   justify-content: center;
   flex-direction: column;
+  .platforms {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    .platform-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 4px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      &:hover {
+        background-color: rgba(var(--primary), 0.08);
+      }
+      &.active .platform-name {
+        font-weight: bold;
+      }
+      .platform-radio {
+        flex-shrink: 0;
+      }
+      .platform-badge {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        min-width: 20px;
+        border-radius: 5px;
+        background-color: rgba(var(--primary), 0.12);
+        color: var(--primary-hex);
+        font-size: 11px;
+        line-height: 1;
+      }
+      .platform-name {
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .platform-nickname {
+        font-size: 12px;
+        max-width: 76px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .platform-login {
+        font-size: 12px;
+      }
+    }
+  }
   .user-info {
     .nickname {
       font-weight: bold;

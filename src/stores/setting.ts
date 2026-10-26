@@ -7,6 +7,69 @@ import { defaultAMLLDbServer } from "@/utils/meta";
 import { defineStore } from "pinia";
 import { CURRENT_SETTING_SCHEMA_VERSION, settingMigrations } from "./migrations/settingMigrations";
 
+/** 第三方平台首页栏目键（真源声明） */
+export const PLATFORM_HOME_SECTION_KEYS = [
+  "square",
+  "recommend",
+  "singer",
+  "album",
+  "radioTheme",
+] as const;
+
+/** 第三方平台首页栏目默认配置 */
+export const PLATFORM_HOME_SECTION_DEFAULTS: ReadonlyArray<{
+  key: (typeof PLATFORM_HOME_SECTION_KEYS)[number];
+  name: string;
+  order: number;
+}> = [
+  { key: "square", name: "精选歌单", order: 0 },
+  { key: "recommend", name: "为你推荐", order: 1 },
+  { key: "singer", name: "歌手推荐", order: 2 },
+  { key: "album", name: "新碟上架", order: 3 },
+  { key: "radioTheme", name: "场景电台", order: 4 },
+];
+
+/** 第三方平台首页栏目条目 */
+export type PlatformHomeSection = {
+  key: (typeof PLATFORM_HOME_SECTION_KEYS)[number];
+  name: string;
+  visible: boolean;
+  order: number;
+};
+
+/**
+ * 规整第三方平台首页栏目列表
+ * @param sections 持久化或内存中的栏目列表
+ * @returns 规整后的栏目列表（按顺序排列）
+ */
+export const normalizePlatformHomeSections = (
+  sections: ReadonlyArray<{ key: string; name?: string; visible?: boolean; order?: number }> | undefined,
+): PlatformHomeSection[] => {
+  const known = PLATFORM_HOME_SECTION_KEYS as readonly string[];
+  const kept: PlatformHomeSection[] = [];
+  for (const item of Array.isArray(sections) ? sections : []) {
+    if (!known.includes(item?.key)) continue;
+    const section = item as PlatformHomeSection;
+    if (!section.name) {
+      section.name = PLATFORM_HOME_SECTION_DEFAULTS.find((it) => it.key === section.key)?.name ?? "";
+    }
+    if (typeof section.visible !== "boolean") section.visible = true;
+    if (!Number.isFinite(Number(section.order))) section.order = 0;
+    kept.push(section);
+  }
+  const present = new Set(kept.map((item) => item.key));
+  const maxOrder = kept.reduce((max, item) => Math.max(max, Number(item.order) || 0), -1);
+  const missing = PLATFORM_HOME_SECTION_DEFAULTS.filter((item) => !present.has(item.key)).map(
+    (item, index) => ({
+      key: item.key,
+      name: item.name,
+      visible: true,
+      order: maxOrder + 1 + index,
+    }),
+  );
+  return [...kept, ...missing].sort((a, b) => a.order - b.order);
+};
+
 export interface SettingState {
   /** Schema 版本号（可选，用于数据迁移） */
   schemaVersion?: number;
@@ -307,6 +370,13 @@ export interface SettingState {
     visible: boolean;
     order: number;
   }>;
+  /** 第三方平台首页栏目配置 */
+  platformHomePageSections: Array<{
+    key: string;
+    name: string;
+    visible: boolean;
+    order: number;
+  }>;
   /** 用户协议版本 */
   userAgreementVersion: string;
   /** 自定义协议注册 **/
@@ -528,6 +598,13 @@ export const useSettingStore = defineStore("setting", {
       { key: "radio", name: "推荐播客", visible: true, order: 4 },
       { key: "album", name: "新碟上架", visible: true, order: 5 },
     ],
+    platformHomePageSections: [
+      { key: "square", name: "精选歌单", visible: true, order: 0 },
+      { key: "recommend", name: "为你推荐", visible: true, order: 1 },
+      { key: "singer", name: "歌手推荐", visible: true, order: 2 },
+      { key: "album", name: "新碟上架", visible: true, order: 3 },
+      { key: "radioTheme", name: "场景电台", visible: true, order: 4 },
+    ],
     userAgreementVersion: "",
     registryProtocol: {
       orpheus: false,
@@ -583,6 +660,12 @@ export const useSettingStore = defineStore("setting", {
       const { lastfm } = state;
       return Boolean(lastfm.apiKey && lastfm.apiSecret);
     },
+    /**
+     * 第三方平台首页栏目（按真源过滤未知键并补齐缺失栏目）
+     */
+    platformHomeSections(state): SettingState["platformHomePageSections"] {
+      return normalizePlatformHomeSections(state.platformHomePageSections);
+    },
   },
   actions: {
     /**
@@ -612,6 +695,12 @@ export const useSettingStore = defineStore("setting", {
         // 统一设置版本号
         this.schemaVersion = targetVersion;
         console.log(`[Setting Migration] 迁移完成，已更新到版本 ${targetVersion}`);
+      }
+
+      // 第三方平台首页栏目：规整未知键并补齐
+      const sections = normalizePlatformHomeSections(this.platformHomePageSections);
+      if (JSON.stringify(sections) !== JSON.stringify(this.platformHomePageSections)) {
+        this.platformHomePageSections = sections;
       }
     },
     // 应用布局模式预设（大比例/小比例/自定义）

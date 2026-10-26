@@ -1,6 +1,8 @@
 import { createRouter, createWebHashHistory, Router } from "vue-router";
 import { isElectron } from "@/utils/env";
 import { isLogin } from "@/utils/auth";
+import { isRouteSupported } from "@/api/platform/capability";
+import { usePlatformStore } from "@/stores";
 import routes from "./routes";
 
 // 基础配置
@@ -30,8 +32,20 @@ router.beforeEach((to, from, next) => {
     }
   }
 
-  // 需要登录
-  if (to.meta.needLogin && !isLogin()) {
+  const platformStore = usePlatformStore();
+  const isPlatformSource = platformStore.currentPlatform !== "netease";
+
+  // 平台能力校验：第三方平台不支持的页面直接拦截
+  const routeName = to.name as string | undefined;
+  if (routeName && !isRouteSupported(platformStore.currentPlatform, routeName)) {
+    if (!isElectron) window.$loadingBar.error();
+    window.$message.warning("当前平台不支持该功能");
+    next({ path: "/" });
+    return;
+  }
+
+  // 需要登录（第三方平台不走网易云登录拦截）
+  if (to.meta.needLogin && !isLogin() && !isPlatformSource) {
     if (!isElectron) window.$loadingBar.error();
     window.$message.warning("请登录后使用");
     import("@/utils/modal").then(({ openUserLogin }) => {
@@ -51,8 +65,6 @@ router.beforeEach((to, from, next) => {
 router.afterEach(() => {
   // 进度条
   window.$loadingBar.finish();
-  // 注意：滚动位置恢复由 AppLayout 的 Transition @after-enter 处理
-  // 不在这里操作滚动，因为 out-in 过渡动画此时尚未完成
 });
 
 export default router;

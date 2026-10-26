@@ -119,6 +119,7 @@ import { formatSongsList } from "@/utils/format";
 import { songDetail } from "@/api/song";
 import { playlistAllSongs } from "@/api/playlist";
 import { radioAllProgram } from "@/api/radio";
+import { dispatchAlbumDetail, dispatchPlaylistDetail } from "@/api/platform/dispatch";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { formatTimestamp } from "@/utils/time";
 import CoverMenu from "@/components/Menu/CoverMenu.vue";
@@ -154,6 +155,14 @@ const coverMenuRef = ref<InstanceType<typeof CoverMenu> | null>(null);
 const isPlaying = (id: number | string) =>
   musicStore.playPlaylistId === id && statusStore.playStatus;
 
+/**
+ * 取条目的平台维度
+ * @param item 条目
+ * @returns 第三方平台标识，网易云条目返回 null
+ */
+const itemPlatform = (item: CoverType): "qqmusic" | "kugou" | null =>
+  item.platform === "qqmusic" || item.platform === "kugou" ? item.platform : null;
+
 // 查看详情
 const goDetail = (item: CoverType) => {
   // 流媒体歌单跳转到专门的路由
@@ -164,9 +173,13 @@ const goDetail = (item: CoverType) => {
     });
     return;
   }
+  const platform = itemPlatform(item);
   router.push({
     name: props.type,
-    query: { id: item.id },
+    query: {
+      id: platform ? (item.platformId ?? item.id) : item.id,
+      ...(platform ? { platform } : {}),
+    },
   });
 };
 
@@ -187,7 +200,7 @@ const playList = debounce(
       // 开始加载
       item.loading = true;
       // 获取播放列表
-      const list = await getListData(item.id);
+      const list = await getListData(item);
       player.updatePlayList(list, undefined, item.id as number);
     } catch (error) {
       console.log("Error to play: ", error);
@@ -200,7 +213,23 @@ const playList = debounce(
 );
 
 // 获取列表数据
-const getListData = async (id: number | string): Promise<SongType[]> => {
+const getListData = async (item: CoverType): Promise<SongType[]> => {
+  const platform = itemPlatform(item);
+  const id = item.platformId ?? item.id;
+
+  // 第三方平台歌单 / 专辑：走平台数据层
+  if (platform) {
+    if (props.type === "album") {
+      const result = await dispatchAlbumDetail(platform, id);
+      return result.tracks;
+    }
+    if (props.type === "playlist") {
+      const result = await dispatchPlaylistDetail(platform, { id, withTracks: true });
+      return result.tracks;
+    }
+    return [];
+  }
+
   // 判断是否为本地歌单
   const isLocalPlaylist = id.toString().length === 16;
 
