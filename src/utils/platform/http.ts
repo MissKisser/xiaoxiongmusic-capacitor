@@ -195,7 +195,8 @@ const requestViaCapacitor = async <T>(
   const { headers, cookies } = normalizeHeaders(nativeResponse.headers);
   let data = nativeResponse.data as T;
 
-  if (options.responseType === "json" && typeof data === "string") {
+  const expectedType = options.responseType ?? "json";
+  if (expectedType === "json" && typeof data === "string") {
     try {
       data = JSON.parse(data) as T;
     } catch {

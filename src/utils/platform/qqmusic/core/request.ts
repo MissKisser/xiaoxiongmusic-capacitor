@@ -144,7 +144,16 @@ const postRaw = async (
     timeout: 8000,
   });
 
-  return (res.data ?? {}) as FcgResponse;
+  let rawData = res.data;
+  if (typeof rawData === "string") {
+    try {
+      rawData = JSON.parse(rawData);
+    } catch {
+      rawData = {};
+    }
+  }
+
+  return (rawData ?? {}) as FcgResponse;
 };
 
 /**
