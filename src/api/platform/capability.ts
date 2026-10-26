@@ -171,3 +171,93 @@ export const LIKE_TABS: Record<ApiPlatform, PlatformTab[]> = {
   qqmusic: [{ name: "like-playlists", label: "歌单" }],
   kugou: [{ name: "like-playlists", label: "歌单" }],
 };
+
+/** 平台展示元信息（名称与单字简标） */
+export const PLATFORM_META: Record<ApiPlatform, { name: string; short: string }> = {
+  netease: { name: "网易云音乐", short: "云" },
+  qqmusic: { name: "QQ 音乐", short: "Q" },
+  kugou: { name: "酷狗音乐", short: "K" },
+};
+
+/** 平台菜单条目 */
+export interface PlatformListItem {
+  /** 平台标识 */
+  platform: ApiPlatform;
+  /** 平台名称 */
+  name: string;
+  /** 单字简标 */
+  short: string;
+  /** 是否为当前激活平台 */
+  active: boolean;
+  /** 是否已登录 */
+  loggedIn: boolean;
+  /** 昵称 */
+  nickname: string;
+  /** 头像地址 */
+  avatarUrl: string;
+}
+
+/** 平台条目点击分发动作 */
+export type PlatformSelectAction =
+  | { type: "login-netease" }
+  | { type: "login-platform"; platform: ApiPlatform }
+  | { type: "switch-platform"; platform: ApiPlatform };
+
+/**
+ * 构建平台账号列表条目
+ * @param current 当前激活的平台
+ * @param neteaseState 网易云登录状态与资料
+ * @param profiles 第三方平台资料映射
+ * @returns 平台账号列表
+ */
+export const buildPlatformListItems = (
+  current: ApiPlatform,
+  neteaseState: { loggedIn: boolean; nickname?: string; avatarUrl?: string },
+  profiles: Partial<Record<ApiPlatform, { nickname?: string; userId?: string | number; avatarUrl?: string } | null>>,
+): PlatformListItem[] => {
+  return (Object.keys(PLATFORM_META) as ApiPlatform[]).map((platform) => {
+    if (platform === "netease") {
+      return {
+        platform,
+        name: PLATFORM_META.netease.name,
+        short: PLATFORM_META.netease.short,
+        active: current === platform,
+        loggedIn: neteaseState.loggedIn,
+        nickname: neteaseState.nickname || "未知用户名",
+        avatarUrl: neteaseState.avatarUrl ?? "",
+      };
+    }
+    const profile = profiles[platform];
+    return {
+      platform,
+      name: PLATFORM_META[platform].name,
+      short: PLATFORM_META[platform].short,
+      active: current === platform,
+      loggedIn: !!profile,
+      nickname:
+        String(profile?.nickname ?? "").trim() ||
+        String(profile?.userId ?? "").trim() ||
+        PLATFORM_META[platform].name,
+      avatarUrl: profile?.avatarUrl ?? "",
+    };
+  });
+};
+
+/**
+ * 解析用户点击平台条目时的响应动作
+ * @param item 平台条目（含平台与登录状态）
+ * @returns 响应动作（网易云登录 / 平台登录 / 切换平台）
+ */
+export const resolvePlatformSelectAction = (item: {
+  platform: ApiPlatform;
+  loggedIn: boolean;
+}): PlatformSelectAction => {
+  if (!item.loggedIn) {
+    if (item.platform === "netease") {
+      return { type: "login-netease" };
+    }
+    return { type: "login-platform", platform: item.platform };
+  }
+  return { type: "switch-platform", platform: item.platform };
+};
+

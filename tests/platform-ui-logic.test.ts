@@ -23,6 +23,9 @@ import {
   RADIO_ROUTES,
   PLATFORM_UNSUPPORTED_ROUTES,
   PLATFORM_PLAYLIST_TYPE_QUERY,
+  buildPlatformListItems,
+  resolvePlatformSelectAction,
+  PLATFORM_META,
 } from "../src/api/platform/capability";
 import {
   normalizePlatformHomeSections,
@@ -143,5 +146,73 @@ describe("平台 UI 逻辑与能力矩阵接线", () => {
     assert.ok(likedStat);
     assert.equal(likedStat.length, 698);
     assert.equal(likedStat.name, "like-songs");
+  });
+
+  it("平台账号列表与登录动作分发：未登录网易云时独立放行第三方平台登录", () => {
+    // 场景 1：全新冷启动状态，未登录任何平台账号（网易云未登录，QQ/酷狗无凭据）
+    const freshList = buildPlatformListItems(
+      "netease",
+      { loggedIn: false },
+      {},
+    );
+    assert.equal(freshList.length, 3);
+    const [neteaseItem, qqItem, kugouItem] = freshList;
+
+    // 初始状态：网易云处于激活但未登录，第三方平台未激活且未登录
+    assert.equal(neteaseItem.platform, "netease");
+    assert.equal(neteaseItem.name, "网易云音乐");
+    assert.equal(neteaseItem.active, true);
+    assert.equal(neteaseItem.loggedIn, false);
+
+    assert.equal(qqItem.platform, "qqmusic");
+    assert.equal(qqItem.name, "QQ 音乐");
+    assert.equal(qqItem.active, false);
+    assert.equal(qqItem.loggedIn, false);
+
+    assert.equal(kugouItem.platform, "kugou");
+    assert.equal(kugouItem.name, "酷狗音乐");
+    assert.equal(kugouItem.active, false);
+    assert.equal(kugouItem.loggedIn, false);
+
+    // 未登录网易云时，点击 QQ 音乐或酷狗音乐必须分发至对应平台自身的登录弹窗，严禁被拦截或导流至网易云登录
+    assert.deepEqual(resolvePlatformSelectAction(qqItem), {
+      type: "login-platform",
+      platform: "qqmusic",
+    });
+    assert.deepEqual(resolvePlatformSelectAction(kugouItem), {
+      type: "login-platform",
+      platform: "kugou",
+    });
+    assert.deepEqual(resolvePlatformSelectAction(neteaseItem), {
+      type: "login-netease",
+    });
+
+    // 场景 2：网易云未登录，但 QQ 音乐已登录并处于激活状态
+    const qqLoggedInList = buildPlatformListItems(
+      "qqmusic",
+      { loggedIn: false },
+      { qqmusic: { nickname: "QQ听众", userId: "10001", avatarUrl: "https://example.com/avatar.jpg" } },
+    );
+    const activeQqItem = qqLoggedInList.find((i) => i.platform === "qqmusic");
+    const unloggedNeteaseItem = qqLoggedInList.find((i) => i.platform === "netease");
+
+    assert.ok(activeQqItem);
+    assert.equal(activeQqItem.active, true);
+    assert.equal(activeQqItem.loggedIn, true);
+    assert.equal(activeQqItem.nickname, "QQ听众");
+    assert.equal(activeQqItem.avatarUrl, "https://example.com/avatar.jpg");
+
+    // 点击已登录平台执行平台切换
+    assert.deepEqual(resolvePlatformSelectAction(activeQqItem), {
+      type: "switch-platform",
+      platform: "qqmusic",
+    });
+
+    // 在 QQ 音乐激活下点击未登录的网易云，仍然能够拉起网易云登录
+    assert.ok(unloggedNeteaseItem);
+    assert.equal(unloggedNeteaseItem.loggedIn, false);
+    assert.deepEqual(resolvePlatformSelectAction(unloggedNeteaseItem), {
+      type: "login-netease",
+    });
   });
 });

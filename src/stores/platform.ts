@@ -23,12 +23,8 @@ export const SUPPORTED_PLATFORMS: ApiPlatform[] = ["netease", "qqmusic", "kugou"
 /** 第三方平台（走平台 IPC 通道的平台） */
 export const THIRD_PARTY_PLATFORMS: ApiPlatform[] = ["qqmusic", "kugou"];
 
-/** 平台展示信息 */
-export const PLATFORM_META: Record<ApiPlatform, { name: string; short: string }> = {
-  netease: { name: "网易云音乐", short: "云" },
-  qqmusic: { name: "QQ 音乐", short: "Q" },
-  kugou: { name: "酷狗音乐", short: "K" },
-};
+import { PLATFORM_META } from "@/api/platform/capability";
+export { PLATFORM_META };
 
 /** 各平台账号资料 */
 export type PlatformProfileMap = Record<ApiPlatform, PlatformProfile | null>;

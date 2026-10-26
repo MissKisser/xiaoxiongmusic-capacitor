@@ -63,65 +63,68 @@
           <n-text v-else class="platform-login" depth="3">登录</n-text>
         </div>
       </div>
-      <n-divider />
-      <!-- 用户信息 -->
-      <n-flex class="user-info" align="center" justify="center" vertical>
-        <!-- 第三方平台：头像 + 昵称 + 会员标记 -->
-        <template v-if="!isNetease">
-          <n-avatar
-            v-if="currentProfile?.avatarUrl"
-            round
-            :size="40"
-            :src="currentProfile.avatarUrl"
-            fallback-src="/images/avatar.jpg?asset"
-          />
-          <n-text class="nickname text-hidden">{{ currentProfileName }}</n-text>
-          <!-- VIP -->
-          <img v-if="currentProfile?.isVip" class="vip-img" src="/images/vip.png?asset" />
-        </template>
-        <!-- 网易云：昵称 + 等级 + 会员标记 -->
-        <template v-else>
-          <n-text class="nickname text-hidden">{{
-            dataStore.userData.name || "未知用户名"
-          }}</n-text>
-          <n-flex align="center" size="small">
-            <n-tag :bordered="false" size="small" round type="warning">
-              Lv.{{ dataStore.userData.level ?? 0 }}
-            </n-tag>
-            <!-- VIP -->
-            <img
-              v-if="dataStore.userLoginStatus && dataStore.userData.vipType !== 0"
-              class="vip-img"
-              src="/images/vip.png?asset"
+      <!-- 当前平台已登录时展示用户信息、喜欢数据与退出登录 -->
+      <template v-if="currentLoggedIn">
+        <n-divider />
+        <!-- 用户信息 -->
+        <n-flex class="user-info" align="center" justify="center" vertical>
+          <!-- 第三方平台：头像 + 昵称 + 会员标记 -->
+          <template v-if="!isNetease">
+            <n-avatar
+              v-if="currentProfile?.avatarUrl"
+              round
+              :size="40"
+              :src="currentProfile.avatarUrl"
+              fallback-src="/images/avatar.jpg?asset"
             />
-          </n-flex>
-        </template>
-      </n-flex>
-      <n-divider />
-      <!-- 喜欢数量 -->
-      <div v-if="showLikeNum" class="like-num">
-        <div
-          v-for="(item, index) in userLikeData"
-          :key="index"
-          class="num-item"
-          @click="router.push({ name: item.name, query: item.query })"
-        >
-          <n-number-animation :from="0" :to="item.value" />
-          <n-text :depth="3">{{ item.label }}</n-text>
+            <n-text class="nickname text-hidden">{{ currentProfileName }}</n-text>
+            <!-- VIP -->
+            <img v-if="currentProfile?.isVip" class="vip-img" src="/images/vip.png?asset" />
+          </template>
+          <!-- 网易云：昵称 + 等级 + 会员标记 -->
+          <template v-else>
+            <n-text class="nickname text-hidden">{{
+              dataStore.userData.name || "未知用户名"
+            }}</n-text>
+            <n-flex align="center" size="small">
+              <n-tag :bordered="false" size="small" round type="warning">
+                Lv.{{ dataStore.userData.level ?? 0 }}
+              </n-tag>
+              <!-- VIP -->
+              <img
+                v-if="dataStore.userLoginStatus && dataStore.userData.vipType !== 0"
+                class="vip-img"
+                src="/images/vip.png?asset"
+              />
+            </n-flex>
+          </template>
+        </n-flex>
+        <n-divider />
+        <!-- 喜欢数量 -->
+        <div v-if="showLikeNum" class="like-num">
+          <div
+            v-for="(item, index) in userLikeData"
+            :key="index"
+            class="num-item"
+            @click="router.push({ name: item.name, query: item.query })"
+          >
+            <n-number-animation :from="0" :to="item.value" />
+            <n-text :depth="3">{{ item.label }}</n-text>
+          </div>
         </div>
-      </div>
-      <n-flex v-else align="center" vertical>
-        <n-text>UID 登录模式</n-text>
-        <n-text :depth="3">部分功能暂不可用</n-text>
-      </n-flex>
-      <n-divider />
-      <!-- 退出登录 -->
-      <n-button :focusable="false" class="logout" strong secondary round @click="isLogout">
-        <template #icon>
-          <SvgIcon name="Power" />
-        </template>
-        退出登录
-      </n-button>
+        <n-flex v-else align="center" vertical>
+          <n-text>UID 登录模式</n-text>
+          <n-text :depth="3">部分功能暂不可用</n-text>
+        </n-flex>
+        <n-divider />
+        <!-- 退出登录 -->
+        <n-button :focusable="false" class="logout" strong secondary round @click="isLogout">
+          <template #icon>
+            <SvgIcon name="Power" />
+          </template>
+          退出登录
+        </n-button>
+      </template>
     </div>
   </n-popover>
 </template>
@@ -139,6 +142,11 @@ import {
 import { openUserLogin, openPlatformLogin } from "@/utils/modal";
 import { getLoginState } from "@/api/login";
 import type { ApiPlatform } from "@/types/shared";
+import {
+  buildPlatformListItems,
+  resolvePlatformSelectAction,
+  type PlatformListItem,
+} from "@/api/platform/capability";
 import {
   toLogout,
   isLogin,
@@ -175,35 +183,17 @@ interface UserLikeItem {
 const userMenuShow = ref<boolean>(false);
 
 // 平台账号列表
-const platformList = computed(() => {
-  const current = platformStore.currentPlatform;
-  return (Object.keys(PLATFORM_META) as ApiPlatform[]).map((platform) => {
-    if (platform === "netease") {
-      return {
-        platform,
-        name: PLATFORM_META.netease.name,
-        short: PLATFORM_META.netease.short,
-        active: current === platform,
-        loggedIn: dataStore.userLoginStatus,
-        nickname: dataStore.userData.name || "未知用户名",
-        avatarUrl: dataStore.userData?.avatarUrl ?? "",
-      };
-    }
-    const profile = platformStore.platformProfiles[platform];
-    return {
-      platform,
-      name: PLATFORM_META[platform].name,
-      short: PLATFORM_META[platform].short,
-      active: current === platform,
-      loggedIn: !!profile,
-      nickname:
-        String(profile?.nickname ?? "").trim() ||
-        String(profile?.userId ?? "").trim() ||
-        PLATFORM_META[platform].name,
-      avatarUrl: profile?.avatarUrl ?? "",
-    };
-  });
-});
+const platformList = computed<PlatformListItem[]>(() =>
+  buildPlatformListItems(
+    platformStore.currentPlatform,
+    {
+      loggedIn: dataStore.userLoginStatus,
+      nickname: dataStore.userData.name,
+      avatarUrl: dataStore.userData?.avatarUrl,
+    },
+    platformStore.platformProfiles,
+  ),
+);
 
 // 当前平台是否已登录
 const currentLoggedIn = computed(() => {
@@ -251,27 +241,25 @@ const currentDisplayName = computed(() => {
   return currentProfileName.value;
 });
 
-// 开启用户菜单
+/** 开启或关闭用户菜单（未登录任何平台时亦允许展示，以便直选平台登录） */
 const openMenu = () => {
-  if (dataStore.userLoginStatus || platformStore.loggedInPlatforms.length > 0) {
-    userMenuShow.value = !userMenuShow.value;
-  } else {
-    openUserLogin();
-  }
+  userMenuShow.value = !userMenuShow.value;
 };
 
-// 选择平台：已登录则切换，未登录则拉起对应平台的登录弹窗
-const handlePlatform = (item: (typeof platformList.value)[number]) => {
+/**
+ * 选择平台：已登录则切换，未登录则拉起对应平台的登录弹窗
+ * @param item 平台条目
+ */
+const handlePlatform = (item: PlatformListItem) => {
   userMenuShow.value = false;
-  if (!item.loggedIn) {
-    if (item.platform === "netease") {
-      openUserLogin();
-    } else {
-      openPlatformLogin(item.platform);
-    }
-    return;
+  const action = resolvePlatformSelectAction(item);
+  if (action.type === "login-netease") {
+    openUserLogin();
+  } else if (action.type === "login-platform") {
+    openPlatformLogin(action.platform);
+  } else if (action.type === "switch-platform") {
+    platformStore.switchPlatform(action.platform);
   }
-  platformStore.switchPlatform(item.platform);
 };
 
 // 用户喜欢数据
