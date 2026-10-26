@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import type { SongType } from "@/types/main";
+import type { ApiPlatform } from "@/types/shared";
 import { isElectron } from "@/utils/env";
 import { cloneDeep } from "lodash-es";
 import { SongLyric } from "@/types/lyric";
@@ -11,6 +12,7 @@ interface MusicState {
   personalFM: {
     playIndex: number;
     list: SongType[];
+    platform?: ApiPlatform;
   };
   dailySongsData: {
     timestamp: number | null;
@@ -76,6 +78,19 @@ export const useMusicStore = defineStore("music", {
     personalFMSong(state): SongType {
       return state.personalFM.list?.[state.personalFM.playIndex] || defaultMusicData;
     },
+    /**
+     * 缓存推荐流的来源平台
+     *
+     * 优先取取数时记录的来源平台；旧版本持久化数据没有该字段，
+     * 按列表内歌曲的平台推断（网易云歌曲不带平台标记，按网易云处理）。
+     */
+    personalFMPlaform(state): ApiPlatform | undefined {
+      const list = state.personalFM.list ?? [];
+      if (!list.length) return undefined;
+      if (state.personalFM.platform) return state.personalFM.platform;
+      const songPlatform = list.find((song) => song.platform)?.platform;
+      return songPlatform ?? "netease";
+    },
   },
   actions: {
     /** 重置音乐数据 */
@@ -86,6 +101,17 @@ export const useMusicStore = defineStore("music", {
       if (isElectron) {
         window.electron.ipcRenderer.send("play-song-change", null);
       }
+    },
+    /**
+     * 重置平台维度的音乐数据
+     *
+     * 正在播放的歌曲、每日推荐与推荐流都只属于一个平台，切换平台时整体作废，
+     * 避免旧平台的内容残留在新平台的界面上。
+     */
+    resetPlatformMusicData() {
+      this.resetMusicData();
+      this.personalFM = { playIndex: 0, list: [] };
+      this.dailySongsData = { timestamp: null, list: [] };
     },
     /**
      * 设置/更新歌曲歌词数据

@@ -334,6 +334,27 @@ export const useStatusStore = defineStore("status", {
         listSortOrder: "default",
       });
     },
+    /**
+     * 重置平台维度的播放状态
+     *
+     * 切换平台时调用：正在播放的歌曲、播放进度与歌词位置都只属于旧平台，
+     * 整体作废；音量、循环模式、排序方式等用户偏好不受影响。
+     */
+    resetPlatformPlayStatus() {
+      this.$patch({
+        currentTime: 0,
+        duration: 0,
+        progress: 0,
+        lyricIndex: -1,
+        lyricLoading: false,
+        playStatus: false,
+        playLoading: false,
+        playListShow: false,
+        showFullPlayer: false,
+        personalFmMode: false,
+        playIndex: -1,
+      });
+    },
   },
   // 持久化（排除每秒高频变化的 duration/progress，仅保留 currentTime 用于恢复上次播放进度）
   persist: {

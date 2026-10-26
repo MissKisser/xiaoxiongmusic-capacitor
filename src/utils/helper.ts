@@ -4,7 +4,7 @@ import {
   AI_AUDIO_KEYS,
 } from "@/utils/meta";
 import { NTooltip, SelectOption } from "naive-ui";
-import { h, VNode } from "vue";
+import { defineAsyncComponent, h, VNode } from "vue";
 import { getCacheData } from "./cache";
 import { updateLog } from "@/api/other";
 import { isEmpty } from "lodash-es";
@@ -12,8 +12,9 @@ import { convertToLocalTime } from "./time";
 import { useSettingStore } from "@/stores";
 import { marked } from "marked";
 import { isElectron } from "./env";
-import SvgIcon from "@/components/Global/SvgIcon.vue";
 import Fuse from "fuse.js";
+
+const SvgIcon = defineAsyncComponent(() => import("@/components/Global/SvgIcon.vue"));
 
 type AnyObject = { [key: string]: any };
 

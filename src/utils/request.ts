@@ -11,14 +11,14 @@ import { localNcmRequest } from "./netease";
 // 生产环境/Capacitor：使用绝对 URL 直接访问远程服务器
 const baseURL: string = isDev && !isCapacitor
   ? "/api/netease"
-  : String(import.meta.env["VITE_API_URL"] || "https://music.viaxv.top") + "/api/netease";
+  : String(import.meta.env?.["VITE_API_URL"] || "https://music.viaxv.top") + "/api/netease";
 
 // 调试信息
 console.log("🔧 环境检测:", {
   isDev,
   isCapacitor,
   baseURL,
-  VITE_API_URL: import.meta.env["VITE_API_URL"]
+  VITE_API_URL: import.meta.env?.["VITE_API_URL"]
 });
 
 // 自定义适配器：在 Capacitor 环境下直接调用原生 HTTP 插件

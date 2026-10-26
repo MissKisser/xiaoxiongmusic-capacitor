@@ -1,3 +1,4 @@
+import { ref, reactive } from "vue";
 import type { SongType, LocalPlaylistType } from "@/types/main";
 import { cloneDeep } from "lodash-es";
 import localforage from "localforage";

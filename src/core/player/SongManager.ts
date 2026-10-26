@@ -2,32 +2,37 @@ import { diagLog } from "@/utils/diag";
 import { personalFm, personalFmToTrash } from "@/api/rec";
 import { songUrl, unlockSongUrl } from "@/api/song";
 import {
+  resolvePlaybackFailureText,
+  PLAYBACK_FAILED_TEXT,
+  type PlatformFailure,
+} from "@/api/platform/errorText";
+import { kgSongUrl, normalizeKgHash } from "@/api/platform/kugou";
+import { qqSongUrl } from "@/api/platform/qqmusic";
+import { kgSongFM, qqSongFM } from "@/api/platform/songfm";
+import { getPlatformLevel, mapPlatformQuality, type PlatformSongUrl } from "@/api/platform/types";
+import { planPlayback, type PlaybackStep } from "@/core/player/playbackDecision";
+import {
   useDataStore,
   useMusicStore,
+  usePlatformStore,
   useSettingStore,
   useStatusStore,
   useStreamingStore,
 } from "@/stores";
 import { QualityType, type SongType } from "@/types/main";
+import { SongUnlockServer, type ApiPlatform } from "@/types/shared";
 import { isLogin } from "@/utils/auth";
 import { isElectron, isCapacitor, isIos } from "@/utils/env";
 import { formatSongsList } from "@/utils/format";
 import { handleSongQuality } from "@/utils/helper";
-import { openUserLogin } from "@/utils/modal";
+import { isAudiobookSong, resolveSongPlatform } from "@/utils/songPlatform";
+import { getPlatformLabel, getUnlockPriority } from "@/utils/unlockPriority";
+import { UnlockUrlCache } from "@/utils/unlockUrlCache";
+
+export { SongUnlockServer };
 
 /**
- * 歌曲解锁服务器
- */
-export enum SongUnlockServer {
-  NETEASE = "netease",
-  BODIAN = "bodian",
-  KUWO = "kuwo",
-  GEQUBAO = "gequbao",
-}
-
-/**
- * 歌曲解锁优先级常量（与 PC 端一致，硬编码）
- * 存储数组顺序不影响尝试序
+ * 歌曲解锁优先级常量（网易云基线尝试序）
  */
 export const SONG_UNLOCK_PRIORITY: readonly SongUnlockServer[] = [
   SongUnlockServer.NETEASE,
@@ -60,6 +65,9 @@ export const getUnlockSourceName = (server: SongUnlockServer): string => {
     [SongUnlockServer.BODIAN]: "波点音乐",
     [SongUnlockServer.GEQUBAO]: "歌曲宝",
     [SongUnlockServer.KUWO]: "酷我音乐",
+    [SongUnlockServer.MIGU]: "咪咕音乐",
+    [SongUnlockServer.CHANGQING]: "长青聚合",
+    [SongUnlockServer.LXMUSIC]: "落雪音源",
   };
   return nameMap[server] || server;
 };
@@ -91,11 +99,84 @@ export type AudioSource = {
   quality?: QualityType;
   /** 解锁源名称（如果使用了解锁服务） */
   unlockSource?: string | null;
+  /** 播放失败的用户可读原因（无源可用时给出） */
+  failureReason?: string;
 };
+
+/** 推荐流单批曲目数 */
+const SONG_FM_BATCH_SIZE = 20;
+
+/** 第三方平台的歌曲缺歌手时的拒绝原因（用户可读） */
+const MISSING_ARTIST_REASON = "缺少歌手信息，无法安全换源";
+
+/** 歌曲缺少编号时的拒绝原因（用户可读） */
+const MISSING_SONG_ID_REASON = "缺少编号信息，无法获取播放链接";
+
+/** 歌曲缺少歌名时的拒绝原因（用户可读） */
+const MISSING_SONG_NAME_REASON = "缺少歌名，无法检索播放链接";
+
+/** 未开启任何换源服务时的拒绝原因（用户可读） */
+const NO_UNLOCK_SERVER_REASON = "未开启换源功能，无法获取播放链接";
+
+/**
+ * 取歌曲的歌手名
+ *
+ * 多个歌手时全部取用（用 ` / ` 连接），便于站外检索源准确匹配。
+ * @param song 歌曲
+ * @returns 歌手名
+ */
+const resolveSongArtist = (song: SongType): string => {
+  const artists = song.artists;
+  if (Array.isArray(artists)) {
+    return artists
+      .map((artist) => artist?.name ?? "")
+      .filter(Boolean)
+      .join(" / ");
+  }
+  return artists ?? "";
+};
+
+/**
+ * 生成歌曲的缓存键
+ *
+ * 平台歌曲用「平台-数字 ID」做键，避免与网易云同数字 ID 的歌曲互相覆盖缓存。
+ * @param song 歌曲
+ * @returns 缓存键
+ */
+const buildCacheKey = (song: SongType): string | number => {
+  const platform = resolveSongPlatform(song);
+  return platform === "netease" ? song.id : `${platform}-${song.id}`;
+};
+
+/**
+ * 生成播放标识（平台 + 数字 ID），用于预载结果匹配
+ * @param song 歌曲
+ * @param songId 歌曲 ID
+ * @returns 播放标识
+ */
+const buildPlayKey = (song: SongType, songId: number): string =>
+  `${resolveSongPlatform(song)}:${songId}`;
+
+/**
+ * 判断是否为第三方平台音源歌曲
+ * @param song 歌曲
+ * @returns 是否为第三方平台音源
+ */
+const isPlatformSource = (song?: SongType | null): boolean =>
+  resolveSongPlatform(song) !== "netease";
+
+/** 换源成功直链的进程内缓存 */
+const unlockedUrlCache = new UnlockUrlCache<QualityType>();
 
 class SongManager {
   /** 预载下一首歌曲播放信息 */
   private nextPrefetch: AudioSource | undefined;
+  /** 预载歌曲的播放标识（平台 + 数字 ID） */
+  private nextPrefetchKey: string | undefined;
+  /** 最近一次第三方平台的播放失败详情（用于最终失败时的用户提示） */
+  private lastPlatformFailure: PlatformFailure | undefined;
+  /** 最近一次换源链的用户可读失败原因（用于最终失败时的用户提示） */
+  private lastUnlockFailure: string | undefined;
 
   /**
    * 预加载封面图片
@@ -132,10 +213,13 @@ class SongManager {
 
   /**
    * 检查本地缓存
-   * @param id 歌曲id
+   * @param id 缓存键（网易云为歌曲 ID，平台歌曲为「平台-歌曲 ID」）
    * @param quality 音质
    */
-  private checkLocalCache = async (id: number, quality?: QualityType): Promise<string | null> => {
+  private checkLocalCache = async (
+    id: number | string,
+    quality?: QualityType,
+  ): Promise<string | null> => {
     const settingStore = useSettingStore();
     if (isElectron && settingStore.cacheEnabled && settingStore.songCacheEnabled) {
       try {
@@ -157,11 +241,15 @@ class SongManager {
 
   /**
    * 触发缓存下载
-   * @param id 歌曲id
+   * @param id 缓存键（网易云为歌曲 ID，平台歌曲为「平台-歌曲 ID」）
    * @param url 下载地址
    * @param quality 音质
    */
-  private triggerCacheDownload = (id: number, url: string, quality?: QualityType | string) => {
+  private triggerCacheDownload = (
+    id: number | string,
+    url: string,
+    quality?: QualityType | string,
+  ) => {
     const settingStore = useSettingStore();
     if (isElectron && settingStore.cacheEnabled && settingStore.songCacheEnabled && url) {
       window.electron.ipcRenderer.invoke("music-cache-download", id, url, quality || "standard");
@@ -181,7 +269,7 @@ class SongManager {
    * Web 端 URL 统一处理：通过代理转发
    * Electron 端：直接返回原始 URL
    * @param url 原始 URL
-   * @param cacheKey 缓存 Key (如歌曲 ID)
+   * @param cacheKey 缓存 Key (如歌曲 ID 或平台复合键)
    * @param referer 可选的防盗链 Referer
    * @returns 处理后的 URL
    */
@@ -224,7 +312,7 @@ class SongManager {
       let proxyUrl = isIos
         ? `capacitor-audio://proxy/audio?url=${encodeURIComponent(targetUrl)}`
         : `http://localhost:18520/proxy/audio?url=${encodeURIComponent(targetUrl)}`;
-      // 传递稳定的缓存 key（歌曲 ID），避免 URL 中的时间戳/token 变化导致缓存失效
+      // 传递稳定的缓存 key（歌曲 ID 或平台复合键），避免 URL 中的时间戳/token 变化导致缓存失效
       if (cacheKey) {
         proxyUrl += `&key=${encodeURIComponent(String(cacheKey))}`;
       }
@@ -257,12 +345,47 @@ class SongManager {
   }
 
   /**
-   * 获取在线播放链接
+   * 获取官方播放链接
+   *
+   * 按歌曲来源平台分派：网易云走既有链路，QQ 音乐与酷狗走各自的平台模块。
+   * @param songOrId 歌曲对象或歌曲 ID
+   * @param songIdOrIsPc 歌曲 ID（当首参为歌曲时）或是否为云盘歌曲（当首参为 ID 时）
+   * @param isPcArg 是否为云盘歌曲
+   * @returns 在线播放信息
+   */
+  public getOnlineUrl = async (
+    songOrId: SongType | number,
+    songIdOrIsPc: number | boolean = false,
+    isPcArg: boolean = false,
+  ): Promise<AudioSource> => {
+    let song: SongType | undefined;
+    let songId: number;
+    let isPc: boolean;
+
+    if (typeof songOrId === "number") {
+      songId = songOrId;
+      isPc = typeof songIdOrIsPc === "boolean" ? songIdOrIsPc : false;
+    } else {
+      song = songOrId;
+      songId = typeof songIdOrIsPc === "number" ? songIdOrIsPc : song.id;
+      isPc = isPcArg;
+    }
+
+    if (song && isPlatformSource(song)) {
+      const platform = resolveSongPlatform(song);
+      if (platform === "qqmusic") return this.getQqOnlineUrl(song);
+      if (platform === "kugou") return this.getKgOnlineUrl(song);
+    }
+    return this.getNeteaseOnlineUrl(songId, isPc);
+  };
+
+  /**
+   * 获取网易云官方播放链接（保持网易云既有函数体与行为零变化）
    * @param id 歌曲id
    * @param isPc 是否为云盘歌曲
    * @returns 在线播放信息
    */
-  public getOnlineUrl = async (id: number, isPc: boolean = false): Promise<AudioSource> => {
+  private getNeteaseOnlineUrl = async (id: number, isPc: boolean = false): Promise<AudioSource> => {
     const settingStore = useSettingStore();
     const level = isPc ? "exhigh" : settingStore.songLevel;
     const res = await songUrl(id, level);
@@ -313,6 +436,128 @@ class SongManager {
   };
 
   /**
+   * 获取 QQ 音乐官方播放链接
+   * @param song 歌曲
+   * @returns 在线播放信息
+   */
+  private getQqOnlineUrl = async (song: SongType): Promise<AudioSource> => {
+    const settingStore = useSettingStore();
+    const mid = song.platformId ?? String(song.id);
+    const level = getPlatformLevel("qqmusic", settingStore.songLevel);
+    let res: PlatformSongUrl;
+    try {
+      res = await qqSongUrl(mid, level);
+    } catch (error) {
+      console.error(`❌ [${song.id}] QQ 音乐播放地址获取失败:`, error);
+      return { id: song.id, url: undefined, isTrial: false, unlockSource: "official" };
+    }
+    console.log(`🌐 [${song.id}] QQ 音乐播放地址:`, {
+      available: res.available,
+      isTrial: res.isTrial,
+      level: res.level,
+      reason: res.reason,
+    });
+    // 失败原因留给最终失败提示用（付费 / 无授权 / 凭证异常）
+    if (!res.available) {
+      this.lastPlatformFailure = { platform: "qqmusic", reason: res.reason };
+    }
+    return this.buildPlatformAudioSource(song, res);
+  };
+
+  /**
+   * 获取酷狗官方播放链接
+   * @param song 歌曲
+   * @returns 在线播放信息
+   */
+  private getKgOnlineUrl = async (song: SongType): Promise<AudioSource> => {
+    const settingStore = useSettingStore();
+    const hash = normalizeKgHash(song.platformId ?? song.id);
+    const level = getPlatformLevel("kugou", settingStore.songLevel);
+    const isAudiobook = isAudiobookSong(song);
+    const album = typeof song.album === "object" && song.album ? song.album : null;
+    const albumId = isAudiobook ? Number(album?.platformId ?? album?.id ?? 0) : 0;
+    const albumAudioId = isAudiobook ? Number(song.id) : 0;
+    let res: PlatformSongUrl;
+    try {
+      res = await kgSongUrl(hash, level, { albumId, albumAudioId });
+    } catch (error) {
+      console.error(`❌ [${song.id}] 酷狗播放地址获取失败:`, error);
+      return { id: song.id, url: undefined, isTrial: false, unlockSource: "official" };
+    }
+    console.log(`🌐 [${song.id}] 酷狗播放地址:`, {
+      available: res.available,
+      isTrial: res.isTrial,
+      status: res.status,
+      privilege: res.privilege,
+      level: res.level,
+    });
+    if (!res.available) {
+      this.lastPlatformFailure = {
+        platform: "kugou",
+        reason: res.reason,
+        status: res.status,
+        privilege: res.privilege,
+      };
+    }
+    return this.buildPlatformAudioSource(song, res);
+  };
+
+  /**
+   * 整理平台播放地址为音频源
+   *
+   * 试听判据：QQ 音乐取 `isTrial`；酷狗取 `status === 2`（付费墙）或 `isTrial`。
+   * 试听片段只记录不落缓存 —— 缓存里放的是整曲文件，片段会污染缓存键。
+   * @param song 歌曲
+   * @param res 平台播放地址
+   * @returns 在线播放信息
+   */
+  private buildPlatformAudioSource = async (
+    song: SongType,
+    res: PlatformSongUrl,
+  ): Promise<AudioSource> => {
+    const id = song.id;
+    const isTrial = res.isTrial === true || res.status === 2;
+    const quality = mapPlatformQuality(res.level);
+    const rawUrl = res.url?.trim() ? res.url.trim() : undefined;
+    if (!rawUrl) {
+      console.warn(`⚠️ [${id}] 官方链接获取失败：无播放地址`);
+      return { id, url: undefined, isTrial, quality, unlockSource: "official" };
+    }
+    const cacheKey = buildCacheKey(song);
+    if (!isTrial && quality && isElectron) {
+      const cachedUrl = await this.checkLocalCache(cacheKey, quality);
+      if (cachedUrl) {
+        console.log(`✅ [${id}] 使用本地缓存播放`);
+        return { id, url: cachedUrl, isTrial, quality, unlockSource: "cache" };
+      }
+    }
+    let processedUrl: string | null | undefined = rawUrl;
+    if (!isElectron && rawUrl) {
+      processedUrl = this.processUrlForWeb(rawUrl, cacheKey);
+      if (!processedUrl) {
+        console.error(`❌ [${id}] 播放 URL 处理失败，原始 URL:`, rawUrl);
+        return { id, url: undefined, isTrial, quality, unlockSource: "official" };
+      }
+      console.log(
+        `🌐 [${id}] 播放使用代理接口，原始 URL:`,
+        rawUrl,
+        "代理 URL:",
+        processedUrl,
+      );
+    }
+    if (!isTrial && isElectron) {
+      this.triggerCacheDownload(cacheKey, rawUrl, quality);
+    }
+    const finalProcessedUrl = processedUrl || undefined;
+    console.log(`📦 [${id}] getOnlineUrl 最终返回:`, {
+      url: finalProcessedUrl,
+      isTrial,
+      quality,
+    });
+    return { id, url: finalProcessedUrl, isTrial, quality, unlockSource: "official" };
+  };
+
+  /**
    * 获取解锁播放链接
    * @param song 歌曲数据
    * @returns 音频源
@@ -320,92 +565,117 @@ class SongManager {
   public getUnlockSongUrl = async (song: SongType): Promise<AudioSource> => {
     const settingStore = useSettingStore();
     const songId = song.id;
+    const platform = resolveSongPlatform(song);
+    const isNeteaseSong = platform === "netease";
+    const cacheKey = buildCacheKey(song);
+
     // 优先检查本地缓存
-    const cachedUrl = await this.checkLocalCache(songId);
+    const cachedUrl = await this.checkLocalCache(cacheKey);
     if (cachedUrl) {
-      return { id: songId, url: cachedUrl };
+      return { id: songId, url: cachedUrl, isUnlocked: true, unlockSource: "cache" };
     }
-    // 提取歌手名
-    const artist = Array.isArray(song.artists) ? song.artists[0].name : song.artists;
+
+    // 提取歌手名：平台歌曲使用 resolveSongArtist 提取全量合作歌手
+    const artist = isNeteaseSong
+      ? (Array.isArray(song.artists) ? song.artists[0]?.name : song.artists) ?? ""
+      : resolveSongArtist(song);
     const songName = song.name;
     if (!songId || !songName) {
-      return { id: songId, url: undefined };
+      return {
+        id: songId,
+        url: undefined,
+        failureReason: !songId ? MISSING_SONG_ID_REASON : MISSING_SONG_NAME_REASON,
+      };
     }
 
-    // 按硬编码优先级获取已启用的解锁服务列表，保证尝试顺序严格对齐 PC 端
-    const sortedServers = selectUnlockServers(settingStore.songUnlockServer);
+    // 第三方平台歌曲进行关键词换源时必须有歌手信息，防范跨平台同名曲目张冠李戴
+    if (!isNeteaseSong && !artist) {
+      console.warn(`⚠️ [${songId}] ${MISSING_ARTIST_REASON}：${songName}`);
+      return { id: songId, url: undefined, failureReason: MISSING_ARTIST_REASON };
+    }
+
+    // 按平台分派换源优先级
+    const priorityOrder = getUnlockPriority(platform);
+
+    // 获取启用的音源列表，并按优先级排序
+    const enabledServers = settingStore.songUnlockServer
+      ? settingStore.songUnlockServer.filter((s) => s.enabled).map((s) => s.key)
+      : [];
+
+    if (enabledServers.length === 0) {
+      return { id: songId, url: undefined, failureReason: NO_UNLOCK_SERVER_REASON };
+    }
+
+    // 按优先级顺序排序启用的服务器
+    let sortedServers = priorityOrder.filter((server) => enabledServers.includes(server));
+
+    // A-05 铁律防御：非网易云歌曲绝不允许拿平台 ID 查网易云
+    if (!isNeteaseSong) {
+      sortedServers = sortedServers.filter((server) => server !== SongUnlockServer.NETEASE);
+    }
 
     if (sortedServers.length === 0) {
-      return { id: songId, url: undefined };
+      return { id: songId, url: undefined, failureReason: NO_UNLOCK_SERVER_REASON };
     }
 
-    // 按顺序请求，一旦成功就返回
-    console.log(`[UNLOCK] [${songId}] 开始按优先级尝试解锁服务`);
-    console.log(`[UNLOCK] [${songId}] 启用的服务: ${sortedServers.map(s => this.getUnlockSourceName(s)).join(', ')}`);
-    console.log(`[UNLOCK] [${songId}] 优先级顺序: ${sortedServers.map(s => this.getUnlockSourceName(s)).join(' -> ')}`);
-
-    // 检查是否有服务未启用
-    const skippedServers = SONG_UNLOCK_PRIORITY.filter((server) => !sortedServers.includes(server));
-    if (skippedServers.length > 0) {
-      console.log(`[UNLOCK] [${songId}] 跳过的服务（未启用）: ${skippedServers.map(s => this.getUnlockSourceName(s)).join(', ')}`);
+    // 检查换源直链内存缓存
+    const cachedUnlocked = unlockedUrlCache.get(String(cacheKey));
+    if (cachedUnlocked) {
+      const cachedUrl = this.processUrlForWeb(cachedUnlocked.url, cacheKey);
+      console.log(`♻️ [${songId}] 命中换源直链缓存（${cachedUnlocked.unlockSource}）`);
+      return {
+        id: songId,
+        url: cachedUrl || undefined,
+        isUnlocked: true,
+        quality: cachedUnlocked.quality,
+        unlockSource: cachedUnlocked.unlockSource,
+      };
     }
 
+    console.log(`[UNLOCK] [${songId}] 开始按优先级尝试解锁服务（平台：${getPlatformLabel(platform)}）`);
+    console.log(
+      `[UNLOCK] [${songId}] 启用的服务: ${sortedServers.map((s) => this.getUnlockSourceName(s)).join(", ")}`,
+    );
+    console.log(
+      `[UNLOCK] [${songId}] 优先级顺序: ${sortedServers.map((s) => this.getUnlockSourceName(s)).join(" -> ")}`,
+    );
+
+    const failures: string[] = [];
     for (const server of sortedServers) {
-      // 提前获取服务名称，避免在作用域内重复定义
       const sourceName = this.getUnlockSourceName(server);
       try {
         console.log(`[UNLOCK] [${songId}] 正在尝试解锁服务: ${sourceName} (${server})...`);
         const result = await unlockSongUrl(songId, songName, artist, server);
         console.log(`[UNLOCK] [${songId}] ${sourceName} 返回结果:`, result);
 
-        // 检查是否成功
         if (result.code === 200 && result.url && result.url.trim() !== "") {
           const originalUrl = result.url.trim();
-          console.log(`[UNLOCK] [${songId}] ${sourceName} 返回的原始 URL 长度: ${originalUrl.length}`);
-          console.log(`[UNLOCK] [${songId}] ${sourceName} 返回的原始 URL 类型检查:`, typeof originalUrl);
-
-          // Web 端：统一通过代理转发（与 Electron 端逻辑对齐）
-          // Electron 端：直接使用原始 URL（MPV 不受浏览器限制）
           diagLog(`解锁尝试 源=${server} 歌曲id=${songId}`);
-          // 歌曲宝源需传入防盗链 Referer
           const referer = server === SongUnlockServer.GEQUBAO ? "https://gequbao.com/" : undefined;
-          const unlockUrl = this.processUrlForWeb(originalUrl, songId, referer);
-          if (!isElectron) {
-            console.log(`[UNLOCK] [${songId}] Web 端处理后的 URL:`, unlockUrl ? sanitizeUrlForLog(unlockUrl) : "null/undefined");
-          }
-
+          const unlockUrl = this.processUrlForWeb(originalUrl, cacheKey, referer);
           const finalUnlockUrl = unlockUrl || undefined;
 
-          // 验证最终 URL 是否有效
           if (!finalUnlockUrl || finalUnlockUrl.trim() === "") {
             console.error(`[UNLOCK] [${songId}] ${sourceName} 处理后的 URL 无效，跳过此服务`);
             continue;
           }
 
-          // 推断音质
           let quality = QualityType.HQ;
           if (originalUrl.includes(".flac") || originalUrl.includes(".wav")) {
             quality = QualityType.SQ;
           }
 
-          // 调试信息：显示使用的解锁源（URL 脱敏，只保留域名与路径，隐藏签名参数）
           console.log(`[UNLOCK] [${songId}] 解锁成功！`);
-          console.log(`[UNLOCK] [${songId}] 解锁源: ${sourceName} (${server})`);
-          console.log(`[UNLOCK] [${songId}] 音质: ${quality}`);
-          console.log(`[UNLOCK] [${songId}] 原始 URL: ${sanitizeUrlForLog(originalUrl)}`);
-          console.log(`[UNLOCK] [${songId}] 最终返回 URL: ${sanitizeUrlForLog(finalUnlockUrl || "")}`);
-          console.log(`[UNLOCK] [${songId}] 最终返回 URL 长度: ${finalUnlockUrl ? finalUnlockUrl.length : 0}`);
+          console.log(`   📍 解锁源: ${sourceName} (${server})`);
+          console.log(`   🎵 音质: ${quality}`);
 
-          // 验证 URL 格式
-          try {
-            new URL(finalUnlockUrl);
-            console.log(`[UNLOCK] [${songId}] URL 格式验证通过`);
-          } catch (e) {
-            console.error(`[UNLOCK] [${songId}] URL 格式验证失败:`, e);
-          }
+          this.triggerCacheDownload(cacheKey, originalUrl);
 
-          // 解锁成功后，触发下载（使用原始 URL，仅 Electron 端）
-          this.triggerCacheDownload(songId, originalUrl);
+          unlockedUrlCache.set(String(cacheKey), {
+            url: originalUrl,
+            quality,
+            unlockSource: server,
+          });
 
           return {
             id: songId,
@@ -415,16 +685,90 @@ class SongManager {
             unlockSource: server,
           };
         } else {
+          failures.push(`${sourceName}：未找到可用链接`);
           console.warn(`[UNLOCK] [${songId}] ${sourceName} 返回失败，继续尝试下一个服务...`);
         }
       } catch (error) {
+        failures.push(`${sourceName}：请求失败`);
         console.error(`[UNLOCK] [${songId}] ${sourceName} 请求失败:`, error);
-        // 继续尝试下一个服务
       }
     }
 
-    console.warn(`[UNLOCK] [${songId}] 所有解锁服务均失败`);
-    return { id: songId, url: undefined };
+    console.warn(`[UNLOCK] [${songId}] 所有解锁服务均失败：${failures.join("；")}`);
+    return { id: songId, url: undefined, failureReason: PLAYBACK_FAILED_TEXT };
+  };
+
+  /**
+   * 执行播放决策树的单一步骤
+   * @param step 决策步骤
+   * @param song 歌曲
+   * @param songId 歌曲 ID
+   * @param official 官方直链信息
+   * @param notify 是否弹出提示
+   * @returns 命中的音频源
+   */
+  private resolvePlaybackStep = async (
+    step: PlaybackStep,
+    song: SongType,
+    songId: number,
+    official: AudioSource,
+    notify: boolean,
+  ): Promise<AudioSource | undefined> => {
+    switch (step) {
+      case "official": {
+        if (!official.url) return undefined;
+        return { ...official, id: songId };
+      }
+      case "unlock": {
+        console.log(`🔓 [${songId}] 官方链接无效或仅可试听，尝试解锁兜底...`);
+        const unlockResult = await this.getUnlockSongUrl(song);
+        if (unlockResult.url && unlockResult.url.trim() !== "") {
+          console.log(`✅ [${songId}] 解锁成功，使用解锁链接播放`);
+          return unlockResult;
+        }
+        if (notify) this.lastUnlockFailure = unlockResult.failureReason;
+        return undefined;
+      }
+      case "trial": {
+        if (!official.url) return undefined;
+        console.warn(`⚠️ [${songId}] 解锁失败，回落官方试听片段`);
+        if (notify) {
+          try {
+            window.$message?.warning("当前歌曲仅可试听");
+          } catch {
+            // 单测或无组件环境忽略
+          }
+        }
+        return {
+          id: songId,
+          url: official.url,
+          quality: official.quality,
+          isUnlocked: false,
+          isTrial: true,
+          unlockSource: "official",
+        };
+      }
+      case "cache": {
+        const fallbackUrl = await this.checkLocalCache(buildCacheKey(song));
+        if (!fallbackUrl) return undefined;
+        console.log(`🚀 [${songId}] 网络请求失败，使用本地缓存兜底`);
+        return { id: songId, url: fallbackUrl, isUnlocked: true, unlockSource: "cache" };
+      }
+      default:
+        return undefined;
+    }
+  };
+
+  /**
+   * 汇总播放最终失败的用户可读原因
+   * @returns 用户可读原因
+   */
+  private takePlaybackFailureReason = (): string => {
+    const failure = this.lastPlatformFailure;
+    this.lastPlatformFailure = undefined;
+    const localReason = this.lastUnlockFailure;
+    this.lastUnlockFailure = undefined;
+    return resolvePlaybackFailureText(failure, localReason);
   };
 
   /**
@@ -462,7 +806,9 @@ class SongManager {
           url: nextSong.streamUrl,
           isUnlocked: false,
           quality: QualityType.SQ,
+          unlockSource: "streaming",
         };
+        this.nextPrefetchKey = buildPlayKey(nextSong, nextSong.id);
         return this.nextPrefetch;
       }
 
@@ -470,37 +816,26 @@ class SongManager {
       const songId = nextSong.type === "radio" ? nextSong.dj?.id : nextSong.id;
       if (!songId) return;
 
-      // 是否可解锁（非电台且开启解锁）
-      const canUnlock = nextSong.type !== "radio" && settingStore.useSongUnlock;
+      // 是否可解锁（非电台、非听书且开启解锁）
+      const canUnlock =
+        nextSong.type !== "radio" && !isAudiobookSong(nextSong) && settingStore.useSongUnlock;
 
-      // 1. 优先尝试获取官方链接
-      const officialResult = await this.getOnlineUrl(songId, !!nextSong.pc);
-      if (officialResult.url && !officialResult.isTrial) {
-        this.nextPrefetch = officialResult;
-        return this.nextPrefetch;
-      }
+      // 官方链接（按平台分派）
+      const official = await this.getOnlineUrl(nextSong, songId, !!nextSong.pc);
+      const steps = planPlayback({
+        hasOfficialUrl: Boolean(official.url),
+        isTrial: Boolean(official.isTrial),
+        canUnlock,
+        playSongDemo: settingStore.playSongDemo,
+      });
 
-      // 暂存试听源
-      let trialSource: AudioSource | null = null;
-      if (officialResult.url && officialResult.isTrial) {
-        trialSource = officialResult;
-      }
-
-      // 2. 官方未果后尝试解锁兜底
-      if (canUnlock) {
-        console.log(`🔓 [${songId}] 预加载：官方无完整链接（${trialSource ? "仅可试听" : "无链接"}），尝试解锁兜底...`);
-        const unlockResult = await this.getUnlockSongUrl(nextSong);
-        if (unlockResult.url) {
-          console.log(`✅ [${songId}] 预加载：解锁成功，使用解锁链接`);
-          this.nextPrefetch = unlockResult;
+      for (const step of steps) {
+        const source = await this.resolvePlaybackStep(step, nextSong, songId, official, false);
+        if (source) {
+          this.nextPrefetch = source;
+          this.nextPrefetchKey = buildPlayKey(nextSong, songId);
           return this.nextPrefetch;
         }
-      }
-
-      // 3. 解锁全部失败后，若暂存了官方试听且允许试听，保留官方试听地址
-      if (trialSource?.url && settingStore.playSongDemo) {
-        this.nextPrefetch = trialSource;
-        return this.nextPrefetch;
       }
 
       return;
@@ -515,6 +850,7 @@ class SongManager {
    */
   public clearPrefetch() {
     this.nextPrefetch = undefined;
+    this.nextPrefetchKey = undefined;
     console.log("🧹 已清除歌曲 URL 缓存");
   }
 
@@ -527,6 +863,8 @@ class SongManager {
   public getAudioSource = async (song: SongType): Promise<AudioSource> => {
     const settingStore = useSettingStore();
     const songId = song.type === "radio" ? song.dj?.id : song.id;
+    this.lastUnlockFailure = undefined;
+    this.lastPlatformFailure = undefined;
     console.log(`🎵 [${songId || song.id}] 开始获取音频源，类型: ${song.type}`, { isElectron, song });
 
     // 本地文件直接返回（仅 Electron 端）
@@ -539,6 +877,7 @@ class SongManager {
       const result = await window.electron.ipcRenderer.invoke("file-exists", song.path);
       if (!result) {
         this.nextPrefetch = undefined;
+        this.nextPrefetchKey = undefined;
         console.error("❌ 本地文件不存在");
         return { id: song.id, url: undefined };
       }
@@ -569,72 +908,66 @@ class SongManager {
     // 在线歌曲
     if (!songId) return { id: 0, url: undefined, quality: undefined, isUnlocked: false };
 
-    // 检查缓存并返回
-    if (this.nextPrefetch && this.nextPrefetch.id === songId && settingStore.useNextPrefetch) {
+    // 检查预加载缓存：使用平台维度复合键
+    const playKey = buildPlayKey(song, songId);
+    if (
+      this.nextPrefetch &&
+      (this.nextPrefetchKey === playKey || (!this.nextPrefetchKey && this.nextPrefetch.id === songId)) &&
+      settingStore.useNextPrefetch
+    ) {
       const cachedSource = this.nextPrefetch;
       // 验证缓存的 URL 是否有效
       if (cachedSource.url && cachedSource.url.trim() !== "") {
         console.log(`🚀 [${songId}] 使用预加载缓存播放`);
         this.nextPrefetch = undefined;
+        this.nextPrefetchKey = undefined;
         return cachedSource;
       } else {
         console.warn(`⚠️ [${songId}] 预加载缓存 URL 无效，重新获取`);
         this.nextPrefetch = undefined;
+        this.nextPrefetchKey = undefined;
       }
     }
 
     // 在线获取
     try {
-      // 是否可解锁（电台类型不解锁）
-      const canUnlock = song.type !== "radio" && settingStore.useSongUnlock;
+      // 是否可解锁（非电台、非听书且开启解锁）
+      const canUnlock =
+        song.type !== "radio" && !isAudiobookSong(song) && settingStore.useSongUnlock;
 
-      // 1. 所有在线歌曲一律先尝试官方链接（云盘歌曲 song.pc 为真）
-      const officialResult = await this.getOnlineUrl(songId, !!song.pc);
-      diagLog(`官方链接 id=${songId} 结果=${officialResult.url ? "有" : "无"} 试听=${officialResult.isTrial}`);
-      console.log(`[SONG] [${songId}] 官方链接获取结果:`, officialResult);
+      // 官方链接（按来源平台分派：网易云 / QQ 音乐 / 酷狗音乐）
+      const official = await this.getOnlineUrl(song, songId, !!song.pc);
+      diagLog(`官方链接 id=${songId} 结果=${official.url ? "有" : "无"} 试听=${official.isTrial}`);
+      console.log(`[SONG] [${songId}] 官方链接获取结果:`, official);
 
-      // 返回完整非试听链接，直接以 official 源返回
-      if (officialResult.url && !officialResult.isTrial) {
-        return officialResult;
+      // 播放决策树：官方完整可播 → 解锁换源 → 官方试听 → 本地缓存
+      const steps = planPlayback({
+        hasOfficialUrl: Boolean(official.url),
+        isTrial: Boolean(official.isTrial),
+        canUnlock,
+        playSongDemo: settingStore.playSongDemo,
+      });
+
+      for (const step of steps) {
+        const source = await this.resolvePlaybackStep(step, song, songId, official, true);
+        if (source) return source;
       }
 
-      // 拿到试听链接，先暂存不直接返回，继续尝试解锁
-      let trialSource: AudioSource | null = null;
-      if (officialResult.url && officialResult.isTrial) {
-        trialSource = officialResult;
-      }
-
-      // 2. 官方未果后（且 useSongUnlock 开启、非电台类型）走解锁链
-      if (canUnlock) {
-        console.log(`[UNLOCK] [${songId}] 官方无完整链接（${trialSource ? "仅可试听" : "无链接"}），尝试解锁服务...`);
-        const unlockResult = await this.getUnlockSongUrl(song);
-        if (unlockResult.url && unlockResult.url.trim() !== "") {
-          console.log(`[UNLOCK] [${songId}] 解锁成功，使用解锁链接播放`);
-          return unlockResult;
-        }
-        console.warn(`[UNLOCK] [${songId}] 所有解锁服务均失败`);
-      }
-
-      // 3. 解锁全部失败后：若暂存了官方试听链接且 settingStore.playSongDemo 开启，返回试听
-      if (trialSource?.url && settingStore.playSongDemo) {
-        window.$message.warning("当前歌曲仅可试听");
-        return trialSource;
-      }
-
-      // 4. 本地缓存兜底（检查是否有之前缓存的文件，不区分音质）
-      const fallbackUrl = await this.checkLocalCache(songId);
-      if (fallbackUrl) {
-        console.log(`🚀 [${songId}] 网络请求失败，使用本地缓存兜底`);
-        return { id: songId, url: fallbackUrl, isUnlocked: true, unlockSource: "cache" };
-      }
-
-      // 5. 无可用源
+      // 无可用源
       console.error(`❌ [${songId}] 所有音频源获取失败，无可用链接`);
-      return { id: songId, url: undefined, quality: undefined, isUnlocked: false, unlockSource: null };
+      const failureReason = this.takePlaybackFailureReason();
+      return {
+        id: songId,
+        url: undefined,
+        quality: undefined,
+        isUnlocked: false,
+        unlockSource: null,
+        failureReason,
+      };
     } catch (e) {
       console.error(`❌ [${songId}] 获取音频源异常:`, e);
       // 异常时的兜底：检查本地是否有缓存
-      const fallbackUrl = await this.checkLocalCache(songId);
+      const fallbackUrl = await this.checkLocalCache(buildCacheKey(song));
       if (fallbackUrl) {
         console.log(`🚀 [${songId}] 获取异常，使用本地缓存兜底`);
         return { id: songId, url: fallbackUrl, isUnlocked: true, unlockSource: "cache" };
@@ -645,12 +978,42 @@ class SongManager {
         quality: undefined,
         isUnlocked: false,
         unlockSource: null,
+        failureReason: PLAYBACK_FAILED_TEXT,
       };
     }
   };
 
   /**
-   * 初始化/播放私人 FM
+   * 读取当前平台的推荐流曲目
+   *
+   * 网易云走 `/personal_fm`（私人 FM，一次 3 首）；
+   * QQ 音乐与酷狗音乐没有等价端点，改由平台推荐流模块给出个性化推荐（一次一批）。
+   * 第三方平台的推荐流取数失败时直接失败，不得回落网易云 `/personal_fm`。
+   * @param platform 目标平台
+   * @returns 推荐流曲目
+   */
+  private fetchSongFMList = async (platform: ApiPlatform): Promise<SongType[]> => {
+    if (platform === "qqmusic") {
+      return qqSongFM(SONG_FM_BATCH_SIZE);
+    }
+    if (platform === "kugou") {
+      return kgSongFM(SONG_FM_BATCH_SIZE);
+    }
+    const res = await personalFm();
+    return formatSongsList(res.data);
+  };
+
+  /**
+   * 判断缓存的推荐流是否属于当前平台
+   */
+  private isPersonalFMPlaformMatched = (): boolean => {
+    const musicStore = useMusicStore();
+    if (!musicStore.personalFM.list.length) return false;
+    return musicStore.personalFMPlaform === usePlatformStore().currentPlatform;
+  };
+
+  /**
+   * 初始化/播放推荐流（网易云私人 FM / QQ 音乐刷歌 / 酷狗音乐刷歌）
    * @param playNext 是否播放下一首
    * @returns 是否成功
    */
@@ -660,13 +1023,18 @@ class SongManager {
 
     try {
       const fetchFM = async () => {
-        const res = await personalFm();
-        musicStore.personalFM.list = formatSongsList(res.data);
+        const platform = usePlatformStore().currentPlatform;
+        musicStore.personalFM.list = await this.fetchSongFMList(platform);
+        musicStore.personalFM.platform = platform;
         musicStore.personalFM.playIndex = 0;
       };
 
-      // 若列表为空或已播放到最后，获取新列表
-      if (musicStore.personalFM.list.length === 0) await fetchFM();
+      // 列表为空或列表不属于当前平台时重新取数
+      if (!this.isPersonalFMPlaformMatched()) {
+        musicStore.personalFM.list = [];
+        musicStore.personalFM.playIndex = 0;
+        await fetchFM();
+      }
       // 如果需要播放下一首
       if (playNext) {
         statusStore.personalFmMode = true;
@@ -679,15 +1047,16 @@ class SongManager {
         }
       }
     } catch (error) {
-      console.error("❌ 私人 FM 初始化失败", error);
+      console.error("❌ 推荐流初始化失败", error);
     }
   }
 
   /**
-   * 私人 FM 垃圾桶
+   * 私人 FM 垃圾桶（仅网易云支持）
    */
   public async personalFMTrash(id: number) {
     if (!isLogin()) {
+      const { openUserLogin } = await import("@/utils/modal");
       openUserLogin(true);
       return;
     }
@@ -703,25 +1072,26 @@ class SongManager {
   }
 
   /**
-   * 刷新私人 FM
+   * 刷新推荐流（网易云私人 FM / QQ 音乐刷歌 / 酷狗音乐刷歌）
    */
   public async refreshPersonalFM() {
     const musicStore = useMusicStore();
-    if (!isLogin()) {
+    const platform = usePlatformStore().currentPlatform;
+    if (platform === "netease" && !isLogin()) {
       window.$message.error("请先登录");
       return;
     }
     try {
-      const res = await personalFm();
-      const newList = formatSongsList(res.data);
+      const newList = await this.fetchSongFMList(platform);
       if (!newList || newList.length === 0) {
-        throw new Error("加载私人漫游列表失败");
+        throw new Error("加载推荐流列表失败");
       }
       musicStore.personalFM.list = newList;
+      musicStore.personalFM.platform = platform;
       musicStore.personalFM.playIndex = 0;
       window.$message.success("刷新成功");
     } catch (error) {
-      console.error("❌ 刷新私人 FM 失败", error);
+      console.error("❌ 刷新推荐流失败", error);
       window.$message.error("刷新失败，请重试");
     }
   }

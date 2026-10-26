@@ -1,5 +1,4 @@
 import { createRouter, createWebHashHistory, Router } from "vue-router";
-import { openUserLogin } from "@/utils/modal";
 import { isElectron } from "@/utils/env";
 import { isLogin } from "@/utils/auth";
 import routes from "./routes";
@@ -35,7 +34,9 @@ router.beforeEach((to, from, next) => {
   if (to.meta.needLogin && !isLogin()) {
     if (!isElectron) window.$loadingBar.error();
     window.$message.warning("请登录后使用");
-    openUserLogin();
+    import("@/utils/modal").then(({ openUserLogin }) => {
+      openUserLogin();
+    });
     return;
   }
   // 需要客户端

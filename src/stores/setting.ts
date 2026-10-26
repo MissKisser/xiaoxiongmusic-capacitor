@@ -1,5 +1,5 @@
 import { TimeFormat } from "@/composables/useTimeFormat";
-import { SongUnlockServer } from "@/core/player/SongManager";
+import { SongUnlockServer } from "@/types/shared";
 import defaultDesktopLyricConfig from "@/assets/data/lyricConfig";
 import type { LyricConfig } from "@/types/desktop-lyric";
 import type { SongLevelType } from "@/types/main";

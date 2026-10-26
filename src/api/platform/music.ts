@@ -120,6 +120,25 @@ export const listPlatformModules = (platform: ApiPlatform): string[] => {
   return [];
 };
 
+/** 测试用调用拦截器签名 */
+export type PlatformCallInterceptor = (
+  platform: ApiPlatform,
+  name: string,
+  params?: Record<string, unknown>,
+) => Promise<unknown> | unknown;
+
+let testInterceptor: PlatformCallInterceptor | null = null;
+
+/**
+ * 设置平台接口调用拦截器（仅用于单测与冒烟桩件环境）
+ * @param interceptor 拦截器函数或 null
+ */
+export const setPlatformCallInterceptor = (
+  interceptor: PlatformCallInterceptor | null,
+): void => {
+  testInterceptor = interceptor;
+};
+
 /**
  * 调用平台接口
  * @param platform 音源平台
@@ -132,6 +151,10 @@ export const platformCall = async <T = unknown>(
   name: string,
   params?: Record<string, unknown>,
 ): Promise<T> => {
+  if (testInterceptor) {
+    const intercepted = await testInterceptor(platform, name, params);
+    if (intercepted !== undefined) return intercepted as T;
+  }
   const res: ApiCallResponse = await executePlatformCall(platform, name, params);
   if (res.ok) return res.data as T;
   if (res.errorCode === "AUTH_EXPIRED") {

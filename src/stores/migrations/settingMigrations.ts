@@ -1,5 +1,5 @@
 import { keywords, regexes } from "@/assets/data/exclude";
-import { SongUnlockServer } from "@/core/player/SongManager";
+import { SongUnlockServer } from "@/types/shared";
 import { defaultAMLLDbServer } from "@/utils/meta";
 import type { SettingState } from "../setting";
 

@@ -386,7 +386,7 @@ export const normalizeKgPlaylist = (playlist: Record<string, any>): PlatformPlay
     owned: !subscribed,
     subscribed,
     // 系统歌单标记原始值：1 默认收藏，2 我喜欢的歌
-    isDef: Number(playlist?.isDef ?? 0),
+    isDef: Number(playlist?.isDef ?? playlist?.is_def ?? 0),
     isDefault: playlist?.isDefault === true,
     // 收藏歌单的真实标识是源歌单，本地 listid 只是收藏记录号
     originListid: String(playlist?.originListid ?? playlist?.list_create_listid ?? "") || undefined,

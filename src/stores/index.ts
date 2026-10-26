@@ -13,3 +13,15 @@ export { useStreamingStore } from "./streaming";
 // auth & version
 export { useAuthStore } from "./auth";
 export { useVersionStore } from "./version";
+
+// platform
+export {
+  usePlatformStore,
+  PLATFORM_META,
+  SUPPORTED_PLATFORMS,
+  THIRD_PARTY_PLATFORMS,
+  onPlatformChange,
+  onAccountChange,
+} from "./platform";
+export { usePlatformScopeStore, initPlatformScope } from "./platformScope";
+

@@ -20,6 +20,8 @@ export enum SongUnlockServer {
   BODIAN = "bodian",
   /** 酷我音乐 */
   KUWO = "kuwo",
+  /** 歌曲宝 */
+  GEQUBAO = "gequbao",
   /** 咪咕音乐 */
   MIGU = "migu",
   /** 长青聚合 */

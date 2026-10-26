@@ -49,8 +49,25 @@ export const songUrl = (
   });
 };
 
+type UnlockSongUrlHandler = (
+  id: number,
+  songName: string,
+  artist: string,
+  server: SongUnlockServer,
+) => Promise<{ code: number; url: string | null }>;
+
+let customUnlockHandler: UnlockSongUrlHandler | null = null;
+
+export const setCustomUnlockHandler = (handler: UnlockSongUrlHandler | null): void => {
+  customUnlockHandler = handler;
+};
+
 // 获取解锁歌曲 URL
 export const unlockSongUrl = (id: number, songName: string, artist: string, server: SongUnlockServer) => {
+  if (customUnlockHandler) {
+    return customUnlockHandler(id, songName, artist, server);
+  }
+
   // Capacitor 环境：使用本地解锁（避免服务器 IP 被封禁）
   if (isCapacitor) {
     console.log(`🔓 [Capacitor] 使用本地解锁: server=${server}`);

@@ -23,7 +23,6 @@ import { likePlaylist, playlistDetail, playlistAllSongs, playlistTracks } from "
 import { likeArtist } from "@/api/artist";
 import { likeAlbum } from "@/api/album";
 import { radioSub } from "@/api/radio";
-import router from "@/router";
 
 /**
  * 用户是否登录
@@ -46,6 +45,7 @@ export const toLogout = async (): Promise<void> => {
   // 清除用户数据
   await dataStore.clearUserData();
   // 跳转首页
+  const { default: router } = await import("@/router");
   router.push("/");
   window.$message.success("成功退出登录");
 };
