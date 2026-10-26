@@ -24,8 +24,32 @@ import {
   user_liked_songs,
   user_playlist_list,
 } from "./modules/user_playlist";
+import {
+  playlist_create,
+  playlist_delete,
+  playlist_rename,
+  playlist_subscribe,
+  playlist_tracks,
+} from "./modules/playlist_write";
 import { song_url } from "./modules/song_url";
+import { lyric } from "./modules/lyric";
+import { comment } from "./modules/comment";
 import { search } from "./modules/search";
+import { match } from "./modules/match";
+import { hot_search } from "./modules/hot_search";
+import { leaderboard, leaderboard_detail, leaderboard_list } from "./modules/leaderboard";
+import { song_info } from "./modules/song_info";
+import { song_list } from "./modules/song_list";
+import { songfm } from "./modules/songfm";
+import { dailyRecommend } from "./modules/daily_recommend";
+import {
+  homeAlbum,
+  homeRecommend,
+  homeSinger,
+  homeSquare,
+} from "./modules/home_recommend";
+import { album } from "./modules/album";
+import { artist } from "./modules/artist";
 import type { QMModule, QMParams } from "./core/types";
 import {
   buildCacheKey,
@@ -49,18 +73,32 @@ export {
 /** 默认缓存有效期：2 分钟 */
 const DEFAULT_TTL = 2 * 60 * 1000;
 
-/** 不走缓存的实时或敏感接口 */
+/** 不走缓存的实时或敏感接口（含全部登录态与写操作接口） */
 const NON_CACHEABLE: ReadonlySet<string> = new Set([
-  "login_qr_key",
-  "login_qr_check",
   "user_detail",
   "song_url",
+  "comment",
   "search",
+  "hot_search",
+  "login_qr_key",
+  "login_qr_check",
   "user_playlist_list",
   "user_liked_songs",
   "subscription_status",
   "playlist_detail",
   "playlist_edit_info",
+  "playlist_create",
+  "playlist_rename",
+  "playlist_delete",
+  "playlist_tracks",
+  "playlist_subscribe",
+  "leaderboard_list",
+  "leaderboard_detail",
+  "songfm",
+  "home/recommend",
+  "home/square",
+  "home/singer",
+  "home/album",
 ]);
 
 /** 模块注册表 */
@@ -74,8 +112,30 @@ const modules: Record<string, QMModule> = {
   subscription_status,
   playlist_detail,
   playlist_edit_info,
+  playlist_create,
+  playlist_rename,
+  playlist_delete,
+  playlist_tracks,
+  playlist_subscribe,
   song_url,
+  lyric,
+  comment,
   search,
+  match,
+  hot_search,
+  leaderboard,
+  leaderboard_list,
+  leaderboard_detail,
+  song_info,
+  song_list,
+  songfm,
+  album,
+  artist,
+  "daily/recommend": dailyRecommend,
+  "home/recommend": homeRecommend,
+  "home/square": homeSquare,
+  "home/singer": homeSinger,
+  "home/album": homeAlbum,
 };
 
 /** 清空 QQ 音乐内存缓存 */
