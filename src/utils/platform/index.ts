@@ -7,3 +7,4 @@
 export * from "./http";
 export * from "./sessionStore";
 export * from "./qqmusic";
+export * from "./kugou";
