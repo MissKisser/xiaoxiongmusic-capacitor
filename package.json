@@ -15,7 +15,8 @@
         "cap:run:android": "cap run android",
         "android:build": "pnpm run build && cap sync android && cap open android",
         "patch:plugin": "pnpm patch @whiskeredaxe/capacitor-music-controls-plugin",
-        "server:dev": "node --import tsx server/start.ts"
+        "server:dev": "node --import tsx server/start.ts",
+        "test": "node --import tsx --test \"tests/**/*.test.ts\""
     },
     "dependencies": {
         "@applemusic-like-lyrics/core": "^0.3.2",
