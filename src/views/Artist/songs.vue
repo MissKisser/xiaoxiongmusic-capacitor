@@ -12,15 +12,19 @@
 </template>
 
 <script setup lang="ts">
+import SongList from "@/components/List/SongList.vue";
 import type { SongType } from "@/types/main";
+import type { ApiPlatform } from "@/types/shared";
 import { artistAllSongs } from "@/api/artist";
 import { songDetail } from "@/api/song";
+import { dispatchArtistDetail } from "@/api/platform/dispatch";
 import { formatSongsList } from "@/utils/format";
 import { debounce } from "lodash-es";
 import { usePlayerController } from "@/core/player/PlayerController";
 
 const props = defineProps<{
-  id: number;
+  id: string;
+  platform?: ApiPlatform | null;
 }>();
 
 const emit = defineEmits<{
@@ -35,13 +39,28 @@ const hasMore = ref<boolean>(true);
 const songData = ref<SongType[]>([]);
 const songOffset = ref<number>(0);
 
+// 单次取回的歌曲数
+const PAGE_SIZE = 100;
+
 // 获取歌手全部歌曲
 const getArtistAllSongs = async () => {
   try {
     if (!props.id) return;
     loading.value = true;
+    // 第三方平台：走平台数据层
+    if (props.platform) {
+      const result = await dispatchArtistDetail(props.platform, {
+        id: props.id,
+        limit: PAGE_SIZE,
+        offset: songOffset.value,
+      });
+      songData.value = songData.value.concat(result.songs);
+      hasMore.value = result.songs.length >= PAGE_SIZE;
+      loading.value = false;
+      return;
+    }
     // 获取数据
-    const result = await artistAllSongs(props.id, 100, songOffset.value);
+    const result = await artistAllSongs(Number(props.id), PAGE_SIZE, songOffset.value);
     // 是否还有
     hasMore.value = result?.more;
     // 处理数据
@@ -67,7 +86,7 @@ const playAllSongs = debounce(() => {
 // 列表触底
 const reachBottom = () => {
   if (hasMore.value) {
-    songOffset.value += 100;
+    songOffset.value += PAGE_SIZE;
     getArtistAllSongs();
   } else {
     loading.value = false;

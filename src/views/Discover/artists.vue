@@ -1,6 +1,6 @@
 <template>
   <div class="discover-artists">
-    <div class="menu">
+    <div v-if="!isPlatformSource" class="menu">
       <!-- 字母分类 -->
       <n-flex class="initial">
         <n-tag
@@ -28,16 +28,38 @@
         </n-tag>
       </n-flex>
     </div>
+    <!-- 平台歌手分类（上游分类清单：有则显示，无则整块隐藏） -->
+    <div v-else-if="artistTypes.length" class="menu">
+      <n-flex class="category">
+        <n-tag
+          v-for="(item, index) in artistTypes"
+          :key="item.id"
+          :type="index === artistTypeChoose ? 'primary' : 'default'"
+          :bordered="index === artistTypeChoose"
+          round
+          @click="artistTypeChange(index)"
+        >
+          {{ item.name }}
+        </n-tag>
+      </n-flex>
+    </div>
     <ArtistList :data="artistsData" :loading="loading" :loadMore="hasMore" @loadMore="loadMore" />
   </div>
 </template>
 
 <script setup lang="ts">
+import ArtistList from "@/components/List/ArtistList.vue";
 import type { ArtistType } from "@/types/main";
 import { artistTypeList } from "@/api/artist";
+import { onPlatformChange, usePlatformStore } from "@/stores";
+import { dispatchHotArtists, type DispatchArtistType } from "@/api/platform/dispatch";
 import { formatArtistsList } from "@/utils/format";
 
 const router = useRouter();
+const platformStore = usePlatformStore();
+
+// 是否为第三方平台（QQ 音乐 / 酷狗）
+const isPlatformSource = computed<boolean>(() => platformStore.currentPlatform !== "netease");
 
 // 歌手标签数据
 const artistInitials = [
@@ -75,8 +97,48 @@ const loading = ref<boolean>(true);
 const artistsOffset = ref<number>(0);
 const artistsData = ref<ArtistType[]>([]);
 
+/**
+ * 平台歌手列表每页条数
+ *
+ * 与网易云歌手列表一页 50 条同口径，
+ * 平台接口支持翻页时按此逐页追加。
+ */
+const PLATFORM_ARTIST_PAGE_SIZE = 50;
+
+/** 平台歌手列表当前页码（从 1 开始） */
+const artistPage = ref<number>(1);
+
+// 酷狗歌手分类（上游下发）与当前选中项
+const artistTypes = ref<DispatchArtistType[]>([]);
+const artistTypeChoose = ref<number>(0);
+
 // 获取歌手数据
 const getArtistListData = async () => {
+  // 第三方平台：取平台歌手列表
+  if (isPlatformSource.value) {
+    loading.value = true;
+    try {
+      const result = await dispatchHotArtists(platformStore.currentPlatform, {
+        type: artistTypes.value[artistTypeChoose.value]?.id,
+        page: artistPage.value,
+        limit: PLATFORM_ARTIST_PAGE_SIZE,
+      });
+      // 平台接口支持翻页时按页追加，不支持时上游只给一次全量
+      artistsData.value =
+        artistPage.value === 1 ? result.artists : [...artistsData.value, ...result.artists];
+      artistTypes.value = result.types;
+      hasMore.value = result.hasMore;
+    } catch (error) {
+      console.error("获取平台热门歌手失败：", error);
+      window.$message.error("加载失败，请重试");
+      // 首页失败时清空列表，避免残留上一分类的数据
+      if (artistPage.value === 1) artistsData.value = [];
+    } finally {
+      // 复位加载状态，避免失败后永久加载
+      loading.value = false;
+    }
+    return;
+  }
   // 获取数据
   loading.value = true;
   try {
@@ -113,9 +175,22 @@ const artistQueryChange = (initial: number | string, type: number) => {
   });
 };
 
+// 酷狗分类切换
+const artistTypeChange = (index: number) => {
+  artistTypeChoose.value = index;
+  artistPage.value = 1;
+  artistsData.value = [];
+  getArtistListData();
+};
+
 // 加载更多
 const loadMore = () => {
-  artistsOffset.value += 50;
+  // 平台按页取，网易云按偏移取
+  if (isPlatformSource.value) {
+    artistPage.value += 1;
+  } else {
+    artistsOffset.value += 50;
+  }
   getArtistListData();
 };
 
@@ -132,6 +207,20 @@ onBeforeRouteUpdate((to) => {
 });
 
 onMounted(getArtistListData);
+
+// 平台切换：重新拉取歌手
+const stopPlatformWatch = onPlatformChange(() => {
+  artistsData.value = [];
+  artistsOffset.value = 0;
+  artistPage.value = 1;
+  artistTypes.value = [];
+  artistTypeChoose.value = 0;
+  getArtistListData();
+});
+
+onUnmounted(() => {
+  stopPlatformWatch();
+});
 </script>
 
 <style lang="scss" scoped>

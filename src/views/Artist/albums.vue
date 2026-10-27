@@ -11,12 +11,16 @@
 </template>
 
 <script setup lang="ts">
+import CoverList from "@/components/List/CoverList.vue";
 import type { CoverType } from "@/types/main";
+import type { ApiPlatform } from "@/types/shared";
 import { artistAblums } from "@/api/artist";
+import { dispatchArtistDetail } from "@/api/platform/dispatch";
 import { formatCoverList } from "@/utils/format";
 
 const props = defineProps<{
-  id: number;
+  id: string;
+  platform?: ApiPlatform | null;
 }>();
 
 // 歌曲数据
@@ -25,13 +29,28 @@ const hasMore = ref<boolean>(true);
 const albumData = ref<CoverType[]>([]);
 const albumOffset = ref<number>(0);
 
+// 单次取回的专辑数
+const PAGE_SIZE = 50;
+
 // 获取歌手全部专辑
 const getArtistAllAlbums = async () => {
   try {
     if (!props.id) return;
     loading.value = true;
+    // 第三方平台：走平台数据层
+    if (props.platform) {
+      const result = await dispatchArtistDetail(props.platform, {
+        id: props.id,
+        limit: 1,
+        offset: albumOffset.value,
+      });
+      albumData.value = albumData.value.concat(result.albums);
+      hasMore.value = false;
+      loading.value = false;
+      return;
+    }
     // 获取数据
-    const result = await artistAblums(props.id, 50, albumOffset.value);
+    const result = await artistAblums(Number(props.id), PAGE_SIZE, albumOffset.value);
     // 是否还有
     hasMore.value = result?.more;
     // 处理数据
@@ -49,7 +68,7 @@ const getArtistAllAlbums = async () => {
 // 加载更多
 const loadMore = () => {
   if (hasMore.value) {
-    albumOffset.value += 50;
+    albumOffset.value += PAGE_SIZE;
     getArtistAllAlbums();
   } else {
     loading.value = false;

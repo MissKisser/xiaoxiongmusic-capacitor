@@ -13,11 +13,13 @@
 
 <script setup lang="ts">
 import type { CoverType } from "@/types/main";
+import type { ApiPlatform } from "@/types/shared";
 import { artistVideos } from "@/api/artist";
 import { formatCoverList } from "@/utils/format";
 
 const props = defineProps<{
-  id: number;
+  id: string;
+  platform?: ApiPlatform | null;
 }>();
 
 // 歌曲数据
@@ -32,7 +34,7 @@ const getArtistAllVideos = async () => {
     if (!props.id) return;
     loading.value = true;
     // 获取数据
-    const result = await artistVideos(props.id, 50, videoOffset.value);
+    const result = await artistVideos(Number(props.id), 50, videoOffset.value);
     // 是否还有
     hasMore.value = result?.hasMore;
     // 处理数据
