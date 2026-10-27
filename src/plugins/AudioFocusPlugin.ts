@@ -1,14 +1,6 @@
 import { registerPlugin } from '@capacitor/core';
 
 /**
- * 音频焦点事件数据
- */
-export interface AudioFocusChangeEvent {
-    /** 焦点事件类型：gain 焦点回归 | loss 永久抢占 | transientLoss 暂时抢占 | canDuck 可压低抢占 */
-    type: 'gain' | 'loss' | 'transientLoss' | 'canDuck';
-}
-
-/**
  * 耳机拔出事件数据
  */
 export interface AudioBecomingNoisyEvent {
@@ -17,26 +9,22 @@ export interface AudioBecomingNoisyEvent {
 }
 
 /**
- * 音频焦点插件接口
- * 由原生层申请/释放音频焦点，并转发系统焦点变化与耳机拔出事件
+ * 音频焦点桥接插件接口
+ * 系统音频焦点由 WebView 内部媒体会话唯一持有，
+ * 本插件仅转发原生层监听到的耳机拔出广播
  */
 export interface AudioFocusPluginInterface {
     /**
-     * 申请音频焦点
+     * 查询耳机拔出广播监听是否就绪
      */
-    requestFocus(): Promise<{ granted: boolean }>;
-
-    /**
-     * 释放音频焦点
-     */
-    abandonFocus(): Promise<void>;
+    isNoisyMonitorReady(): Promise<{ noisySupported: boolean }>;
 
     /**
      * 添加事件监听器
      */
     addListener(
-        eventName: 'focusChange' | 'becomingNoisy',
-        listenerFunc: (data: any) => void,
+        eventName: 'becomingNoisy',
+        listenerFunc: (data: AudioBecomingNoisyEvent) => void,
     ): Promise<{ remove: () => void }>;
 }
 

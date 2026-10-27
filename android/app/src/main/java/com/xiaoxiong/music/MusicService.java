@@ -170,21 +170,6 @@ public class MusicService extends Service {
         Log.d(TAG, "Updating state, isPlaying: " + isPlaying);
         updatePlaybackState(isPlaying);
         updateNotification();
-        if (isPlaying) {
-            requestAudioFocusForPlayback();
-        }
-    }
-
-    /**
-     * 开始播放时申请音频焦点，确保来电/其他应用抢占时能收到系统焦点回调
-     */
-    private void requestAudioFocusForPlayback() {
-        AudioFocusPlugin plugin = AudioFocusPlugin.getInstance();
-        if (plugin != null) {
-            plugin.requestForPlayback();
-        } else {
-            Log.w(TAG, "requestAudioFocusForPlayback: AudioFocusPlugin not loaded");
-        }
     }
 
     private void handleUpdatePosition(Intent intent) {
@@ -498,10 +483,6 @@ public class MusicService extends Service {
     public void onDestroy() {
         instance = null;
         handleClearSleepTimer(); // 清理睡眠定时器
-        AudioFocusPlugin focusPlugin = AudioFocusPlugin.getInstance();
-        if (focusPlugin != null) {
-            focusPlugin.abandonPlaybackFocus();
-        }
         stopAudioProxyServer();
         if (mediaSession != null) {
             mediaSession.setActive(false);
