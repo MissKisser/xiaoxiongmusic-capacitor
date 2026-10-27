@@ -94,6 +94,10 @@ const init = async () => {
 
     const { initAndroidDesktopLyricBridge } = await import("@/utils/androidDesktopLyricBridge");
     initAndroidDesktopLyricBridge();
+
+    // 安卓音频焦点：来电抢占暂停、耳机拔出暂停、可压低抢占降音量，焦点回归后按需恢复
+    const { initNativeAudioFocus } = await import("@/utils/nativeAudioFocus");
+    initNativeAudioFocus();
   }
 
   // 初始化播放器
