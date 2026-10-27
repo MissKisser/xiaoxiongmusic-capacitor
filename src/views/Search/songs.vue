@@ -26,46 +26,64 @@
 
 <script setup lang="ts">
 import type { SongType } from "@/types/main";
-import { searchResult } from "@/api/search";
-import { formatSongsList } from "@/utils/format";
+import { dispatchSearch } from "@/api/platform/dispatch";
+import { onPlatformChange, usePlatformStore } from "@/stores";
 
 const props = defineProps<{
   keyword: string;
 }>();
 
+const platformStore = usePlatformStore();
+
 // 搜索数据
 const hasMore = ref<boolean>(true);
 const loading = ref<boolean>(true);
-const searchOffset = ref<number>(0);
+const searchPage = ref<number>(1);
 const searchCount = ref<number>(1);
 const searchResultData = ref<SongType[]>([]);
+// 请求序号：平台切换后丢弃旧平台的在途响应
+const requestId = ref<number>(0);
 
 // 获取搜索结果
-const getSearchResult = async () => {
+const getSearchResult = async (reset: boolean = false) => {
   // 获取数据
   loading.value = true;
+  if (reset) {
+    searchPage.value = 1;
+    searchResultData.value = [];
+  }
+  const currentId = ++requestId.value;
   try {
-    const result = await searchResult(props.keyword, 50, searchOffset.value, 1);
+    const result = await dispatchSearch(platformStore.currentPlatform, {
+      keyword: props.keyword,
+      category: "song",
+      page: searchPage.value,
+      limit: 50,
+    });
+    // 已被更新的请求取代时丢弃本次结果
+    if (currentId !== requestId.value) return;
     // 是否还有
-    hasMore.value = result.result?.hasMore || result.result?.songCount > searchOffset.value + 50;
+    hasMore.value = result.hasMore;
     // 搜索总数
-    searchCount.value = result.result?.songCount;
+    searchCount.value = result.total;
     // 处理数据
-    const songData = formatSongsList(result.result.songs);
-    searchResultData.value = searchResultData.value?.concat(songData);
+    searchResultData.value = searchResultData.value.concat(result.songs);
   } catch (error) {
+    if (currentId !== requestId.value) return;
     console.error("获取搜索结果失败", error);
     window.$message.error("加载失败，请重试");
   } finally {
     // 复位加载状态，避免失败后永久加载
-    loading.value = false;
+    if (currentId === requestId.value) {
+      loading.value = false;
+    }
   }
 };
 
 // 列表触底
 const reachBottom = () => {
   if (hasMore.value) {
-    searchOffset.value += 50;
+    searchPage.value += 1;
     getSearchResult();
   } else {
     loading.value = false;
@@ -73,6 +91,15 @@ const reachBottom = () => {
 };
 
 onMounted(() => {
-  getSearchResult();
+  getSearchResult(true);
+});
+
+// 平台切换后清空当前结果并重搜
+const stopPlatformWatch = onPlatformChange(() => {
+  getSearchResult(true);
+});
+
+onUnmounted(() => {
+  stopPlatformWatch();
 });
 </script>

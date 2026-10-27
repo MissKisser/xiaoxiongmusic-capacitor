@@ -66,8 +66,8 @@
 </template>
 
 <script setup lang="ts">
-import { searchSuggest } from "@/api/search";
-import { useStatusStore, useSettingStore } from "@/stores";
+import { dispatchSearchSuggest } from "@/api/platform/suggest";
+import { onPlatformChange, useStatusStore, useSettingStore, usePlatformStore } from "@/stores";
 
 const emit = defineEmits<{
   toSearch: [key: number | string, type: string];
@@ -75,6 +75,7 @@ const emit = defineEmits<{
 
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
+const platformStore = usePlatformStore();
 
 // 搜索建议数据
 const searchSuggestData = ref<any>({});
@@ -116,10 +117,10 @@ const getSearchSuggest = async (keywords: string) => {
   // 记录请求序号
   const seq = ++suggestSeq;
   searchSuggestData.value = {};
-  const result = await searchSuggest(keywords);
+  const result = await dispatchSearchSuggest(platformStore.currentPlatform, keywords);
   // 响应已过期则丢弃
   if (seq !== suggestSeq) return;
-  searchSuggestData.value = result.result;
+  searchSuggestData.value = result;
   // 计算高度
   nextTick(calcSearchSuggestHeights);
 };
@@ -233,6 +234,27 @@ watchDebounced(
   },
   { debounce: 300 },
 );
+
+// 平台切换后按新平台重取建议
+//
+// 平台切换不改动搜索框里的关键词，建议只随关键词变化重新拉取，
+// 只清空不重取会让下拉面板一直是空的；留着旧平台的结果又会串台。
+const stopPlatformWatch = onPlatformChange(() => {
+  // 作废在途响应，避免旧平台的建议覆盖新平台
+  suggestSeq += 1;
+  searchSuggestData.value = {};
+  nextTick(calcSearchSuggestHeights);
+  // 关键词仍在输入框里时，按新平台重取一次建议
+  const keyword = statusStore.searchInputValue;
+  if (!keyword || !settingStore.useOnlineService) return;
+  getSearchSuggest(keyword).catch((error) => {
+    console.error("切换平台后刷新搜索建议失败：", error);
+  });
+});
+
+onUnmounted(() => {
+  stopPlatformWatch();
+});
 </script>
 
 <style lang="scss" scoped>

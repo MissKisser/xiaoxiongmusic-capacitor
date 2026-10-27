@@ -183,6 +183,11 @@ const toSearch = async (key: any, type: string = "keyword") => {
       setSearchHistory(key);
       break;
     case "songs": {
+      // 第三方平台：建议条目自带歌曲数据，直接入队播放
+      if (key?.song) {
+        player.addNextSong(key.song, true);
+        break;
+      }
       const result = await songDetail(key?.id);
       const song = formatSongsList(result.songs)[0];
       player.addNextSong(song, true);
@@ -191,19 +196,19 @@ const toSearch = async (key: any, type: string = "keyword") => {
     case "playlists":
       router.push({
         name: "playlist",
-        query: { id: key?.id },
+        query: { id: key?.id, ...(key?.platform ? { platform: key.platform } : {}) },
       });
       break;
     case "artists":
       router.push({
         name: "artist",
-        query: { id: key?.id },
+        query: { id: key?.id, ...(key?.platform ? { platform: key.platform } : {}) },
       });
       break;
     case "albums":
       router.push({
         name: "album",
-        query: { id: key?.id },
+        query: { id: key?.id, ...(key?.platform ? { platform: key.platform } : {}) },
       });
       break;
     case "share":

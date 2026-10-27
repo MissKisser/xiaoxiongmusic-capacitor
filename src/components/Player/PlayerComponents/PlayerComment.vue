@@ -1,6 +1,6 @@
 <!-- 播放器 - 评论 -->
 <template>
-  <div class="player-comment">
+  <div :class="['player-comment', { 'read-only': !canWrite }]">
     <n-flex :wrap="false" align="center" class="song-data">
       <n-image
         :src="musicStore.songCover"
@@ -70,10 +70,11 @@
 
 <script setup lang="ts">
 import type { CommentType } from "@/types/main";
-import { useMusicStore, useStatusStore, useSettingStore } from "@/stores";
-import { getComment, getHotComment } from "@/api/comment";
+import type { ApiPlatform } from "@/types/shared";
+import { useMusicStore, useStatusStore, useSettingStore, onPlatformChange } from "@/stores";
+import { dispatchComments, dispatchHotComments } from "@/api/platform/dispatch";
 import { isEmpty } from "lodash-es";
-import { formatCommentList, removeBrackets } from "@/utils/format";
+import { removeBrackets } from "@/utils/format";
 import { NScrollbar } from "naive-ui";
 import { coverLoaded } from "@/utils/helper";
 
@@ -89,6 +90,15 @@ const isShowComment = computed<boolean>(() => statusStore.showPlayerComment);
 // 歌曲 id
 const songId = computed<number>(() => musicStore.playSong.id);
 
+// 音源平台
+const songPlatform = computed<ApiPlatform>(() => musicStore.playSong.platform ?? "netease");
+
+// 平台内字符串主键（QQ 音乐 mid；酷狗评论用数字 id，不取该字段）
+const songPlatformId = computed<string | undefined>(() => musicStore.playSong.platformId);
+
+// 第三方平台评论区只读（平台侧无评论点赞 / 回复写接口）
+const canWrite = computed<boolean>(() => songPlatform.value === "netease");
+
 // 歌曲类型
 const songType = computed<0 | 1 | 7 | 2 | 3 | 4 | 5 | 6>(() =>
   musicStore.playSong.type === "radio" ? 4 : 0,
@@ -100,21 +110,27 @@ const commentData = ref<CommentType[]>([]);
 const commentHotData = ref<CommentType[] | null>([]);
 const commentPage = ref<number>(1);
 const commentHasMore = ref<boolean>(true);
+// 评论游标（网易云为时间戳，平台为平台游标）
+const commentCursor = ref<number | string | undefined>(undefined);
 
 // 获取热门评论
 const getHotCommentData = async () => {
   if (!songId.value) return;
   try {
     // 获取评论
-    const result = await getHotComment(songId.value);
+    const result = await dispatchHotComments(songPlatform.value, {
+      id: songId.value,
+      platformId: songPlatformId.value,
+      type: songType.value,
+      pageSize: 20,
+    });
     // 处理数据
-    const formatData = formatCommentList(result.hotComments);
-    commentHotData.value = formatData?.length > 0 ? formatData : null;
+    commentHotData.value = result.comments?.length > 0 ? result.comments : null;
     // 滚动到顶部
     commentScroll.value?.scrollTo({ top: 0, behavior: "smooth" });
   } catch (error) {
     console.error("获取热门评论失败", error);
-    window.$message.error("评论加载失败，请重试");
+    window.$message?.error("评论加载失败，请重试");
     // 失败时隐藏热门评论区域，避免空态展示骨架屏
     commentHotData.value = null;
   }
@@ -125,25 +141,29 @@ const getAllComment = async () => {
   if (!songId.value) return;
   commentLoading.value = true;
   try {
-    // 分页参数
-    const cursor =
-      commentPage.value > 1 && commentData.value?.length > 0
-        ? commentData.value[commentData.value.length - 1]?.time
-        : undefined;
     // 获取评论
-    const result = await getComment(songId.value, songType.value, commentPage.value, 20, 3, cursor);
-    if (isEmpty(result.data?.comments)) {
+    const result = await dispatchComments(songPlatform.value, {
+      id: songId.value,
+      platformId: songPlatformId.value,
+      type: songType.value,
+      page: commentPage.value,
+      pageSize: 20,
+      sortType: 3,
+      cursor: commentCursor.value,
+    });
+    if (isEmpty(result.comments)) {
       commentHasMore.value = false;
       return;
     }
     // 处理数据
-    const formatData = formatCommentList(result.data.comments);
-    commentData.value = commentData.value.concat(formatData);
+    commentData.value = commentData.value.concat(result.comments);
+    // 记录游标
+    commentCursor.value = result.cursor;
     // 是否还有
-    commentHasMore.value = result.data.hasMore;
+    commentHasMore.value = result.hasMore;
   } catch (error) {
     console.error("获取评论失败", error);
-    window.$message.error("评论加载失败，请重试");
+    window.$message?.error("评论加载失败，请重试");
   } finally {
     // 复位加载状态，避免失败后永久加载
     commentLoading.value = false;
@@ -156,19 +176,33 @@ const loadMoreComment = () => {
   getAllComment();
 };
 
+// 重置评论数据
+const resetCommentData = () => {
+  commentData.value = [];
+  commentHotData.value = [];
+  commentPage.value = 1;
+  commentHasMore.value = true;
+  commentCursor.value = undefined;
+};
+
 // 歌曲id变化
 watch(
   () => songId.value,
   () => {
-    commentData.value = [];
-    commentHotData.value = [];
-    commentPage.value = 1;
-    commentHasMore.value = true;
+    resetCommentData();
     if (!isShowComment.value) return;
     getHotCommentData();
     getAllComment();
   },
 );
+
+// 平台切换后重新拉取评论
+const stopPlatformWatch = onPlatformChange(() => {
+  resetCommentData();
+  if (!isShowComment.value) return;
+  getHotCommentData();
+  getAllComment();
+});
 
 // 是否展示
 watch(
@@ -188,6 +222,10 @@ onMounted(() => {
   getHotCommentData();
   getAllComment();
 });
+
+onBeforeUnmount(() => {
+  stopPlatformWatch();
+});
 </script>
 
 <style lang="scss" scoped>
@@ -199,6 +237,12 @@ onMounted(() => {
   width: 100%;
   height: calc(100vh - 160px);
   overflow: hidden;
+  // 第三方平台评论区只读：隐藏点赞等写操作入口
+  &.read-only {
+    :deep(.like) {
+      display: none;
+    }
+  }
   :deep(.n-text),
   :deep(.n-icon),
   :deep(.n-button) {

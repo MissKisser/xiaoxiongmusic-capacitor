@@ -12,14 +12,22 @@
       </div>
     </div>
     <div class="comment-main">
-      <ListComment v-if="songId" :id="songId" :type="songType" height="auto" />
+      <ListComment
+        v-if="songId"
+        :id="songId"
+        :type="songType"
+        :platform="songPlatform"
+        :platform-id="songPlatformId"
+        height="auto"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useRouter, useRoute } from "vue-router";
-import { useMusicStore, useSettingStore } from "@/stores";
+import { useMusicStore, useSettingStore, usePlatformStore } from "@/stores";
+import type { ApiPlatform } from "@/types/shared";
 import { computed } from "vue";
 import ListComment from "@/components/List/ListComment.vue";
 import { removeBrackets } from "@/utils/format";
@@ -28,6 +36,7 @@ const router = useRouter();
 const route = useRoute();
 const musicStore = useMusicStore();
 const settingStore = useSettingStore();
+const platformStore = usePlatformStore();
 
 // 从路由参数获取歌曲信息
 const songId = computed(() => {
@@ -37,6 +46,27 @@ const songId = computed(() => {
   }
   // 路由参数可能为 string[]，取首项
   return Array.isArray(id) ? Number(id[0] ?? 0) : Number(id);
+});
+
+// 进入页面时的播放歌曲快照
+// 评论页从播放器跳转而来，平台信息取自当时的播放歌曲，避免播放列表推进后评论对象漂移
+const targetSong = musicStore.playSong;
+
+// 评论对象是否就是路由上的歌曲
+const isTargetSong = computed<boolean>(
+  () => !!targetSong && String(targetSong.id) === String(songId.value),
+);
+
+// 评论对象的音源平台
+const songPlatform = computed<ApiPlatform>(() => {
+  if (isTargetSong.value) return targetSong.platform ?? "netease";
+  return platformStore.currentPlatform;
+});
+
+// 评论对象的平台内字符串主键（QQ 音乐 mid；酷狗评论用数字 id，不取该字段）
+const songPlatformId = computed<string | undefined>(() => {
+  if (isTargetSong.value) return targetSong.platformId;
+  return undefined;
 });
 
 const songType = computed<0 | 1 | 7 | 2 | 3 | 4 | 5 | 6>(() => {

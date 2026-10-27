@@ -1,6 +1,6 @@
 <!-- 列表评论 -->
 <template>
-  <div ref="commentListRef" class="list-comment">
+  <div ref="commentListRef" :class="['list-comment', { 'read-only': !canWrite }]">
     <div
       :style="{ height: height === 'auto' ? 'auto' : `${height || commentListHeight}px` }"
       class="comment-container"
@@ -30,8 +30,8 @@
             :data="commentData"
             :loading="commentLoading"
             :type="type"
-            :load-more="true"
-            @loadMore="handleLoadMore"
+            :load-more="commentHasMore"
+            @load-more="handleLoadMore"
           />
           <div class="placeholder" />
         </div>
@@ -42,10 +42,11 @@
 
 <script setup lang="ts">
 import type { CommentType } from "@/types/main";
+import type { ApiPlatform } from "@/types/shared";
 import CommentList from "@/components/List/CommentList.vue";
-import { useElementSize, useThrottleFn } from "@vueuse/core";
-import { getComment, getHotComment } from "@/api/comment";
-import { formatCommentList } from "@/utils/format";
+import { useElementSize } from "@vueuse/core";
+import { dispatchComments, dispatchHotComments } from "@/api/platform/dispatch";
+import { onPlatformChange } from "@/stores";
 import { isEmpty } from "lodash-es";
 
 const props = withDefaults(
@@ -56,8 +57,14 @@ const props = withDefaults(
     type: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
     // 高度
     height?: number | "auto"; // px
+    // 音源平台
+    platform?: ApiPlatform;
+    // 平台内字符串主键（QQ 音乐 mid；酷狗评论用数字 id，不取该字段）
+    platformId?: string;
   }>(),
-  {},
+  {
+    platform: "netease",
+  },
 );
 
 const commentListRef = ref<HTMLElement | null>(null);
@@ -65,20 +72,29 @@ const commentListRef = ref<HTMLElement | null>(null);
 // 列表高度
 const { height: commentListHeight, stop: stopCalcHeight } = useElementSize(commentListRef);
 
+// 第三方平台评论区只读（平台侧无评论点赞 / 回复写接口）
+const canWrite = computed<boolean>(() => props.platform === "netease");
+
 // 评论数据
 const commentLoading = ref<boolean>(false);
 const commentData = ref<CommentType[]>([]);
 const commentHotData = ref<CommentType[] | null>(null);
 const commentPage = ref<number>(1);
 const commentHasMore = ref<boolean>(true);
+// 评论游标（网易云为时间戳，平台为平台游标）
+const commentCursor = ref<number | string | undefined>(undefined);
 
 // 获取热门评论
 const getHotCommentData = async () => {
   if (!props.id) return;
   try {
-    const result = await getHotComment(props.id, props.type);
-    const formatData = formatCommentList(result.hotComments);
-    commentHotData.value = formatData?.length > 0 ? formatData : null;
+    const result = await dispatchHotComments(props.platform, {
+      id: props.id,
+      platformId: props.platformId,
+      type: props.type,
+      pageSize: 20,
+    });
+    commentHotData.value = result.comments?.length > 0 ? result.comments : null;
   } catch (error) {
     console.error("Error getting hot comment data:", error);
     commentHotData.value = null;
@@ -94,30 +110,35 @@ const getCommentData = async (clean: boolean = true) => {
       commentData.value = [];
       commentPage.value = 1;
       commentHasMore.value = true;
+      commentCursor.value = undefined;
     }
     // 获取热门评论
     await getHotCommentData();
-    // 分页参数
-    const cursor =
-      commentPage.value > 1 && commentData.value?.length > 0
-        ? commentData.value[commentData.value.length - 1]?.time
-        : undefined;
     // 获取评论
-    const result = await getComment(props.id, props.type, commentPage.value, 20, 3, cursor);
-    if (isEmpty(result.data?.comments)) {
+    const result = await dispatchComments(props.platform, {
+      id: props.id,
+      platformId: props.platformId,
+      type: props.type,
+      page: commentPage.value,
+      pageSize: 20,
+      sortType: 3,
+      cursor: commentCursor.value,
+    });
+    if (isEmpty(result.comments)) {
       commentHasMore.value = false;
       commentLoading.value = false;
       return;
     }
     // 处理数据
-    const formatData = formatCommentList(result.data.comments);
-    commentData.value = commentData.value.concat(formatData);
+    commentData.value = commentData.value.concat(result.comments);
+    // 记录游标
+    commentCursor.value = result.cursor;
     // 是否还有
-    commentHasMore.value = result.data.hasMore;
+    commentHasMore.value = result.hasMore;
     commentLoading.value = false;
   } catch (error) {
     console.error("Error getting comment data:", error);
-    window.$message.error("获取评论数据失败");
+    window.$message?.error("获取评论数据失败");
     commentLoading.value = false;
   }
 };
@@ -129,22 +150,31 @@ const handleLoadMore = () => {
   getCommentData(false);
 };
 
-// 已取消自动加载，改为手动点击加载更多按钮
+// 重置评论数据并重新拉取
+const resetAndReload = () => {
+  commentData.value = [];
+  commentHotData.value = null;
+  commentPage.value = 1;
+  commentHasMore.value = true;
+  commentCursor.value = undefined;
+  getCommentData();
+};
 
 // 监听 id 变化，重置评论数据
 watch(
   () => props.id,
   (newId) => {
     if (newId) {
-      commentData.value = [];
-      commentHotData.value = null;
-      commentPage.value = 1;
-      commentHasMore.value = true;
-      getCommentData();
+      resetAndReload();
     }
   },
   { immediate: true },
 );
+
+// 平台切换后重新拉取评论
+const stopPlatformWatch = onPlatformChange(() => {
+  resetAndReload();
+});
 
 // 如果高度是 auto，停止计算高度
 watch(
@@ -155,10 +185,10 @@ watch(
   { immediate: true },
 );
 
-// 取消自动加载（已改为手动点击加载更多按钮）
-// 组件卸载时停止高度计算
+// 组件卸载时停止高度计算与平台监听
 onBeforeUnmount(() => {
   stopCalcHeight();
+  stopPlatformWatch();
 });
 </script>
 
@@ -174,6 +204,12 @@ onBeforeUnmount(() => {
     .n-icon {
       margin-right: 8px;
       font-size: 20px;
+    }
+  }
+  // 第三方平台评论区只读：隐藏点赞等写操作入口
+  &.read-only {
+    :deep(.like) {
+      display: none;
     }
   }
 }
