@@ -25,6 +25,23 @@
     <n-text :depth="3" class="hint">
       解锁服务按固定优先级依次尝试（网易云 → 波点音乐 → 歌曲宝 → 酷我音乐），可在此单独启用或停用各渠道。
     </n-text>
+    <n-card
+      :content-style="{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '16px',
+      }"
+      class="probe-item"
+    >
+      <div class="probe-info">
+        <n-text class="name">匿名上报音源可用性</n-text>
+        <n-text :depth="3" class="desc">
+          换源取链时匿名上报本次成功与否与耗时，仅含音源、成败、耗时与失败类别，不含歌名与任何身份信息
+        </n-text>
+      </div>
+      <n-switch v-model:value="settingStore.anonymousProbeReport" :round="false" />
+    </n-card>
   </div>
 </template>
 
@@ -93,6 +110,30 @@ const orderedServers = computed(() => {
     font-size: 13px;
     line-height: 1.5;
     padding: 0 4px;
+  }
+
+  .probe-item {
+    border-radius: 8px;
+
+    .probe-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+
+      .name {
+        font-size: 16px;
+        line-height: normal;
+      }
+
+      .desc {
+        font-size: 13px;
+        line-height: 1.5;
+      }
+    }
+
+    .n-switch {
+      margin-left: auto;
+    }
   }
 }
 </style>
