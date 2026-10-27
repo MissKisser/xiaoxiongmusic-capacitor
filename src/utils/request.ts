@@ -5,13 +5,14 @@ import { getCookie } from "./cookie";
 import axiosRetry from "axios-retry";
 import { CapacitorHttp, HttpResponse } from "@capacitor/core";
 import { localNcmRequest } from "./netease";
+import { API_BASE_URL } from "@/utils/apiBase";
 
 // 全局地址配置
 // 开发环境：使用相对路径，通过 Vite 代理转发到远程服务器
 // 生产环境/Capacitor：使用绝对 URL 直接访问远程服务器
 const baseURL: string = isDev && !isCapacitor
   ? "/api/netease"
-  : String(import.meta.env?.["VITE_API_URL"] || "https://music.viaxv.cn") + "/api/netease";
+  : API_BASE_URL + "/api/netease";
 
 // 调试信息
 console.log("🔧 环境检测:", {
@@ -92,7 +93,7 @@ server.interceptors.request.use(
 
     // Capacitor 下的 baseURL 处理：补全相对路径或缺失的域名
     if (isCapacitor && (!request.baseURL || request.baseURL.startsWith("/"))) {
-      const domain = String(import.meta.env["VITE_API_URL"] || "https://music.viaxv.cn");
+      const domain = API_BASE_URL;
       request.baseURL = domain + (request.baseURL || "/api/netease");
       console.log(`🌐 Capacitor 自动补全 baseURL: ${request.baseURL}`);
     }

@@ -7,9 +7,10 @@
  * 采样节流与失败优先的判定见 `@/utils/probeSampling`（纯逻辑，可单独验证）。
  */
 import { ProbeSampler, type ProbeSample } from "./probeSampling";
+import { API_BASE_URL } from "@/utils/apiBase";
 
 /** 上报接口地址 */
-const PROBE_REPORT_URL = "https://music.viaxv.cn/api/probe/report";
+const PROBE_REPORT_URL = `${API_BASE_URL}/api/probe/report`;
 
 /** 全局采样器：各换源源各自独立的采样窗口 */
 const sampler = new ProbeSampler();

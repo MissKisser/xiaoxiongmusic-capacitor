@@ -23,6 +23,7 @@ import { SongUnlockServer } from "@/types/shared";
 import { isCapacitor } from "@/utils/env";
 import { unblockLog } from "./http";
 import type { SongUrlResult } from "./types";
+import { API_BASE_URL } from "@/utils/apiBase";
 
 /** 走远程回退的换源（端侧无本地实现，服务端有同源实现） */
 export const REMOTE_UNLOCK_SERVERS: readonly SongUnlockServer[] = [
@@ -54,7 +55,7 @@ export const SOURCE_UNAVAILABLE_REASON = "源暂不可用";
 const MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36";
 
 /** 远程解锁服务基址 */
-const REMOTE_UNLOCK_BASE = "https://music.viaxv.cn/api/unblock";
+const REMOTE_UNLOCK_BASE = `${API_BASE_URL}/api/unblock`;
 
 /** 远程换源查询参数 */
 export interface RemoteUnlockParams {

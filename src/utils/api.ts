@@ -1,10 +1,11 @@
 import axios from 'axios';
 import axiosRetry from 'axios-retry';
+import { API_BASE_URL } from "@/utils/apiBase";
 
 
 // 创建 axios 实例
 const api = axios.create({
-    baseURL: 'https://music.viaxv.cn/api',
+    baseURL: `${API_BASE_URL}/api`,
     timeout: 15000,
 });
 
