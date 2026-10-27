@@ -54,7 +54,7 @@ export const SOURCE_UNAVAILABLE_REASON = "源暂不可用";
 const MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36";
 
 /** 远程解锁服务基址 */
-const REMOTE_UNLOCK_BASE = "https://music.viaxv.top/api/unblock";
+const REMOTE_UNLOCK_BASE = "https://music.viaxv.cn/api/unblock";
 
 /** 远程换源查询参数 */
 export interface RemoteUnlockParams {

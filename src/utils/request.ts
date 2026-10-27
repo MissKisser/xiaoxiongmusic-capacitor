@@ -11,7 +11,7 @@ import { localNcmRequest } from "./netease";
 // 生产环境/Capacitor：使用绝对 URL 直接访问远程服务器
 const baseURL: string = isDev && !isCapacitor
   ? "/api/netease"
-  : String(import.meta.env?.["VITE_API_URL"] || "https://music.viaxv.top") + "/api/netease";
+  : String(import.meta.env?.["VITE_API_URL"] || "https://music.viaxv.cn") + "/api/netease";
 
 // 调试信息
 console.log("🔧 环境检测:", {
@@ -92,7 +92,7 @@ server.interceptors.request.use(
 
     // Capacitor 下的 baseURL 处理：补全相对路径或缺失的域名
     if (isCapacitor && (!request.baseURL || request.baseURL.startsWith("/"))) {
-      const domain = String(import.meta.env["VITE_API_URL"] || "https://music.viaxv.top");
+      const domain = String(import.meta.env["VITE_API_URL"] || "https://music.viaxv.cn");
       request.baseURL = domain + (request.baseURL || "/api/netease");
       console.log(`🌐 Capacitor 自动补全 baseURL: ${request.baseURL}`);
     }
@@ -233,7 +233,7 @@ server.interceptors.response.use(
 // 请求
 const request = async <T = any>(config: AxiosRequestConfig): Promise<T> => {
   try {
-    // Capacitor 端无条件走本地 API:纯 JS 签名直连网易云,不经 music.viaxv.top。
+    // Capacitor 端无条件走本地 API:纯 JS 签名直连网易云,不经 music.viaxv.cn。
     // 失败自动回退到下方服务器链路(try-catch)。
     if (isCapacitor) {
       try {

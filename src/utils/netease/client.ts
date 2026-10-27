@@ -2,7 +2,7 @@
  * 网易云本地直连客户端。
  *
  * 在 WebView 内用纯 JS 完成 weapi/eapi 签名 + cookie 注入 + 请求头伪装,
- * 通过 CapacitorHttp 直连 music.163.com,不经 music.viaxv.top 服务器。
+ * 通过 CapacitorHttp 直连 music.163.com,不经 music.viaxv.cn 服务器。
  *
  * 与 src/utils/request.ts 的 request() 对齐:接收 AxiosRequestConfig,
  * 返回 response.data(即 NCM 响应 body)。失败时抛错,由 request.ts

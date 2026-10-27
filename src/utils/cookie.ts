@@ -69,7 +69,7 @@ export const removeCookie = (key: string) => {
   
   // Capacitor 环境下也移除原生层的 Cookie
   if (isCapacitor) {
-    const domain = String(import.meta.env["VITE_API_URL"] || "https://music.viaxv.top");
+    const domain = String(import.meta.env["VITE_API_URL"] || "https://music.viaxv.cn");
     CapacitorCookies.deleteCookie({ url: domain, key }).catch(console.error);
   }
 };
@@ -155,7 +155,7 @@ export const setCookies = (cookieValue: string) => {
 export const syncNativeCookies = async () => {
   if (!isCapacitor) return;
   try {
-    const domain = String(import.meta.env["VITE_API_URL"] || "https://music.viaxv.top");
+    const domain = String(import.meta.env["VITE_API_URL"] || "https://music.viaxv.cn");
     console.log(`🍪 [Native Sync] 正在从 localStorage 同步影子库到原生域名: ${domain}`);
 
     // 遍历 localStorage 中所有镜像出来的 Cookie
