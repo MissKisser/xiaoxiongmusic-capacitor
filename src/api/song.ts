@@ -92,7 +92,7 @@ export const unlockSongUrl = (id: number, songName: string, artist: string, serv
 // 获取歌曲歌词
 export const songLyric = (id: number) => {
   return request({
-    url: "/lyric/new",
+    url: "/lyric",
     params: {
       id,
     },
