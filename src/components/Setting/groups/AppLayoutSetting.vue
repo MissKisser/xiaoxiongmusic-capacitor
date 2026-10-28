@@ -84,7 +84,7 @@
           <div class="slider-row">
             <n-slider
               :value="settingStore.navHeight"
-              :min="50"
+              :min="30"
               :max="70"
               :step="1"
               class="nav-slider"

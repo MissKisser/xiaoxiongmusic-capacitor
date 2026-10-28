@@ -6,7 +6,7 @@ import type { SettingState } from "../setting";
 /**
  * 当前设置 Schema 版本号
  */
-export const CURRENT_SETTING_SCHEMA_VERSION = 12;
+export const CURRENT_SETTING_SCHEMA_VERSION = 13;
 
 /**
  * 迁移函数类型
@@ -194,5 +194,35 @@ export const settingMigrations: Record<number, MigrationFunction> = {
       cardTransparency: 85,
       globalBackgroundSaved: false,
     };
+  },
+  13: (state) => {
+    // 布局默认值换代：把旧默认值整体迁到新默认，自定义值不受影响
+    // - 旧默认值（顶栏高度 70px、卡片 2 列、大卡片比例 100%、布局模式 large）迁至新默认（50px、3 列、80%、custom）
+    // - 用户自定义值与小比例预设保持不变
+    // - 无历史版本号视为全新安装，直接落新默认值
+    const isLegacyInstall = (state.schemaVersion ?? 0) > 0;
+    if (!isLegacyInstall) {
+      return {
+        navHeight: 50,
+        mobileCardColumns: 3,
+        homeCardScale: 80,
+        layoutMode: "custom",
+      };
+    }
+
+    const updates: Partial<SettingState> = {};
+    if (state.navHeight === 70) {
+      updates.navHeight = 50;
+    }
+    if (state.mobileCardColumns === 2) {
+      updates.mobileCardColumns = 3;
+    }
+    if (state.homeCardScale === 100) {
+      updates.homeCardScale = 80;
+    }
+    if (state.layoutMode === "large") {
+      updates.layoutMode = "custom";
+    }
+    return updates;
   },
 };

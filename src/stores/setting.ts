@@ -463,7 +463,7 @@ export interface SettingState {
   enableBlurEffect: boolean;
   /** 手机端卡片列数（2 或 3 列） */
   mobileCardColumns: 2 | 3;
-  /** 顶栏高度（px，可调 50-70） */
+  /** 顶栏高度（px，可调 30-70） */
   navHeight: number;
   /** 布局模式：large 大比例 / small 小比例 / custom 自定义 */
   layoutMode: "large" | "small" | "custom";
@@ -672,10 +672,10 @@ export const useSettingStore = defineStore("setting", {
     audioCacheMaxSize: 500,
     audioCacheStrategy: "all",
     enableBlurEffect: false,
-    mobileCardColumns: 2,
-    navHeight: 70,
-    layoutMode: "large",
-    homeCardScale: 100,
+    mobileCardColumns: 3,
+    navHeight: 50,
+    layoutMode: "custom",
+    homeCardScale: 80,
     listRowHeight: 90,
     desktopLyricConfig: { ...defaultDesktopLyricConfig },
   }),

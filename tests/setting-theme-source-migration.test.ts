@@ -16,8 +16,8 @@ import {
 import { useSettingStore } from "../src/stores/setting";
 
 describe("主题色来源迁移 settingMigrations v12", () => {
-  it("当前 Schema 版本号为 12 且注册了 v12 迁移", () => {
-    assert.equal(CURRENT_SETTING_SCHEMA_VERSION, 12);
+  it("当前 Schema 版本号大于等于 12 且注册了 v12 迁移", () => {
+    assert.ok(CURRENT_SETTING_SCHEMA_VERSION >= 12);
     assert.equal(typeof settingMigrations[12], "function");
   });
 
@@ -78,7 +78,7 @@ describe("主题色来源迁移 settingMigrations v12", () => {
         themeGlobalColor: true,
       });
       settingStore.checkAndMigrate();
-      assert.equal(settingStore.schemaVersion, 12);
+      assert.equal(settingStore.schemaVersion, CURRENT_SETTING_SCHEMA_VERSION);
       assert.equal(settingStore.themeColorSource, "cover");
       assert.equal(settingStore.backgroundBlur, 0);
       assert.equal(settingStore.cardTransparency, 85);
@@ -96,14 +96,14 @@ describe("主题色来源迁移 settingMigrations v12", () => {
         themeGlobalColor: true,
       });
       settingStore.checkAndMigrate();
-      assert.equal(settingStore.schemaVersion, 12);
+      assert.equal(settingStore.schemaVersion, CURRENT_SETTING_SCHEMA_VERSION);
       assert.equal(settingStore.themeColorSource, "preset");
     });
 
     it("全新安装（无历史版本）默认来源为 cover 且跳过迁移", () => {
       const settingStore = useSettingStore();
       settingStore.checkAndMigrate();
-      assert.equal(settingStore.schemaVersion, 12);
+      assert.equal(settingStore.schemaVersion, CURRENT_SETTING_SCHEMA_VERSION);
       assert.equal(settingStore.themeColorSource, "cover");
     });
   });
