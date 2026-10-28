@@ -4,7 +4,7 @@
       <n-h3 prefix="bar"> 主题与背景 </n-h3>
 
       <!-- 主题模式 -->
-      <n-card class="set-item">
+      <n-card class="set-item theme-mode-item">
         <div class="label">
           <n-text class="name">主题模式</n-text>
           <n-text class="tip" :depth="3"> 选择应用的主题模式 </n-text>
@@ -288,6 +288,18 @@ const setBlurEffect = (enabled: boolean) => {
 
 <style lang="scss" scoped>
 .app-setting {
+  .theme-mode-item {
+    :deep(.n-card-content) {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+    }
+
+    .label {
+      padding-right: 0;
+    }
+  }
+
   .theme-mode-group {
     display: flex;
     flex-wrap: wrap;
@@ -296,7 +308,7 @@ const setBlurEffect = (enabled: boolean) => {
 
     .n-button {
       flex: 1;
-      min-width: 80px;
+      min-width: 0;
     }
   }
 
@@ -350,12 +362,15 @@ const setBlurEffect = (enabled: boolean) => {
 
   .custom-color-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 12px;
     width: 100%;
 
     .custom-color-picker {
-      width: min(50vw, 220px);
+      flex: 1;
+      min-width: 120px;
+      max-width: 100%;
     }
   }
 
@@ -384,10 +399,10 @@ const setBlurEffect = (enabled: boolean) => {
   .slider-item {
     :deep(.n-card-content) {
       flex-direction: column;
-      align-items: flex-start;
+      align-items: stretch;
 
       .tuning-slider {
-        width: min(100%, 320px);
+        width: 100%;
       }
     }
   }
@@ -395,10 +410,6 @@ const setBlurEffect = (enabled: boolean) => {
   @media (max-width: 768px) {
     .tuning-slider {
       width: 100%;
-    }
-
-    .custom-color-picker {
-      width: 100% !important;
     }
   }
 }

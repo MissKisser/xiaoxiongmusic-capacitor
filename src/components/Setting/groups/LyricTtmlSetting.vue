@@ -159,6 +159,16 @@ onMounted(refreshLocalTtml);
 
 <style lang="scss" scoped>
 #lyrics-local-ttml {
+  :deep(.n-card-content) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .label {
+    padding-right: 0;
+  }
+
   .local-ttml-toolbar {
     display: flex;
     gap: 8px;

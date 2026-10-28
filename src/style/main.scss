@@ -176,10 +176,6 @@ body.has-global-bg.blur-effects-enabled {
 
 // slider
 .n-slider {
-
-  // .n-slider-rail {
-  //   backdrop-filter: blur(10px);
-  // }
   .n-slider-handle {
     transition:
       opacity 0.3s var(--n-bezier),
@@ -191,6 +187,14 @@ body.has-global-bg.blur-effects-enabled {
 
 .n-slider-handle-indicator {
   --n-indicator-border-radius: 8px !important;
+}
+
+// 移动端滑杆触摸防御
+@media (max-width: 768px) {
+  .n-slider,
+  .n-slider .n-slider-rail {
+    touch-action: none;
+  }
 }
 
 // popover

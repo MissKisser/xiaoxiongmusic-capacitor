@@ -85,6 +85,8 @@ const itemTitle = computed(() => titles[item.value] || "设置");
   flex-direction: column;
   height: 100%;
   padding: 0 40px;
+  min-width: 0;
+  overflow-x: hidden;
 
   .item-header {
     display: flex;
@@ -105,6 +107,15 @@ const itemTitle = computed(() => titles[item.value] || "设置");
     flex: 1;
     min-height: 0;
     padding-right: 12px;
+
+    :deep(.n-scrollbar-container) {
+      overflow-x: hidden !important;
+    }
+
+    :deep(.n-scrollbar-content) {
+      min-width: 0;
+      max-width: 100%;
+    }
   }
 
   @media (max-width: 768px) {
@@ -124,18 +135,6 @@ const itemTitle = computed(() => titles[item.value] || "设置");
     --n-color-focus: var(--n-color-hover);
   }
 
-  // 单选按钮（radio-button）与主题模式按钮一致：选中纯色主色底白字，未选中浅灰底
-  .n-radio-group {
-    flex-wrap: wrap;
-    // 按钮之间留出间距（splitor 为按钮间 1px 分割线）
-    .n-radio-group__splitor + .n-radio-button {
-      margin-left: 8px;
-    }
-    // 分割线透明，避免选中态主色泄露到按钮间隙
-    .n-radio-group__splitor {
-      background-color: transparent !important;
-    }
-  }
   .n-radio-button {
     --n-button-color: color-mix(in srgb, var(--surface-container-hex), rgb(0 0 0 / 10%));
     --n-button-color-active: rgb(var(--primary));
@@ -159,9 +158,23 @@ const itemTitle = computed(() => titles[item.value] || "设置");
       border-radius: 8px;
       margin-bottom: 12px;
 
+      // 单选按钮（radio-button）：支持弹性折行，间距由 gap 提供
+      .n-radio-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+
+        // 分割线透明，避免选中态主色泄露到按钮间隙
+        .n-radio-group__splitor {
+          background-color: transparent !important;
+        }
+      }
+
       .n-card-content {
         display: flex;
         flex-direction: row;
+        flex-wrap: wrap;
+        gap: 12px;
         align-items: center;
         justify-content: space-between;
         padding: 16px;
@@ -169,11 +182,23 @@ const itemTitle = computed(() => titles[item.value] || "设置");
 
       .label {
         display: flex;
-        flex-direction: column;
-        padding-right: 20px;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 4px 8px;
+        flex: 1;
+        min-width: 0;
 
         .name {
           font-size: 16px;
+          flex-shrink: 0;
+          max-width: 100%;
+        }
+
+        .tip {
+          word-break: break-word;
+          overflow-wrap: anywhere;
+          min-width: 0;
         }
       }
     }

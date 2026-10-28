@@ -221,7 +221,9 @@ onMounted(async () => {
 <style lang="scss" scoped>
 .app-setting {
   .cache-slider {
-    width: min(50vw, 280px);
+    flex: 1;
+    min-width: 120px;
+    width: auto;
   }
 
   .arrow {
