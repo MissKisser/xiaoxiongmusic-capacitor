@@ -7,6 +7,14 @@ import { defaultAMLLDbServer } from "@/utils/meta";
 import { defineStore } from "pinia";
 import { CURRENT_SETTING_SCHEMA_VERSION, settingMigrations } from "./migrations/settingMigrations";
 
+/**
+ * 主题色来源
+ * - preset：预设主题色 / 自定义颜色（themeColorType / themeCustomColor）
+ * - background：从全局背景图提取主色
+ * - cover：跟随当前歌曲封面取色
+ */
+export type ThemeColorSource = "preset" | "background" | "cover";
+
 /** 第三方平台首页栏目键（真源声明） */
 export const PLATFORM_HOME_SECTION_KEYS = [
   "square",
@@ -94,10 +102,21 @@ export interface SettingState {
   traditionalChineseVariant: "s2t" | "s2tw" | "s2hk" | "s2twp";
   /** 主题自定义颜色 */
   themeCustomColor: string;
-  /** 全局着色 */
+  /**
+   * 历史遗留字段，仅为兼容旧数据保留
+   * 整体着色改由主题色来源推导，全局背景图的存在性由 globalBackgroundImage 判定
+   */
   themeGlobalColor: boolean;
-  /** 主题跟随封面 */
+  /**
+   * @deprecated 语义已并入 themeColorSource === "cover"，仅为兼容旧数据与既有消费方保留
+   */
   themeFollowCover: boolean;
+  /** 主题色来源：预设/自定义色、全局背景图取色、跟随歌曲封面 */
+  themeColorSource: ThemeColorSource;
+  /** 背景图片模糊度（0-100，映射为 0-30px，仅设置全局背景图后生效） */
+  backgroundBlur: number;
+  /** 卡片背景透明度（0-100，仅设置全局背景图后生效；无背景时卡片保持不透明） */
+  cardTransparency: number;
   /** 全局字体 */
   globalFont: "default" | string;
   /** 歌词区域字体 */
@@ -424,15 +443,23 @@ export interface SettingState {
   disableAiAudio: boolean;
   /** Fuck DJ: 开启后自动跳过 DJ 歌曲 */
   disableDjMode: boolean;
-  /** 全局背景图片 */
+  /**
+   * 全局背景图（内存中的渲染数据，data URL）
+   * 持久化以文件形式存放在应用数据目录（见 utils/backgroundStore），此处不落 localStorage
+   */
   globalBackgroundImage: string | null;
+  /** 全局背景图是否已持久化到应用数据目录（启动时据此回填内存渲染数据） */
+  globalBackgroundSaved: boolean;
   /** 音频流缓存开关（Capacitor 本地代理缓存） */
   audioCacheEnabled: boolean;
   /** 音频流缓存大小上限（MB） */
   audioCacheMaxSize: number;
   /** 音频缓存策略: all=缓存所有播放的歌曲, complete=只缓存播放完的歌曲 */
   audioCacheStrategy: "all" | "complete";
-  /** 启用毛玻璃特效（低性能设备建议关闭） */
+  /**
+   * 启用毛玻璃特效（低性能设备建议关闭）
+   * 统一管控全局磨砂效果，仅在设置了全局背景图后生效
+   */
   enableBlurEffect: boolean;
   /** 手机端卡片列数（2 或 3 列） */
   mobileCardColumns: 2 | 3;
@@ -457,7 +484,10 @@ export const useSettingStore = defineStore("setting", {
     traditionalChineseVariant: "s2t",
     themeCustomColor: "#fe7971",
     themeFollowCover: false,
+    themeColorSource: "cover",
     themeGlobalColor: false,
+    backgroundBlur: 0,
+    cardTransparency: 85,
     globalFont: "default",
     LyricFont: "follow",
     japaneseLyricFont: "follow",
@@ -637,6 +667,7 @@ export const useSettingStore = defineStore("setting", {
     disableAiAudio: false,
     disableDjMode: false,
     globalBackgroundImage: null,
+    globalBackgroundSaved: false,
     audioCacheEnabled: true,
     audioCacheMaxSize: 500,
     audioCacheStrategy: "all",

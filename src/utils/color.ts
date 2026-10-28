@@ -1,4 +1,5 @@
 import type { CoverColors } from "@/types/main";
+import type { ThemeColorSource } from "@/stores/setting";
 import {
   themeFromSourceColor,
   QuantizerCelebi,
@@ -30,37 +31,51 @@ export const setGlobalColor = (name: string, colorValue: string): void => {
   root.style.setProperty(name, colorValue);
 };
 
-// 设置动态配色
+/**
+ * 设置动态配色
+ * @param color 颜色字符串（预设/自定义色）或取色得到的主题数据
+ * @param mode 明暗模式
+ * @param options tintSurfaces 为 true 时界面底色跟随取色结果（整体着色），
+ *                否则底色回退为中性色，仅强调色取自该颜色
+ * @returns 各颜色项的 RGB 字符串集合
+ */
 export const setColorSchemes = (
   color: string | CoverColors,
-  // 明暗模式
   mode: "dark" | "light",
+  options: { tintSurfaces?: boolean } = {},
 ): { [key: string]: string } => {
-  const settingStore = useSettingStore();
   const colorData = typeof color === "string" ? getMDColor(color) : color;
   if (!colorData) throw new Error("Color data not found");
   // 指定模式颜色数据
   const colorModeData = colorData[mode];
+  if (!colorModeData) throw new Error("Color data not found");
+  // 未整体着色时使用的中性底色
+  const neutralColors: Record<string, { r: number; g: number; b: number }> = {
+    background:
+      mode === "dark" ? { r: 16, g: 16, b: 20 } : { r: 246, g: 246, b: 246 },
+    "surface-container":
+      mode === "dark" ? { r: 24, g: 24, b: 28 } : { r: 255, g: 255, b: 255 },
+  };
+  const tintSurfaces = options.tintSurfaces === true;
   const modifiedColorModeData: { [key: string]: string } = {};
-  // 是否全局应用
-  if (!settingStore.themeGlobalColor && colorModeData) {
-    // 修改关键颜色
-    colorModeData.background =
-      mode === "dark" ? { r: 16, g: 16, b: 20 } : { r: 246, g: 246, b: 246 };
-    colorModeData["surface-container"] =
-      mode === "dark" ? { r: 24, g: 24, b: 28 } : { r: 255, g: 255, b: 255 };
-    console.log(colorModeData);
-  }
   // 遍历颜色并修改
   for (const key in colorModeData) {
-    const color = colorModeData[key];
-    if (typeof color === "object" && "r" in color && "g" in color && "b" in color) {
-      const hexValue = rgbToHex(color.r, color.g, color.b);
+    const colorValue = colorModeData[key];
+    if (
+      typeof colorValue === "object" &&
+      colorValue !== null &&
+      "r" in colorValue &&
+      "g" in colorValue &&
+      "b" in colorValue
+    ) {
+      // 不整体着色时底色回退中性色（不修改入参，避免污染取色缓存）
+      const effective = !tintSurfaces && neutralColors[key] ? neutralColors[key] : colorValue;
+      const hexValue = rgbToHex(effective.r, effective.g, effective.b);
       // 修改后的颜色值存储在新的对象中
       modifiedColorModeData[`${key}-hex`] = hexValue;
-      modifiedColorModeData[key] = `${color.r}, ${color.g}, ${color.b}`;
+      modifiedColorModeData[key] = `${effective.r}, ${effective.g}, ${effective.b}`;
       // 设置样式
-      setGlobalColor(`--${key}`, `${color.r}, ${color.g}, ${color.b}`);
+      setGlobalColor(`--${key}`, `${effective.r}, ${effective.g}, ${effective.b}`);
       setGlobalColor(`--${key}-hex`, hexValue);
     } else {
       console.error(`Invalid color data for key: ${key}`);
@@ -169,4 +184,86 @@ export const getCoverColor = async (coverUrl: string) => {
     // 移除元素
     image.remove();
   };
+};
+
+/**
+ * 加载图片元素
+ * @param src 图片地址（data URL 或网络地址）
+ * @returns 加载完成的图像元素
+ */
+const loadImageElement = (src: string): Promise<HTMLImageElement> =>
+  new Promise((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = "Anonymous";
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("image load failed"));
+    image.src = src;
+  });
+
+/**
+ * 从全局背景图提取主题色数据
+ * 复用封面取色的 QuantizerCelebi 量化与 Score 评分流程，输出与其同构
+ * @param backgroundImage 背景图 data URL 或图片地址
+ * @returns 与封面取色同格式的主题色数据；图片缺失或加载失败返回 null
+ */
+export const getBackgroundTheme = async (
+  backgroundImage: string,
+): Promise<CoverColors | null> => {
+  if (!backgroundImage) return null;
+  try {
+    const image = await loadImageElement(backgroundImage);
+    const backgroundTheme = getCoverColorData(image);
+    image.remove();
+    return backgroundTheme;
+  } catch {
+    return null;
+  }
+};
+
+/** 主题色来源分流结果：preset 携带颜色字符串，其余携带与封面取色同构的主题数据 */
+export type ThemeColorRoute =
+  | { kind: "preset"; presetColor: string }
+  | { kind: "cover"; theme: CoverColors }
+  | { kind: "background"; theme: CoverColors };
+
+/** 主题色来源分流所需的各来源输入 */
+export interface ThemeColorRouteInputs {
+  /** 预设来源的颜色值（预设主题色或自定义颜色字符串） */
+  presetColor?: string | null;
+  /** 背景图取色结果（未设置背景图或尚未取色时为 null） */
+  backgroundTheme?: CoverColors | null;
+  /** 封面取色结果（无封面主题时为 null） */
+  coverTheme?: CoverColors | null;
+}
+
+/**
+ * 判定取色主题数据是否可用
+ * 仅当明暗两套配色都带有主色时才视为可用，避免空数据导致配色整体失效
+ * @param theme 取色主题数据
+ * @returns 是否可用
+ */
+const isUsableTheme = (theme: CoverColors | null | undefined): theme is CoverColors =>
+  Boolean(theme && theme.light?.primary && theme.dark?.primary);
+
+/**
+ * 按主题色来源分流取色输入
+ * 选定来源不可用时回退 preset；preset 亦不可用返回 null（由调用方保持现状）
+ * @param source 主题色来源
+ * @param inputs 各来源的取色输入
+ * @returns 分流结果
+ */
+export const resolveThemeColorRoute = (
+  source: ThemeColorSource,
+  inputs: ThemeColorRouteInputs,
+): ThemeColorRoute | null => {
+  if (source === "cover" && isUsableTheme(inputs.coverTheme)) {
+    return { kind: "cover", theme: inputs.coverTheme };
+  }
+  if (source === "background" && isUsableTheme(inputs.backgroundTheme)) {
+    return { kind: "background", theme: inputs.backgroundTheme };
+  }
+  if (inputs.presetColor) {
+    return { kind: "preset", presetColor: inputs.presetColor };
+  }
+  return null;
 };

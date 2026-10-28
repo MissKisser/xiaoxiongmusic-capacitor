@@ -42,21 +42,6 @@
       <n-flex align="center" class="nav-right">
         <!-- 搜索按钮（移动端，在最左边） -->
         <SearchInp v-if="!isDesktop && settingStore.useOnlineService" />
-        <!-- 全局着色按钮（同时切换全局着色和跟随封面） -->
-        <n-button
-          class="global-color-btn"
-          :class="{ 'global-color-enabled': isGlobalColorEnabled }"
-          :focusable="false"
-          :title="isGlobalColorEnabled ? '关闭全局着色' : '开启全局着色'"
-          :type="isGlobalColorEnabled ? 'primary' : 'default'"
-          tertiary
-          circle
-          @click="toggleGlobalColor"
-        >
-          <template #icon>
-            <SvgIcon name="Palette" :class="{ 'icon-enabled': isGlobalColorEnabled }" />
-          </template>
-        </n-button>
         <!-- 用户 -->
         <User v-if="settingStore.useOnlineService" />
         <!-- 设置菜单 -->
@@ -156,20 +141,6 @@ const rememberNotAsk = ref(false);
 const useBorderless = ref(true);
 // 当前窗口状态
 const isMax = ref(false);
-
-// 全局着色状态（同时考虑 themeGlobalColor 和 themeFollowCover）
-const isGlobalColorEnabled = computed(() => {
-  return settingStore.themeGlobalColor && settingStore.themeFollowCover;
-});
-
-// 切换全局着色（同时切换两个设置）
-const toggleGlobalColor = () => {
-  const newValue = !isGlobalColorEnabled.value;
-  settingStore.themeGlobalColor = newValue;
-  settingStore.themeFollowCover = newValue;
-  // 显示 toast 提示
-  window.$message.success(newValue ? "全局着色已开启" : "全局着色已关闭");
-};
 
 // 缩放相关（当前模板中设置菜单已注释隐藏，保留代码以便以后恢复）
 /*
@@ -330,22 +301,28 @@ onMounted(async () => {
   // 注意：不要把 backdrop-filter 直接加在 .nav 上
   // 否则在部分移动端 WebView/Safari 下会影响子元素 position: fixed（搜索遮罩），导致遮罩只在顶栏区域生效
   @media (max-width: 768px) {
-    background-color: rgba(var(--surface-container), 0.5) !important;
+    // 顶栏与卡片消费同一透明度变量（调卡片透明度时顶栏一起变化）
+    background-color: rgba(var(--surface-container), var(--card-bg-alpha, 1)) !important;
     z-index: 2005;
     // 使用阴影向上延伸背景颜色，确保状态栏区域底色一致
-    box-shadow: 0 -100px 0 0 rgba(var(--surface-container), 0.5);
-    
+    box-shadow: 0 -100px 0 0 rgba(var(--surface-container), var(--card-bg-alpha, 1));
+
     &::before {
       content: "";
       position: absolute;
       inset: -100px 0 0 0; // 向上延伸背景层
-      backdrop-filter: blur(20px) saturate(180%);
-      -webkit-backdrop-filter: blur(20px) saturate(180%);
       background-color: transparent;
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
       pointer-events: none;
       z-index: 0;
     }
+
+    // 顶栏毛玻璃：仅在设置了背景图且开启毛玻璃特效时生效
+    body.has-global-bg.blur-effects-enabled &::before {
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+    }
+
     > * {
       position: relative;
       z-index: 1;
@@ -450,34 +427,6 @@ onMounted(async () => {
   margin-top: 12px;
   :deep(.n-checkbox__label) {
     line-height: 0;
-  }
-}
-// 全局着色按钮样式
-.global-color-btn {
-  transition: all 0.3s ease;
-  &.global-color-enabled {
-    // 开启状态：使用主题色
-    background-color: rgba(var(--primary), 0.15) !important;
-    border-color: rgba(var(--primary), 0.3) !important;
-    :deep(.n-icon) {
-      color: rgb(var(--primary)) !important;
-    }
-    &:hover {
-      background-color: rgba(var(--primary), 0.25) !important;
-      border-color: rgba(var(--primary), 0.5) !important;
-    }
-  }
-  // 关闭状态：使用默认灰色
-  &:not(.global-color-enabled) {
-    :deep(.n-icon) {
-      color: var(--n-text-color-3) !important;
-    }
-    &:hover {
-      background-color: var(--n-color-hover) !important;
-      :deep(.n-icon) {
-        color: var(--n-text-color-2) !important;
-      }
-    }
   }
 }
 </style>

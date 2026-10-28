@@ -20,7 +20,6 @@ declare module 'vue' {
     AppThemeSetting: typeof import('./src/components/Setting/groups/AppThemeSetting.vue')['default']
     ArtistList: typeof import('./src/components/List/ArtistList.vue')['default']
     AutoClose: typeof import('./src/components/Modal/AutoClose.vue')['default']
-    BackgroundParamsModal: typeof import('./src/components/Modal/Setting/BackgroundParamsModal.vue')['default']
     BackgroundRender: typeof import('./src/components/AMLL/BackgroundRender.vue')['default']
     BatchList: typeof import('./src/components/Modal/BatchList.vue')['default']
     ChangeRate: typeof import('./src/components/Modal/ChangeRate.vue')['default']

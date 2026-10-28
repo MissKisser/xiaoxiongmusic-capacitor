@@ -131,6 +131,8 @@ import { useMusicStore, useStatusStore, useSettingStore, useAuthStore } from "@/
 import GlobalAuthModal from "@/components/Modal/GlobalAuthModal.vue";
 import { useBlobURLManager } from "@/core/resource/BlobURLManager";
 import { isElectron } from "@/utils/env";
+import { restoreGlobalBackground } from "@/utils/backgroundStore";
+import { resolveBackgroundBlurPx, resolveCardBgAlpha } from "@/utils/themeSetting";
 import { useMobile } from "@/composables/useMobile";
 import { useSwipe } from "@vueuse/core";
 import { usePlayerController } from "@/core/player/PlayerController";
@@ -209,24 +211,34 @@ const { direction, lengthX } = useSwipe(appLayoutRef, {
 });
 
 
-// 全局着色是否启用
-const isGlobalColorEnabled = computed(() => {
-  return settingStore.themeGlobalColor;
-});
+// 是否设置了全局背景图
+const hasGlobalBackground = computed(() => Boolean(settingStore.globalBackgroundImage));
 
-// 根据全局着色状态切换 body 类名及设置背景图变量
+// 背景模糊度：0-100 映射为 0-30px（仅设置背景图后生效）
+const backgroundBlurPx = computed(() =>
+  resolveBackgroundBlurPx(settingStore.backgroundBlur, hasGlobalBackground.value),
+);
+
+// 卡片背景透明度：0-100 映射为 0-1（仅设置背景图后生效，无背景时保持不透明）
+const cardBgAlpha = computed(() =>
+  resolveCardBgAlpha(settingStore.cardTransparency, hasGlobalBackground.value),
+);
+
+// 根据全局背景图状态挂载 body 类，并注入背景旋钮 CSS 变量（供消费层按需使用）
 watchEffect(() => {
-  if (isGlobalColorEnabled.value) {
-    document.body.classList.add('global-color-enabled');
-    if (settingStore.globalBackgroundImage) {
-      document.body.style.setProperty('--global-background-image', `url(${settingStore.globalBackgroundImage})`);
-    } else {
-      document.body.style.removeProperty('--global-background-image');
-    }
+  if (hasGlobalBackground.value) {
+    document.body.classList.add("has-global-bg");
+    // 背景图渲染变量与背景存在性绑定：设置了背景图即渲染
+    document.body.style.setProperty(
+      "--global-background-image",
+      `url(${settingStore.globalBackgroundImage})`,
+    );
   } else {
-    document.body.classList.remove('global-color-enabled');
-    document.body.style.removeProperty('--global-background-image');
+    document.body.classList.remove("has-global-bg");
+    document.body.style.removeProperty("--global-background-image");
   }
+  document.body.style.setProperty("--bg-blur", `${backgroundBlurPx.value}px`);
+  document.body.style.setProperty("--card-bg-alpha", `${cardBgAlpha.value}`);
 });
 
 // 根据毛玻璃特效设置切换 body 类名
@@ -289,6 +301,10 @@ onBeforeUnmount(() => {
 
 onMounted(() => {
   init();
+  // 启动回填全局背景图（持久化于应用数据目录，标志存在时才读取）
+  if (settingStore.globalBackgroundSaved) {
+    restoreGlobalBackground().catch((error) => console.error("恢复全局背景图失败:", error));
+  }
   if (!isElectron) {
     window.addEventListener("beforeunload", (event) => {
       event.preventDefault();

@@ -393,11 +393,16 @@ const instantLyrics = computed(() => {
   z-index: 10;
   // 仅移动端显示毛玻璃效果
   @media (max-width: 768px) {
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    background-color: rgba(var(--surface-container), 0.5) !important;
+    // 播放条与卡片消费同一透明度变量（随卡片透明度一起变化）
+    background-color: rgba(var(--surface-container), var(--card-bg-alpha, 1)) !important;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     height: calc(clamp(70px, 15vw, 80px) + env(safe-area-inset-bottom, 0px));
+
+    // 播放条毛玻璃：仅在设置了背景图且开启毛玻璃特效时生效
+    body.has-global-bg.blur-effects-enabled & {
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+    }
   }
   @media (max-width: 512px) {
     height: calc(70px + env(safe-area-inset-bottom, 0px));

@@ -16,8 +16,8 @@
       </div>
     </div>
     <n-space justify="end" style="margin-top: 16px">
-      <n-button @click="emit('cancel')">取消</n-button>
-      <n-button type="primary" @click="handleConfirm">确认裁剪</n-button>
+      <n-button :disabled="isSaving" @click="emit('cancel')">取消</n-button>
+      <n-button type="primary" :loading="isSaving" @click="handleConfirm">确认裁剪</n-button>
     </n-space>
   </div>
 </template>
@@ -25,9 +25,9 @@
 <script setup lang="ts">
 /**
  * 图片裁剪弹窗组件
- * @author Hackerdallas
+ * 确认后经 backgroundStore 持久化全局背景图，配色逻辑交由主题色来源设置控制
  */
-import { useSettingStore } from "@/stores";
+import { saveGlobalBackground } from "@/utils/backgroundStore";
 
 const props = defineProps<{
   imageSrc: string;
@@ -38,7 +38,7 @@ const emit = defineEmits<{
   (e: "confirm"): void;
 }>();
 
-const settingStore = useSettingStore();
+const isSaving = ref(false);
 const cropImageRef = ref<HTMLImageElement | null>(null);
 const cropBoxRef = ref<HTMLDivElement | null>(null);
 
@@ -121,45 +121,47 @@ const startDrag = (e: MouseEvent | TouchEvent) => {
   document.addEventListener("touchend", handleEnd);
 };
 
-// 确认裁剪
-const handleConfirm = () => {
-  if (!cropImageRef.value || !cropBoxRef.value) return;
-  
+// 确认裁剪并持久化全局背景图
+const handleConfirm = async () => {
+  if (!cropImageRef.value || !cropBoxRef.value || isSaving.value) return;
+
   const img = cropImageRef.value;
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  
+
   // 计算裁剪区域（相对于图片原始尺寸）
   const imgRect = img.getBoundingClientRect();
   const cropRect = cropBoxRef.value.getBoundingClientRect();
-  
+
   const scaleX = img.naturalWidth / imgRect.width;
   const scaleY = img.naturalHeight / imgRect.height;
-  
+
   const cropX = (cropRect.left - imgRect.left) * scaleX;
   const cropY = (cropRect.top - imgRect.top) * scaleY;
   const cropWidth = cropRect.width * scaleX;
   const cropHeight = cropRect.height * scaleY;
-  
+
   canvas.width = cropWidth;
   canvas.height = cropHeight;
-  
+
   ctx.drawImage(
     img,
     cropX, cropY, cropWidth, cropHeight,
     0, 0, cropWidth, cropHeight
   );
-  
+
   const croppedImage = canvas.toDataURL("image/jpeg", 0.9);
-  settingStore.globalBackgroundImage = croppedImage;
-  
-  // 自动开启全局着色
-  settingStore.themeGlobalColor = true;
-  settingStore.themeFollowCover = true;
-  window.$message.success("背景设置成功，已自动开启全局着色");
-  
-  emit("confirm");
+  isSaving.value = true;
+  try {
+    await saveGlobalBackground(croppedImage);
+    window.$message.success("背景设置成功");
+    emit("confirm");
+  } catch {
+    window.$message.error("背景保存失败，请重试");
+  } finally {
+    isSaving.value = false;
+  }
 };
 </script>
 

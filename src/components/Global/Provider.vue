@@ -46,9 +46,11 @@ import {
   GlobalThemeOverrides,
 } from "naive-ui";
 import { useSettingStore, useStatusStore } from "@/stores";
-import { setColorSchemes } from "@/utils/color";
+import { getBackgroundTheme, resolveThemeColorRoute, setColorSchemes } from "@/utils/color";
+import { isTintSurfacesRoute } from "@/utils/themeSetting";
 import { useCustomCode } from "@/composables/useCustomCode";
 import themeColor from "@/assets/data/themeColor.json";
+import type { CoverColors } from "@/types/main";
 
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
@@ -79,33 +81,67 @@ const theme = computed(() => {
       : null;
 });
 
-// 获取当前主题色数据
-const getThemeMainColor = () => {
+// 解析主题色来源，得到生效配色与整体着色状态
+// 取色来源（背景取色 / 封面取色）下界面整体跟随该色着色，预设与自定义色下保持中性底色
+const resolveThemePalette = () => {
   const themeType = theme.value ? "dark" : "light";
-  // 强制取色逻辑：如果开启了跟随封面，优先使用 statusStore 中的封面色
-  if (settingStore.themeFollowCover && statusStore.songCoverTheme) {
-    const coverColor = statusStore.songCoverTheme;
-    // 强制取色逻辑
-    return setColorSchemes(coverColor as any, themeType); 
-  } else if (settingStore.themeColorType !== "custom") {
-    return setColorSchemes(themeColor[settingStore.themeColorType].color, themeType);
-  } else {
-    return setColorSchemes(settingStore.themeCustomColor, themeType);
+  // 预设来源颜色值：预设主题色或自定义颜色
+  const presetColor =
+    settingStore.themeColorType !== "custom"
+      ? themeColor[settingStore.themeColorType].color
+      : settingStore.themeCustomColor;
+  // 按主题色来源分流：cover 跟随封面 / background 背景图取色 / preset 预设与自定义色
+  const route = resolveThemeColorRoute(settingStore.themeColorSource, {
+    presetColor,
+    backgroundTheme: backgroundTheme.value,
+    coverTheme: statusStore.songCoverTheme || null,
+  });
+  // 是否整体着色：取色来源下界面底色跟随取色结果
+  const tintSurfaces = isTintSurfacesRoute(route);
+  if (!route) {
+    return { schemes: setColorSchemes(presetColor, themeType), tintSurfaces };
+  }
+  if (route.kind === "preset") {
+    return { schemes: setColorSchemes(route.presetColor, themeType), tintSurfaces };
+  }
+  return {
+    schemes: setColorSchemes(route.theme as any, themeType, { tintSurfaces }),
+    tintSurfaces,
+  };
+};
+// 背景图取色主题（背景图变化时重取）
+const backgroundTheme = shallowRef<CoverColors | null>(null);
+// 背景图取色请求序号（避免旧图的异步取色结果覆盖新图）
+let backgroundThemeRequestId = 0;
+
+// 从全局背景图提取主题色，并在取色完成后刷新全局主题
+const refreshBackgroundTheme = async () => {
+  const backgroundImage = settingStore.globalBackgroundImage;
+  const requestId = ++backgroundThemeRequestId;
+  if (!backgroundImage) {
+    backgroundTheme.value = null;
+    changeGlobalTheme();
+    return;
+  }
+  const themeData = await getBackgroundTheme(backgroundImage);
+  if (requestId === backgroundThemeRequestId) {
+    backgroundTheme.value = themeData;
+    changeGlobalTheme();
   }
 };
 
 // 更改全局主题
 const changeGlobalTheme = () => {
   try {
-    // 获取配色方案
-    const colorSchemes = getThemeMainColor();
+    // 获取配色方案与整体着色状态
+    const { schemes: colorSchemes, tintSurfaces } = resolveThemePalette();
     if (!colorSchemes || Object.keys(colorSchemes).length === 0) {
       themeOverrides.value = {};
       return;
     }
     // 构造主题缓存 Key
     const themeModeLabel = theme.value ? "dark" : "light";
-    const themeCacheKey = `${themeModeLabel}|${settingStore.themeGlobalColor ? 1 : 0}|${settingStore.globalFont}|${colorSchemes.primary}|${colorSchemes.background}|${colorSchemes["surface-container"]}|${isMobile.value ? 1 : 0}`;
+    const themeCacheKey = `${themeModeLabel}|${tintSurfaces ? 1 : 0}|${settingStore.globalFont}|${colorSchemes.primary}|${colorSchemes.background}|${colorSchemes["surface-container"]}|${isMobile.value ? 1 : 0}`;
     if (lastThemeCacheKey === themeCacheKey) return;
     lastThemeCacheKey = themeCacheKey;
 
@@ -204,10 +240,16 @@ const changeGlobalTheme = () => {
         : {}),
     });
 
-    // 获取组件样式
-    const specificStyles = getComponentStyles(settingStore.themeGlobalColor);
+    // 获取组件样式（整体着色时追加取色相关组件样式）
+    const specificStyles = getComponentStyles(tintSurfaces);
 
-    if (settingStore.themeGlobalColor) {
+    // 页面底色：移动端设置了全局背景图时透明，便于透出背景图
+    const bodyColor =
+      isMobile.value && settingStore.globalBackgroundImage
+        ? "transparent"
+        : `rgb(${colorSchemes.background})`;
+
+    if (tintSurfaces) {
       themeOverrides.value = {
         common: {
           ...commonBase,
@@ -215,9 +257,7 @@ const changeGlobalTheme = () => {
           textColor1: colors.primary,
           textColor2: toRGBA(primaryRGB, 0.82),
           textColor3: colors.primary52,
-          bodyColor: isMobile.value && settingStore.themeGlobalColor && settingStore.globalBackgroundImage 
-            ? 'transparent' 
-            : `rgb(${colorSchemes.background})`, // 移动端仅在有背景图时透明
+          bodyColor,
           cardColor: colors.surface,
           tagColor: colors.surface,
           modalColor: colors.surface,
@@ -238,10 +278,16 @@ const changeGlobalTheme = () => {
       };
     } else {
       themeOverrides.value = {
-        common: commonBase,
+        common: {
+          ...commonBase,
+          bodyColor,
+        },
         ...specificStyles,
       };
     }
+
+    // 整体着色状态同步到 body，供菜单等对比度样式消费
+    document.body.classList.toggle("global-color-enabled", tintSurfaces);
   } catch (error) {
     themeOverrides.value = {};
     console.error("切换主题色出现错误：", error);
@@ -277,14 +323,19 @@ const NaiveProviderContent = defineComponent({
 watch(
   () => [
     settingStore.themeColorType,
-    settingStore.themeFollowCover,
-    settingStore.themeGlobalColor,
+    settingStore.themeColorSource,
     settingStore.globalFont,
     statusStore.songCoverTheme?.main,
     theme.value,
     isMobile.value, // 监听移动端变化以更新背景色
   ],
   () => changeGlobalTheme(),
+);
+
+// 监听背景图变化，重取背景图主题色
+watch(
+  () => settingStore.globalBackgroundImage,
+  () => refreshBackgroundTheme(),
 );
 
 // 自定义颜色更改
@@ -298,6 +349,10 @@ watchDebounced(
 
 onMounted(() => {
   changeGlobalTheme();
+  // 已设置全局背景图时启动取色（来源为背景图或后续切换来源时已有数据可用）
+  if (settingStore.globalBackgroundImage) {
+    refreshBackgroundTheme();
+  }
   // 自定义代码注入
   useCustomCode();
 });

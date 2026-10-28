@@ -69,34 +69,8 @@
         </n-card>
       </template>
 
-      <!-- 性能 -->
-      <n-h3 prefix="bar"> 性能 </n-h3>
-      <n-card class="set-item">
-        <div class="label">
-          <n-text class="name">毛玻璃特效</n-text>
-          <n-text class="tip" :depth="3">
-            {{ settingStore.enableBlurEffect
-              ? '已开启：使用高级毛玻璃模糊效果，对 GPU 要求较高'
-              : '已关闭：使用半透明纯色替代，流畅度更好' }}
-          </n-text>
-        </div>
-        <n-switch
-          :value="settingStore.enableBlurEffect"
-          class="set"
-          :round="false"
-          @update:value="handleBlurToggle"
-        />
-      </n-card>
-
       <!-- 更多设置（入口弹窗） -->
       <n-h3 prefix="bar"> 更多设置 </n-h3>
-      <n-card class="set-item" @click="openSongUnlockManager()">
-        <div class="label">
-          <n-text class="name">音源管理</n-text>
-          <n-text class="tip" :depth="3"> 配置歌曲解锁音源服务 </n-text>
-        </div>
-        <n-text class="arrow" depth="3">›</n-text>
-      </n-card>
       <n-card class="set-item" @click="openSidebarHideManager()">
         <div class="label">
           <n-text class="name">侧边栏隐藏管理</n-text>
@@ -140,7 +114,6 @@ import {
   // openCustomCode, // 自定义代码注入（Electron 专属，Capacitor 端已隐藏）
   openHomePageSectionManager,
   openSidebarHideManager,
-  openSongUnlockManager,
 } from "@/utils/modal";
 
 const settingStore = useSettingStore();
@@ -166,12 +139,6 @@ const handleCheckUpdate = async () => {
   } finally {
     isCheckingUpdate.value = false;
   }
-};
-
-// === 性能设置 ===
-const handleBlurToggle = (enabled: boolean) => {
-  settingStore.enableBlurEffect = enabled;
-  window.$message.success(enabled ? "毛玻璃特效已开启" : "毛玻璃特效已关闭");
 };
 
 // === 缓存设置 ===

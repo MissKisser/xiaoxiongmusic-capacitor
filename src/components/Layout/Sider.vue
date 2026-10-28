@@ -30,9 +30,14 @@ const statusStore = useStatusStore();
   flex-direction: column;
   // 仅移动端显示毛玻璃效果
   @media (max-width: 768px) {
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    background-color: rgba(var(--background), 0.4) !important;
+    // 侧栏与卡片消费同一透明度变量（随卡片透明度一起变化）
+    background-color: rgba(var(--background), var(--card-bg-alpha, 1)) !important;
+
+    // 侧栏毛玻璃：仅在设置了背景图且开启毛玻璃特效时生效
+    body.has-global-bg.blur-effects-enabled & {
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+    }
   }
   .logo {
     display: flex;

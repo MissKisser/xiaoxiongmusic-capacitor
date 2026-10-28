@@ -6,7 +6,7 @@ import type { SettingState } from "../setting";
 /**
  * 当前设置 Schema 版本号
  */
-export const CURRENT_SETTING_SCHEMA_VERSION = 11;
+export const CURRENT_SETTING_SCHEMA_VERSION = 12;
 
 /**
  * 迁移函数类型
@@ -174,6 +174,25 @@ export const settingMigrations: Record<number, MigrationFunction> = {
       layoutMode: custom ? "custom" : "large",
       homeCardScale: 100,
       listRowHeight: 90,
+    };
+  },
+  12: (state) => {
+    // 主题色来源重构：
+    // - themeFollowCover 的语义并入 themeColorSource：开启过跟随封面则映射为 cover，否则为 preset
+    // - themeGlobalColor 仅为兼容旧数据保留，不再参与主题着色与背景图渲染判定
+    // - 补齐背景模糊度、卡片透明度与背景图持久化标志的默认值
+    // - 无历史版本号（schemaVersion=0）视为全新安装，直接落默认值 cover
+    const oldState = state as Partial<SettingState> & { themeFollowCover?: boolean };
+    const isLegacyInstall = (state.schemaVersion ?? 0) > 0;
+    return {
+      themeColorSource: isLegacyInstall
+        ? oldState.themeFollowCover
+          ? "cover"
+          : "preset"
+        : "cover",
+      backgroundBlur: 0,
+      cardTransparency: 85,
+      globalBackgroundSaved: false,
     };
   },
 };

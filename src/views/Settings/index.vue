@@ -49,7 +49,7 @@ const menuItems = [
   {
     type: "app",
     label: "应用设置",
-    desc: "主题、背景、缓存、性能、音源管理",
+    desc: "主题、背景、界面布局、缓存",
     icon: "Settings",
   },
 ];

@@ -23,7 +23,6 @@ import ExcludeLyrics from "@/components/Modal/Setting/ExcludeLyrics.vue";
 import ChangeRate from "@/components/Modal/ChangeRate.vue";
 import AutoClose from "@/components/Modal/AutoClose.vue";
 import Equalizer from "@/components/Modal/Equalizer.vue";
-import SongUnlockManager from "@/components/Modal/Setting/SongUnlockManager.vue";
 import SidebarHideManager from "@/components/Modal/Setting/SidebarHideManager.vue";
 import HomePageSectionManager from "@/components/Modal/Setting/HomePageSectionManager.vue";
 import CopyLyrics from "@/components/Modal/CopyLyrics.vue";
@@ -31,7 +30,7 @@ import AMLLServer from "@/components/Modal/Setting/AMLLServer.vue";
 import FontManager from "@/components/Modal/Setting/FontManager.vue";
 import CustomCode from "@/components/Modal/Setting/CustomCode.vue";
 import StreamingServerConfig from "@/components/Modal/Setting/StreamingServerConfig.vue";
-import BackgroundParamsModal from "@/components/Modal/Setting/BackgroundParamsModal.vue";
+import ImageCropModal from "@/components/Modal/Setting/ImageCropModal.vue";
 import type { StreamingServerConfig as StreamingServerConfigType } from "@/types/streaming";
 
 export const openUserAgreement = () => {
@@ -402,20 +401,6 @@ export const openDescModal = (content: string, title: string = "歌单简介") =
   });
 };
 
-/** 打开音源管理弹窗 */
-export const openSongUnlockManager = () => {
-  window.$modal.create({
-    preset: "card",
-    transformOrigin: "center",
-    autoFocus: false,
-    style: { width: "500px" },
-    title: "音源管理",
-    content: () => {
-      return h(SongUnlockManager);
-    },
-  });
-};
-
 /** 打开侧边栏隐藏管理弹窗 */
 export const openSidebarHideManager = () => {
   window.$modal.create({
@@ -534,21 +519,32 @@ export const openStreamingServerConfig = (
   });
 };
 
-/** 打开背景设置弹窗 */
-export const openBackgroundSetting = () => {
-  window.$modal.create({
+/**
+ * 打开全局背景裁剪弹窗
+ * 裁剪确认后经 backgroundStore 持久化背景图，主题配色由主题色来源设置决定
+ * @param imageSrc 待裁剪的图片地址（data URL）
+ */
+export const openBackgroundCropModal = (imageSrc: string) => {
+  const modal = window.$modal.create({
     preset: "card",
     transformOrigin: "center",
     autoFocus: false,
+    maskClosable: false,
+    closeOnEsc: false,
+    closable: false,
     style: {
-      width: "500px",
+      width: "min(90vw, 600px)",
       maxWidth: "calc(100vw - 32px)",
-      marginTop: "calc(env(safe-area-inset-top, 0px) + var(--nav-height, 70px))", // 不与顶栏接触
+      marginTop: "calc(env(safe-area-inset-top, 0px) + var(--nav-height, 70px))",
     },
-    zIndex: 3000,
-    title: "背景设置",
+    zIndex: 4000,
+    title: "裁剪背景图片",
     content: () => {
-      return h(BackgroundParamsModal);
+      return h(ImageCropModal, {
+        imageSrc,
+        onCancel: () => modal.destroy(),
+        onConfirm: () => modal.destroy(),
+      });
     },
   });
 };
