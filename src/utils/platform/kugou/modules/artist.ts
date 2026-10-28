@@ -149,6 +149,7 @@ const resolveAuthorId = async (idOrName: string): Promise<string> => {
       },
       headers: { "x-router": "complexsearch.kugou.com" },
       allowBusinessError: true,
+      timeoutMs: 20000,
     });
 
     const list = response?.data?.lists || response?.data?.info || [];
@@ -176,6 +177,7 @@ export const artist: KGModule = async (params: KGParams) => {
       data: { author_id: artistId },
       headers: { "x-router": "openapi.kugou.com", "kg-tid": "36" },
       allowBusinessError: true,
+      timeoutMs: 20000,
     });
     const detailCode = kgErrorCode(detailResponse);
     if (detailCode !== 0) throw new Error(`error_code=${detailCode}`);
@@ -198,6 +200,7 @@ export const artist: KGModule = async (params: KGParams) => {
       },
       headers: { "x-router": "openapi.kugou.com", "kg-tid": "220" },
       allowBusinessError: true,
+      timeoutMs: 20000,
     });
     const songsCode = kgErrorCode(songsResponse);
     if (songsCode !== 0) throw new Error(`error_code=${songsCode}`);
@@ -219,6 +222,7 @@ export const artist: KGModule = async (params: KGParams) => {
       },
       headers: { "x-router": "openapi.kugou.com", "kg-tid": "36" },
       allowBusinessError: true,
+      timeoutMs: 20000,
     });
     const albumsCode = kgErrorCode(albumsResponse);
     if (albumsCode !== 0) throw new Error(`error_code=${albumsCode}`);

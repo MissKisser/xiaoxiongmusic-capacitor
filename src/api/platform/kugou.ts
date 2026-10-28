@@ -916,6 +916,29 @@ interface KgPublicPlaylistResponse {
  * @param id 歌手 id
  * @returns 归一化后的歌手详情、歌曲与专辑
  */
+/** 歌手详情缓存条目：在途请求共享与近期结果复用 */
+interface KgArtistCacheEntry {
+  /** 在途请求（并发调用合并为一次） */
+  pending?: Promise<{
+    artist: PlatformArtistDetail;
+    songs: PlatformSong[];
+    albums: PlatformCoverEntry[];
+  }>;
+  /** 已就绪结果与过期时间戳 */
+  resolved?: {
+    artist: PlatformArtistDetail;
+    songs: PlatformSong[];
+    albums: PlatformCoverEntry[];
+  };
+  expires?: number;
+}
+
+/** 歌手详情缓存：歌手页头部与歌曲子页并发取同一歌手时合并为一次链路 */
+const kgArtistCache = new Map<string, KgArtistCacheEntry>();
+
+/** 歌手详情缓存有效期（毫秒） */
+const KG_ARTIST_CACHE_TTL = 5 * 60 * 1000;
+
 export const kgArtistDetail = async (
   id: string | number,
 ): Promise<{
@@ -923,6 +946,13 @@ export const kgArtistDetail = async (
   songs: PlatformSong[];
   albums: PlatformCoverEntry[];
 }> => {
+  const cacheKey = String(id).trim().toLowerCase();
+  const cached = kgArtistCache.get(cacheKey);
+  const now = Date.now();
+  if (cached?.pending) return cached.pending;
+  if (cached?.resolved && (cached.expires ?? 0) > now) return cached.resolved;
+
+  const request = (async () => {
   const res = await platformRequest<KgArtistResponse>(KUGOU, "artist", { id: String(id) });
   const originalIndex = buildKgOriginalIndex(res?.raw);
   const songs = (res?.songs ?? []).map((song) => normalizeKgSong(song, originalIndex));
@@ -953,6 +983,24 @@ export const kgArtistDetail = async (
     description: String(res?.artist?.intro ?? ""),
   };
   return { artist, songs, albums };
+  })();
+
+  const entry: KgArtistCacheEntry = kgArtistCache.get(cacheKey) ?? {};
+  entry.pending = request;
+  entry.resolved = undefined;
+  kgArtistCache.set(cacheKey, entry);
+  try {
+    const result = await request;
+    entry.resolved = result;
+    entry.expires = Date.now() + KG_ARTIST_CACHE_TTL;
+    return result;
+  } catch (error) {
+    // 失败不缓存，下次进入页面可立即重试
+    if (entry.pending === request) kgArtistCache.delete(cacheKey);
+    throw error;
+  } finally {
+    if (entry.pending === request) entry.pending = undefined;
+  }
 };
 
 /**
@@ -1279,6 +1327,36 @@ export const kgLeaderboardDetail = async (
     songs: (res?.songs ?? []).map(normalizeKgLeaderboardSong),
     hasMore: page * limit < total,
   };
+};
+
+/**
+ * 读取酷狗热搜词
+ *
+ * 酷狗无公开热搜词接口，用热歌榜（找不到时退到首个榜单）的顶部曲名
+ * 作为热搜词来源，与站内搜索天然可衔接。
+ * @returns 热搜词列表（按榜单名次降序给分）
+ */
+export const kgHotSearch = async (): Promise<
+  { keyword: string; score: number }[]
+> => {
+  const groups = await kgLeaderboardList();
+  const boards = groups.flatMap((group) => group.toplists ?? []);
+  const target =
+    boards.find((board) => /热歌/.test(board.title)) ??
+    boards.find((board) => /飙升/.test(board.title)) ??
+    boards[0];
+  if (!target) return [];
+  const detail = await kgLeaderboardDetail(target.topId, 1, 30);
+  const seen = new Set<string>();
+  const items: { keyword: string; score: number }[] = [];
+  for (const song of detail.songs) {
+    const keyword = String(song?.name ?? "").trim();
+    if (!keyword || seen.has(keyword)) continue;
+    seen.add(keyword);
+    items.push({ keyword, score: Math.max(1, 100 - items.length * 3) });
+    if (items.length >= 20) break;
+  }
+  return items;
 };
 
 /** 酷狗歌手分类项 */

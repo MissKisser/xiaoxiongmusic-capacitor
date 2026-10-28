@@ -55,6 +55,7 @@ import {
   kgHomeAlbums,
   kgHomeThemes,
   kgHotArtists,
+  kgHotSearch,
   kgLeaderboardDetail,
   kgLeaderboardList,
   kgPlaylistDetail,
@@ -1096,7 +1097,12 @@ export const dispatchHotSearch = async (
     }));
   }
 
-  return [];
+  const res = await kgHotSearch();
+  return res.map((item) => ({
+    searchWord: item.keyword,
+    score: item.score,
+    content: "",
+  }));
 };
 
 /** 分派层评论分页 */

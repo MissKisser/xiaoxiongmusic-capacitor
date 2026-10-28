@@ -263,10 +263,41 @@ describe("空响应降级", () => {
     }
   });
 
-  it("酷狗没有热搜模块：恒返回空列表且不发起数据面调用", async () => {
+  it("酷狗热搜由热歌榜曲名派生：取榜单清单与详情两次数据面调用", async () => {
+    installInterceptor((_platform, name) => {
+      if (name === "leaderboard_list") {
+        return {
+          groups: [
+            { groupId: 1, groupName: "官方榜", toplists: [{ rankId: 888, title: "热歌榜" }] },
+            { groupId: 2, groupName: "特色榜", toplists: [{ rankId: 3000, title: "飙升榜" }] },
+          ],
+        };
+      }
+      return {
+        title: "热歌榜",
+        total: 2,
+        songs: [
+          { hash: "KGHASH01", name: "晴天", singer: "周杰伦" },
+          { hash: "KGHASH02", name: "晴天", singer: "翻唱" },
+          { hash: "KGHASH03", name: "稻香", singer: "周杰伦" },
+        ],
+      };
+    });
+    const hot = await dispatchHotSearch("kugou");
+    assert.equal(calls[0].name, "leaderboard_list");
+    assert.equal(calls[1].name, "leaderboard_detail");
+    assert.equal(calls[1].params.rankid, 888);
+    // 同名曲只保留一条，分值按名次递减
+    assert.deepEqual(hot, [
+      { searchWord: "晴天", score: 100, content: "" },
+      { searchWord: "稻香", score: 97, content: "" },
+    ]);
+  });
+
+  it("酷狗榜单清单为空时热搜降级为空数组", async () => {
+    installInterceptor(() => ({ groups: [] }));
     const hot = await dispatchHotSearch("kugou");
     assert.deepEqual(hot, []);
-    assert.equal(calls.length, 0);
   });
 
   it("QQ 热搜空列表降级为空数组", async () => {
