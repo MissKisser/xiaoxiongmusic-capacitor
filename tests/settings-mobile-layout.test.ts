@@ -23,6 +23,9 @@ const readSource = (relativePath: string): string =>
 
 describe("设置页共享层容器与标签自适应（src/views/Settings/item.vue）", () => {
   const itemVue = readSource("src/views/Settings/item.vue");
+  const themeSettingVue = readSource(
+    "src/components/Setting/groups/AppThemeSetting.vue",
+  );
 
   it("设置卡片内容容器支持换行与间距接管", () => {
     assert.match(
@@ -60,16 +63,35 @@ describe("设置页共享层容器与标签自适应（src/views/Settings/item.v
     );
   });
 
-  it("设置项内单选按钮组在窄屏下支持自适应折行", () => {
+  it("设置项内单选按钮组保持原生内联块排布且窄屏可折行", () => {
+    const radioGroupBlock = itemVue.match(
+      /\.n-radio-group\s*\{([\s\S]*?)\n\s{6}\}/,
+    )?.[1] ?? "";
+    assert.ok(radioGroupBlock.length > 0, "应存在 .n-radio-group 规则块");
     assert.match(
-      itemVue,
-      /\.set-item[\s\S]*?\.n-radio-group[\s\S]*?display:\s*flex;[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?gap:\s*8px;/s,
-      ".set-item 内的 .n-radio-group 应限定在卡片内并支持 flex wrap 与 gap",
+      radioGroupBlock,
+      /white-space:\s*normal;/,
+      "单选按钮组应放开 white-space 以便窄屏折行",
+    );
+    assert.match(
+      radioGroupBlock,
+      /height:\s*auto;/,
+      "单选按钮组应自适应高度，避免折行后压行",
+    );
+    assert.match(
+      radioGroupBlock,
+      /flex:\s*0\s+0\s+auto;/,
+      "单选按钮组作为弹性子项时不应被压缩",
+    );
+    // 单选按钮内文字为 nowrap，被 flex 压缩后会溢出到相邻按钮上造成重叠
+    assert.doesNotMatch(
+      radioGroupBlock,
+      /display:\s*flex;/,
+      ".n-radio-group 不得被强制为 flex 容器",
     );
   });
 
-  it("设置子页面与滚动容器声明横向溢出防御", () => {
-    assert.match(
+  it("设置子页面与滚动容器声明横向溢出防御", () => {    assert.match(
       itemVue,
       /\.settings-item-page[\s\S]*?min-width:\s*0;[\s\S]*?overflow-x:\s*hidden;/s,
       ".settings-item-page 应声明 min-width: 0 与 overflow-x: hidden",
@@ -125,11 +147,11 @@ describe("主题设置页列式结构与自适应（src/components/Setting/group
     );
   });
 
-  it("主题模式按钮取消固定最小宽度以实现三等分", () => {
+  it("主题模式按钮保留内容宽度以免文字重叠", () => {
     assert.match(
       themeVue,
-      /\.theme-mode-group[\s\S]*?\.n-button[\s\S]*?min-width:\s*0;/s,
-      ".theme-mode-group 中的 .n-button 应使用 min-width: 0",
+      /\.theme-mode-group[\s\S]*?\.n-button[\s\S]*?flex:\s*1\s+1\s+auto;[\s\S]*?min-width:\s*fit-content;/s,
+      ".theme-mode-group 中的 .n-button 应可均分宽度但不低于内容宽度（min-width: fit-content）",
     );
   });
 

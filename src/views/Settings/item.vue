@@ -158,15 +158,24 @@ const itemTitle = computed(() => titles[item.value] || "设置");
       border-radius: 8px;
       margin-bottom: 12px;
 
-      // 单选按钮（radio-button）：支持弹性折行，间距由 gap 提供
+      // 单选按钮组（radio-button group）：
+      // 保持 naive 原生内联块排布——按钮内文字为 nowrap，一旦被 flex 压缩就会溢出到相邻按钮上造成重叠；
+      // 窄屏通过放开 white-space 与自适应高度让整组自然折行
       .n-radio-group {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
+        white-space: normal;
+        height: auto;
+        line-height: normal;
+        // 作为行内弹性子项时不被压缩到内容宽度以下，放不下时由父级换行到下一行
+        flex: 0 0 auto;
 
         // 分割线透明，避免选中态主色泄露到按钮间隙
         .n-radio-group__splitor {
           background-color: transparent !important;
+        }
+
+        // 按钮之间留出间距（splitor 为按钮间 1px 分割线）
+        .n-radio-group__splitor + .n-radio-button {
+          margin-left: 8px;
         }
       }
 

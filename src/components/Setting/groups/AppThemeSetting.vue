@@ -307,8 +307,9 @@ const setBlurEffect = (enabled: boolean) => {
     width: 100%;
 
     .n-button {
-      flex: 1;
-      min-width: 0;
+      // 均分卡片宽度，但不压缩到内容宽度以下（按钮文字不换行，压缩会导致文字重叠）
+      flex: 1 1 auto;
+      min-width: fit-content;
     }
   }
 
