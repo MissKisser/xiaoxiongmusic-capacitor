@@ -16,6 +16,10 @@ import { deleteSongs, isLogin } from "@/utils/auth";
 import { songUrl } from "@/api/song";
 import { dailyRecommendDislike } from "@/api/rec";
 import { formatSongsList } from "@/utils/format";
+import { useSongLike } from "@/composables/useSongLike";
+import { isSongLikedInScope } from "@/utils/songLiked";
+import { resolveSongPlatform } from "@/utils/songPlatform";
+import { usePlatformStore } from "@/stores/platform";
 
 /** 歌曲菜单 */
 export const useSongMenu = () => {
@@ -26,6 +30,8 @@ export const useSongMenu = () => {
   const settingStore = useSettingStore();
   const player = usePlayerController();
   const downloadManager = useDownloadManager();
+  const platformStore = usePlatformStore();
+  const { toggleSongLike } = useSongLike();
 
   // 删除本地歌曲
   const deleteLocalSong = (song: SongType, emit: (event: "removeSong", args: any[]) => void) => {
@@ -165,6 +171,13 @@ export const useSongMenu = () => {
     const isCurrent = statusStore.playIndex === index;
     const isUserPlaylist = !!playListId && userPlaylistsData.some((pl) => pl.id === playListId);
     const isDownloading = dataStore.downloadingSongs.some((item) => item.song.id === song.id);
+    // 红心状态按平台统一判据（与歌曲行、播放条的红心同源）
+    const isLiked = isSongLikedInScope(song);
+    // 第三方平台歌曲：预热该平台的红心集合，首次命中即为空
+    const songPlatform = resolveSongPlatform(song);
+    if (songPlatform !== "netease" && platformStore.platformProfiles[songPlatform]) {
+      void platformStore.ensureLikedSongs(songPlatform);
+    }
 
     return [
       {
@@ -192,6 +205,15 @@ export const useSongMenu = () => {
           onClick: () => openPlaylistAdd([song], isLocal),
         },
         icon: renderIcon("AddList", { size: 18 }),
+      },
+      {
+        key: "like-song",
+        label: isLiked ? "取消喜欢" : "喜欢该曲",
+        show: !isLocal && type === "song",
+        props: {
+          onClick: () => toggleSongLike(song),
+        },
+        icon: renderIcon(isLiked ? "Favorite" : "FavoriteBorder", { size: 18 }),
       },
       {
         key: "mv",

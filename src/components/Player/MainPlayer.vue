@@ -61,12 +61,10 @@
             <!-- 喜欢 -->
             <SvgIcon
               v-if="musicStore.playSong.type !== 'radio'"
-              :name="dataStore.isLikeSong(musicStore.playSong.id) ? 'Favorite' : 'FavoriteBorder'"
+              :name="isSongLikedNow(musicStore.playSong) ? 'Favorite' : 'FavoriteBorder'"
               :size="20"
               class="like"
-              @click="
-                toLikeSong(musicStore.playSong, !dataStore.isLikeSong(musicStore.playSong.id))
-              "
+              @click="toggleSongLike(musicStore.playSong)"
             />
             <!-- 更多操作 -->
             <n-dropdown :options="songMoreOptions" trigger="click" placement="top-start">
@@ -211,8 +209,8 @@
 <script setup lang="ts">
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useSongManager } from "@/core/player/SongManager";
-import { useDataStore, useMusicStore, useSettingStore, useStatusStore } from "@/stores";
-import { toLikeSong } from "@/utils/auth";
+import { useMusicStore, useSettingStore, useStatusStore } from "@/stores";
+import { useSongLike } from "@/composables/useSongLike";
 import { useTimeFormat } from "@/composables/useTimeFormat";
 import { useSwipe } from "@vueuse/core";
 import { copyData, coverLoaded, renderIcon } from "@/utils/helper";
@@ -228,7 +226,6 @@ import { removeBrackets } from "@/utils/format";
 import type { DropdownOption } from "naive-ui";
 
 const router = useRouter();
-const dataStore = useDataStore();
 const musicStore = useMusicStore();
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
@@ -237,6 +234,7 @@ const player = usePlayerController();
 const songManager = useSongManager();
 
 const { timeDisplay, toggleTimeFormat } = useTimeFormat();
+const { isSongLikedNow, toggleSongLike } = useSongLike();
 
 const playerRef = ref<HTMLElement | null>(null);
 

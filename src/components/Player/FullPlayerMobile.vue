@@ -44,16 +44,12 @@
                 <div
                   v-if="musicStore.playSong.type !== 'radio'"
                   class="action-btn"
-                  @click="
-                    toLikeSong(musicStore.playSong, !dataStore.isLikeSong(musicStore.playSong.id))
-                  "
+                  @click="toggleSongLike(musicStore.playSong)"
                 >
                   <SvgIcon
-                    :name="
-                      dataStore.isLikeSong(musicStore.playSong.id) ? 'Favorite' : 'FavoriteBorder'
-                    "
+                    :name="isSongLikedNow(musicStore.playSong) ? 'Favorite' : 'FavoriteBorder'"
                     :size="26"
-                    :class="{ liked: dataStore.isLikeSong(musicStore.playSong.id) }"
+                    :class="{ liked: isSongLikedNow(musicStore.playSong) }"
                   />
                 </div>
                 <!-- 设置按钮 -->
@@ -169,14 +165,12 @@
           <div
             v-if="musicStore.playSong.type !== 'radio'"
             class="action-btn"
-            @click.stop="
-              toLikeSong(musicStore.playSong, !dataStore.isLikeSong(musicStore.playSong.id))
-            "
+            @click.stop="toggleSongLike(musicStore.playSong)"
           >
             <SvgIcon
-              :name="dataStore.isLikeSong(musicStore.playSong.id) ? 'Favorite' : 'FavoriteBorder'"
+              :name="isSongLikedNow(musicStore.playSong) ? 'Favorite' : 'FavoriteBorder'"
               :size="24"
-              :class="{ liked: dataStore.isLikeSong(musicStore.playSong.id) }"
+              :class="{ liked: isSongLikedNow(musicStore.playSong) }"
             />
           </div>
         </div>
@@ -206,10 +200,10 @@
 import { useRouter } from "vue-router";
 import { useSwipe } from "@vueuse/core";
 import type { LyricLine } from "@applemusic-like-lyrics/lyric";
-import { useMusicStore, useStatusStore, useDataStore, useSettingStore } from "@/stores";
+import { useMusicStore, useStatusStore, useSettingStore } from "@/stores";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useTimeFormat } from "@/composables/useTimeFormat";
-import { toLikeSong } from "@/utils/auth";
+import { useSongLike } from "@/composables/useSongLike";
 import { openPlaylistAdd } from "@/utils/modal";
 import { removeBrackets } from "@/utils/format";
 import TextContainer from "@/components/Global/TextContainer.vue";
@@ -219,9 +213,9 @@ const router = useRouter();
 const musicStore = useMusicStore();
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
-const dataStore = useDataStore();
 const player = usePlayerController();
 const { timeDisplay, toggleTimeFormat } = useTimeFormat();
+const { isSongLikedNow, toggleSongLike } = useSongLike();
 
 // 实时播放进度和歌词索引
 const playSeek = ref(0);

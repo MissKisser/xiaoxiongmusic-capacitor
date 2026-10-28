@@ -1,9 +1,9 @@
 import { usePlayerController } from "@/core/player/PlayerController";
-import { useDataStore, useMusicStore, useStatusStore } from "@/stores";
+import { useMusicStore, useStatusStore } from "@/stores";
 import { SettingType } from "@/types/main";
 import { handleProtocolUrl } from "@/utils/protocol";
 import { cloneDeep } from "lodash-es";
-import { toLikeSong } from "./auth";
+import { useSongLike } from "@/composables/useSongLike";
 import { isElectron } from "./env";
 import { getPlayerInfoObj } from "./format";
 import { openSetting, openUpdateApp } from "./modal";
@@ -38,9 +38,9 @@ const initIpc = () => {
     window.electron.ipcRenderer.on("toggleShuffle", (_, mode) => player.toggleShuffle(mode));
     // 喜欢歌曲
     window.electron.ipcRenderer.on("toggle-like-song", async () => {
-      const dataStore = useDataStore();
       const musicStore = useMusicStore();
-      await toLikeSong(musicStore.playSong, !dataStore.isLikeSong(musicStore.playSong.id));
+      const { toggleSongLike } = useSongLike();
+      await toggleSongLike(musicStore.playSong);
     });
     // 开启设置
     window.electron.ipcRenderer.on("openSetting", (_, type: SettingType, scrollTo?: string) =>

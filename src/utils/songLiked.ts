@@ -16,6 +16,7 @@ import type { SongType } from "@/types/main";
 import type { ApiPlatform } from "@/types/shared";
 import { resolveSongPlatform } from "@/utils/songPlatform";
 import { usePlatformStore } from "@/stores/platform";
+import { useDataStore } from "@/stores/data";
 
 /** 外部可注入的红心状态读取接口（用于单测与独立环境解耦） */
 export interface LikedStoreReader {
@@ -122,9 +123,8 @@ export const isSongLikedInScope = (song?: SongType | null): boolean => {
     if (glob.__piniaDataStore__) {
       return glob.__piniaDataStore__.isLikeSong(Number(song.id));
     }
+    return useDataStore().isLikeSong(Number(song.id));
   } catch {
     return false;
   }
-
-  return false;
 };

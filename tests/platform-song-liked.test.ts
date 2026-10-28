@@ -13,6 +13,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import "./helpers/setup";
+
 import type { SongType } from "../src/types/main";
 import {
   AUDIOBOOK_TEXT,

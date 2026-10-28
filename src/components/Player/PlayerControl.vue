@@ -11,10 +11,10 @@
           <div
             v-if="musicStore.playSong.type !== 'radio'"
             class="menu-icon"
-            @click="toLikeSong(musicStore.playSong, !dataStore.isLikeSong(musicStore.playSong.id))"
+            @click="toggleSongLike(musicStore.playSong)"
           >
             <SvgIcon
-              :name="dataStore.isLikeSong(musicStore.playSong.id) ? 'Favorite' : 'FavoriteBorder'"
+              :name="isSongLikedNow(musicStore.playSong) ? 'Favorite' : 'FavoriteBorder'"
             />
           </div>
           <!-- 添加到歌单 -->
@@ -121,14 +121,14 @@
 <script setup lang="ts">
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useSongManager } from "@/core/player/SongManager";
-import { useDataStore, useMusicStore, useStatusStore } from "@/stores";
-import { toLikeSong } from "@/utils/auth";
+import { useMusicStore, useStatusStore } from "@/stores";
+import { useSongLike } from "@/composables/useSongLike";
 import { useTimeFormat } from "@/composables/useTimeFormat";
 import { openDownloadSong, openPlaylistAdd } from "@/utils/modal";
 
-const dataStore = useDataStore();
 const musicStore = useMusicStore();
 const statusStore = useStatusStore();
+const { isSongLikedNow, toggleSongLike } = useSongLike();
 
 const songManager = useSongManager();
 const player = usePlayerController();
