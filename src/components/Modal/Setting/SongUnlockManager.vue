@@ -23,7 +23,7 @@
       </n-card>
     </div>
     <n-text :depth="3" class="hint">
-      解锁服务按固定优先级依次尝试（星海音源 → 网易云 → 波点音乐 → 歌曲宝 → 酷我音乐），可在此单独启用或停用各渠道。
+      解锁服务按歌曲来源平台分派优先级依次尝试（网易云：星海音源 → 网易云 → 咪咕音乐 → 长青聚合 → 酷我音乐 → 波点音乐 → 歌曲宝；QQ 音乐：小鱼音源 → 长青聚合 → 咪咕音乐 → 网易云 → 落雪音源 → 波点音乐 → 酷我音乐 → 歌曲宝；酷狗音乐：吉祥音源 → 长青聚合 → 咪咕音乐 → 网易云 → 落雪音源 → 波点音乐 → 酷我音乐 → 歌曲宝），可在此单独启用或停用各渠道。
     </n-text>
     <n-card
       :content-style="{
@@ -63,6 +63,8 @@ const settingStore = useSettingStore();
  */
 export const SOURCE_LABEL: Record<SongUnlockServer, string> = {
   [SongUnlockServer.XINGHAI]: "星海音源（社区公益源，网易云曲库）",
+  [SongUnlockServer.FISH]: "小鱼音源（社区公益源，QQ 曲库）",
+  [SongUnlockServer.JIEXIANG]: "吉祥音源（社区公益源，酷狗曲库）",
   [SongUnlockServer.NETEASE]: "网易云音乐（官方曲库）",
   [SongUnlockServer.BODIAN]: "波点音乐（第三方曲库）",
   [SongUnlockServer.GEQUBAO]: "歌曲宝（社区公益源，稳定性无保障）",

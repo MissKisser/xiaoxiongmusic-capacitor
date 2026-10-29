@@ -3,8 +3,8 @@
  *
  * 分发两类换源：
  * - 本地直连源（网易云 / 酷我 / 波点 / 歌曲宝）：端侧自行完成检索与取链；
- * - 远程回退源（咪咕 / 长青聚合 / 落雪音源 / 星海音源）：端侧无本地实现，服务端有同源实现，
- *   统一改为请求远程解锁服务，避免这些源被当成未知类型恒定 404 空转。
+ * - 远程回退源（咪咕 / 长青聚合 / 落雪音源 / 星海音源 / 小鱼音源 / 吉祥音源）：端侧无本地实现，
+ *   服务端有同源实现，统一改为请求远程解锁服务，避免这些源被当成未知类型恒定 404 空转。
  */
 import { SongUnlockServer } from "@/core/player/SongManager";
 import type { SongUrlResult } from "./types";
@@ -68,7 +68,7 @@ export async function localUnlockSongUrl(
                 break;
             default:
                 if (isRemoteUnlockServer(server)) {
-                    // 咪咕 / 长青聚合 / 落雪音源：端侧无实现，改走远程解锁服务
+                    // 咪咕 / 长青聚合 / 落雪音源 / 星海音源 / 小鱼音源 / 吉祥音源：端侧无实现，改走远程解锁服务
                     result = await requestRemoteUnlock(server, {
                         keyword,
                         songName,

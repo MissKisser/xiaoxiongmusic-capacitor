@@ -217,4 +217,98 @@ describe("换源探活上报接线 probeWiring", () => {
     assert.equal(payload.success, true);
     assert.equal(payload.failCategory, "none");
   });
+
+  it("小鱼音源换源成功：上报 source 为 fish，并透传 QQ 歌曲 mid 作为 platformId", async () => {
+    const settingStore = useSettingStore();
+    settingStore.songUnlockServer = [{ key: SongUnlockServer.FISH, enabled: true }];
+
+    let capturedContext: unknown;
+    setCustomUnlockHandler(async (id, songName, artist, server, context) => {
+      capturedContext = context;
+      return {
+        code: 200,
+        url: "https://fish.example.com/audio.mp3",
+      };
+    });
+
+    const qqSong: SongType = {
+      id: 97773,
+      name: "晴天",
+      artists: "周杰伦",
+      album: "叶惠美",
+      cover: "",
+      duration: 269000,
+      free: 0,
+      mv: null,
+      type: "song",
+      platform: "qqmusic",
+      platformId: "0039MnYb0qxYhV",
+    };
+
+    const res = await songManager.getUnlockSongUrl(qqSong);
+    await flush();
+
+    assert.equal(res.id, 97773);
+    assert.equal(res.isUnlocked, true);
+    assert.equal(res.unlockSource, SongUnlockServer.FISH);
+
+    assert.deepEqual(capturedContext, {
+      duration: 269,
+      platform: "qqmusic",
+      platformId: "0039MnYb0qxYhV",
+    });
+
+    assert.equal(captured.length, 1);
+    const payload = JSON.parse(captured[0].body ?? "{}");
+    assert.equal(payload.source, "fish");
+    assert.equal(payload.success, true);
+    assert.equal(payload.failCategory, "none");
+  });
+
+  it("吉祥音源换源成功：上报 source 为 jiexiang，并透传酷狗歌曲 hash 作为 platformId", async () => {
+    const settingStore = useSettingStore();
+    settingStore.songUnlockServer = [{ key: SongUnlockServer.JIEXIANG, enabled: true }];
+
+    let capturedContext: unknown;
+    setCustomUnlockHandler(async (id, songName, artist, server, context) => {
+      capturedContext = context;
+      return {
+        code: 200,
+        url: "https://jiexiang.example.com/audio.mp3",
+      };
+    });
+
+    const kgSong: SongType = {
+      id: 12345,
+      name: "素颜",
+      artists: "许嵩",
+      album: "素颜",
+      cover: "",
+      duration: 238000,
+      free: 0,
+      mv: null,
+      type: "song",
+      platform: "kugou",
+      platformId: "30C94AE2868E63B1058DA7685E0CDF3B",
+    };
+
+    const res = await songManager.getUnlockSongUrl(kgSong);
+    await flush();
+
+    assert.equal(res.id, 12345);
+    assert.equal(res.isUnlocked, true);
+    assert.equal(res.unlockSource, SongUnlockServer.JIEXIANG);
+
+    assert.deepEqual(capturedContext, {
+      duration: 238,
+      platform: "kugou",
+      platformId: "30C94AE2868E63B1058DA7685E0CDF3B",
+    });
+
+    assert.equal(captured.length, 1);
+    const payload = JSON.parse(captured[0].body ?? "{}");
+    assert.equal(payload.source, "jiexiang");
+    assert.equal(payload.success, true);
+    assert.equal(payload.failCategory, "none");
+  });
 });

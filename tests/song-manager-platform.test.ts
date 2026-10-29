@@ -245,6 +245,130 @@ describe("SongManager 平台播放接线与判据 songManager-platform", () => {
       assert.equal(res.url, undefined);
       assert.equal(res.failureReason, "缺少歌手信息，无法安全换源");
     });
+
+    it("QQ 歌曲优先尝试 FISH 源，且透传 QQ mid 作为 platformId", async () => {
+      const settingStore = useSettingStore();
+      settingStore.songUnlockServer = [
+        { key: SongUnlockServer.FISH, enabled: true },
+        { key: SongUnlockServer.CHANGQING, enabled: true },
+        { key: SongUnlockServer.BODIAN, enabled: true },
+      ];
+
+      const qqSong: SongType = {
+        id: 99901,
+        name: "晴天",
+        artists: "周杰伦",
+        album: "叶惠美",
+        cover: "",
+        duration: 269000,
+        free: 0,
+        mv: null,
+        type: "song",
+        platform: "qqmusic",
+        platformId: "0039MnYb0qxYhV",
+      };
+
+      const requestedServers: SongUnlockServer[] = [];
+      let capturedContext: unknown;
+      setCustomUnlockHandler(async (id, songName, artist, server, context) => {
+        requestedServers.push(server);
+        capturedContext = context;
+        if (server === SongUnlockServer.FISH) {
+          return { code: 200, url: "https://fish.example.com/audio.flac" };
+        }
+        return { code: 404, url: null };
+      });
+
+      const res = await songManager.getUnlockSongUrl(qqSong);
+      assert.equal(res.id, 99901);
+      assert.equal(res.isUnlocked, true);
+      assert.equal(res.unlockSource, SongUnlockServer.FISH);
+      assert.equal(requestedServers[0], SongUnlockServer.FISH);
+      assert.deepEqual(capturedContext, {
+        duration: 269,
+        platform: "qqmusic",
+        platformId: "0039MnYb0qxYhV",
+      });
+    });
+
+    it("酷狗歌曲优先尝试 JIEXIANG 源，且透传酷狗 hash 作为 platformId", async () => {
+      const settingStore = useSettingStore();
+      settingStore.songUnlockServer = [
+        { key: SongUnlockServer.JIEXIANG, enabled: true },
+        { key: SongUnlockServer.CHANGQING, enabled: true },
+        { key: SongUnlockServer.BODIAN, enabled: true },
+      ];
+
+      const kgSong: SongType = {
+        id: 99902,
+        name: "素颜",
+        artists: "许嵩",
+        album: "素颜",
+        cover: "",
+        duration: 238000,
+        free: 0,
+        mv: null,
+        type: "song",
+        platform: "kugou",
+        platformId: "30C94AE2868E63B1058DA7685E0CDF3B",
+      };
+
+      const requestedServers: SongUnlockServer[] = [];
+      let capturedContext: unknown;
+      setCustomUnlockHandler(async (id, songName, artist, server, context) => {
+        requestedServers.push(server);
+        capturedContext = context;
+        if (server === SongUnlockServer.JIEXIANG) {
+          return { code: 200, url: "https://jiexiang.example.com/audio.flac" };
+        }
+        return { code: 404, url: null };
+      });
+
+      const res = await songManager.getUnlockSongUrl(kgSong);
+      assert.equal(res.id, 99902);
+      assert.equal(res.isUnlocked, true);
+      assert.equal(res.unlockSource, SongUnlockServer.JIEXIANG);
+      assert.equal(requestedServers[0], SongUnlockServer.JIEXIANG);
+      assert.deepEqual(capturedContext, {
+        duration: 238,
+        platform: "kugou",
+        platformId: "30C94AE2868E63B1058DA7685E0CDF3B",
+      });
+    });
+
+    it("网易云歌曲链位零触碰：不会尝试小鱼音源与吉祥音源", async () => {
+      const settingStore = useSettingStore();
+      settingStore.songUnlockServer = [
+        { key: SongUnlockServer.XINGHAI, enabled: true },
+        { key: SongUnlockServer.FISH, enabled: true },
+        { key: SongUnlockServer.JIEXIANG, enabled: true },
+        { key: SongUnlockServer.NETEASE, enabled: true },
+      ];
+
+      const neteaseSong: SongType = {
+        id: 99903,
+        name: "晴天",
+        artists: "周杰伦",
+        album: "叶惠美",
+        cover: "",
+        duration: 269000,
+        free: 0,
+        mv: null,
+        type: "song",
+        platform: "netease",
+      };
+
+      const requestedServers: SongUnlockServer[] = [];
+      setCustomUnlockHandler(async (id, songName, artist, server) => {
+        requestedServers.push(server);
+        return { code: 404, url: null };
+      });
+
+      await songManager.getUnlockSongUrl(neteaseSong);
+      assert.equal(requestedServers.includes(SongUnlockServer.FISH), false);
+      assert.equal(requestedServers.includes(SongUnlockServer.JIEXIANG), false);
+      assert.equal(requestedServers[0], SongUnlockServer.XINGHAI);
+    });
   });
 
   describe("播放音频源决策树调度 getAudioSource (SPEC 三态判据对齐)", () => {

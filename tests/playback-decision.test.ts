@@ -103,6 +103,13 @@ describe("播放决策树与换源优先级", () => {
       assert.equal(getPlatformLabel("netease"), "网易云");
     });
 
+    it("QQ 歌曲以 FISH 为第一首选，酷狗歌曲以 JIEXIANG 为第一首选", () => {
+      assert.equal(getUnlockPriority("qqmusic")[0], SongUnlockServer.FISH);
+      assert.equal(getUnlockPriority("kugou")[0], SongUnlockServer.JIEXIANG);
+      assert.equal(getPlatformLabel("qqmusic"), "QQ 音乐");
+      assert.equal(getPlatformLabel("kugou"), "酷狗音乐");
+    });
+
     it("三个平台按实测可用性锁定的链位全序（与 PC 端同构）", () => {
       const neteasePriority = getUnlockPriority("netease");
       const qqPriority = getUnlockPriority("qqmusic");
@@ -110,6 +117,7 @@ describe("播放决策树与换源优先级", () => {
 
       // 第三方平台歌曲对 NETEASE 源走关键词寻址（useKeywordLookup），不拿平台数字 ID 直查，
       // 故 NETEASE 可入 QQ/酷狗链（A-05 禁的是数字 ID 直查，不是源入链）
+      // 网易云链零触碰：星海仍在首位
       assert.deepEqual(neteasePriority, [
         SongUnlockServer.XINGHAI,
         SongUnlockServer.NETEASE,
@@ -119,7 +127,9 @@ describe("播放决策树与换源优先级", () => {
         SongUnlockServer.BODIAN,
         SongUnlockServer.GEQUBAO,
       ]);
+      // QQ 链首位插小鱼，其余顺序保持原样
       assert.deepEqual(qqPriority, [
+        SongUnlockServer.FISH,
         SongUnlockServer.CHANGQING,
         SongUnlockServer.MIGU,
         SongUnlockServer.NETEASE,
@@ -128,13 +138,24 @@ describe("播放决策树与换源优先级", () => {
         SongUnlockServer.KUWO,
         SongUnlockServer.GEQUBAO,
       ]);
-      assert.deepEqual(kgPriority, qqPriority);
+      // 酷狗链首位插吉祥，其余顺序与 QQ 链同构
+      assert.deepEqual(kgPriority, [
+        SongUnlockServer.JIEXIANG,
+        SongUnlockServer.CHANGQING,
+        SongUnlockServer.MIGU,
+        SongUnlockServer.NETEASE,
+        SongUnlockServer.LXMUSIC,
+        SongUnlockServer.BODIAN,
+        SongUnlockServer.KUWO,
+        SongUnlockServer.GEQUBAO,
+      ]);
       // 歌曲宝是社区公益源，置于各平台链位末位，仅在其余源全部落空时兜底
       assert.equal(neteasePriority.at(-1), SongUnlockServer.GEQUBAO);
       assert.equal(qqPriority.at(-1), SongUnlockServer.GEQUBAO);
-
-      assert.equal(getPlatformLabel("qqmusic"), "QQ 音乐");
-      assert.equal(getPlatformLabel("kugou"), "酷狗音乐");
+      assert.equal(kgPriority.at(-1), SongUnlockServer.GEQUBAO);
+      // 网易云链不含新源，避免误用于网易云曲库
+      assert.equal(neteasePriority.includes(SongUnlockServer.FISH), false);
+      assert.equal(neteasePriority.includes(SongUnlockServer.JIEXIANG), false);
     });
   });
 
@@ -212,6 +233,58 @@ describe("播放决策树与换源优先级", () => {
         vueContent.includes("SongUnlockServer.XINGHAI"),
         "设置页组件应注册 XINGHAI 枚举项",
       );
+    });
+  });
+
+  describe("小鱼音源与吉祥音源统一定义断言", () => {
+    it("源名映射为小鱼音源与吉祥音源", () => {
+      assert.equal(getUnlockSourceName(SongUnlockServer.FISH), "小鱼音源");
+      assert.equal(getUnlockSourceName(SongUnlockServer.JIEXIANG), "吉祥音源");
+    });
+
+    it("设置项默认包含两源且默认启用", () => {
+      setActivePinia(createPinia());
+      const settingStore = useSettingStore();
+      const fish = settingStore.songUnlockServer.find(
+        (s) => s.key === SongUnlockServer.FISH,
+      );
+      const jiexiang = settingStore.songUnlockServer.find(
+        (s) => s.key === SongUnlockServer.JIEXIANG,
+      );
+      assert.ok(fish, "默认换源清单应包含小鱼音源");
+      assert.equal(fish.enabled, true, "小鱼音源应默认启用");
+      assert.ok(jiexiang, "默认换源清单应包含吉祥音源");
+      assert.equal(jiexiang.enabled, true, "吉祥音源应默认启用");
+    });
+
+    it("设置页组件包含两源标签定义", () => {
+      const vueContent = readFileSync(
+        path.join(repoRoot, "src/components/Modal/Setting/SongUnlockManager.vue"),
+        "utf8",
+      );
+      assert.ok(
+        vueContent.includes("小鱼音源（社区公益源，QQ 曲库）"),
+        "设置页组件应声明小鱼音源专属标签",
+      );
+      assert.ok(
+        vueContent.includes("吉祥音源（社区公益源，酷狗曲库）"),
+        "设置页组件应声明吉祥音源专属标签",
+      );
+      assert.ok(
+        vueContent.includes("SongUnlockServer.FISH"),
+        "设置页组件应注册 FISH 枚举项",
+      );
+      assert.ok(
+        vueContent.includes("SongUnlockServer.JIEXIANG"),
+        "设置页组件应注册 JIEXIANG 枚举项",
+      );
+    });
+
+    it("两源均不出现在网易云链内", () => {
+      const neteasePriority = getUnlockPriority("netease");
+      assert.equal(neteasePriority.includes(SongUnlockServer.FISH), false);
+      assert.equal(neteasePriority.includes(SongUnlockServer.JIEXIANG), false);
+      assert.equal(neteasePriority[0], SongUnlockServer.XINGHAI);
     });
   });
 });

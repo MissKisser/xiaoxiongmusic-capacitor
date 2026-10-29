@@ -1,7 +1,8 @@
 /**
- * 远程换源回退（MIGU / CHANGQING / LXMUSIC / XINGHAI）
+ * 远程换源回退（MIGU / CHANGQING / LXMUSIC / XINGHAI / FISH / JIEXIANG）
  *
- * 这四个源在移动端没有本地实现：咪咕官方曲库检索、长青公益聚合站、落雪自定义源协议、星海网易云通道
+ * 这六个源在移动端没有本地实现：咪咕官方曲库检索、长青公益聚合站、落雪自定义源协议、
+ * 星海网易云通道、小鱼 QQ 曲库通道、吉祥酷狗曲库通道
  * 都依赖服务端同源实现（服务端持有取链凭据、候选检索与直链体积校验逻辑），
  * 端侧直连既拿不到凭据也无法复刻校验链路。故端侧不再把这些源当成未知源直接判死链，
  * 而是在本地直连分发层内回退到远程解锁服务，由服务端完成检索、取链与校验，
@@ -31,6 +32,8 @@ export const REMOTE_UNLOCK_SERVERS: readonly SongUnlockServer[] = [
     SongUnlockServer.CHANGQING,
     SongUnlockServer.LXMUSIC,
     SongUnlockServer.XINGHAI,
+    SongUnlockServer.FISH,
+    SongUnlockServer.JIEXIANG,
 ];
 
 /**
@@ -45,6 +48,8 @@ export const REMOTE_UNLOCK_TIMEOUT: Partial<Record<SongUnlockServer, number>> = 
     [SongUnlockServer.CHANGQING]: 40000,
     [SongUnlockServer.LXMUSIC]: 20000,
     [SongUnlockServer.XINGHAI]: 20000,
+    [SongUnlockServer.FISH]: 20000,
+    [SongUnlockServer.JIEXIANG]: 20000,
 };
 
 /** 未单独配置预算的远程源所用的默认超时（毫秒） */

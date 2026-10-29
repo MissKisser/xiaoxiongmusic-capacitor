@@ -122,12 +122,14 @@ describe("远程换源回退 unblockRemote", () => {
     assert.equal(minimalUrl.searchParams.get("platformId"), null);
   });
 
-  it("四源超时预算与 PC 端 UNLOCK_TIMEOUT 表一致", async () => {
+  it("六源超时预算与 PC 端 UNLOCK_TIMEOUT 表一致", async () => {
     assert.deepEqual(REMOTE_UNLOCK_TIMEOUT, {
       [SongUnlockServer.MIGU]: 30000,
       [SongUnlockServer.CHANGQING]: 40000,
       [SongUnlockServer.LXMUSIC]: 20000,
       [SongUnlockServer.XINGHAI]: 20000,
+      [SongUnlockServer.FISH]: 20000,
+      [SongUnlockServer.JIEXIANG]: 20000,
     });
 
     const captured = { urls: [], timeouts: [] };
@@ -137,6 +139,22 @@ describe("远程换源回退 unblockRemote", () => {
       artist: "周杰伦",
     }, transportOf({ status: 404, body: "" }, captured));
     assert.deepEqual(captured.timeouts, [30000]);
+
+    const fishCaptured = { urls: [], timeouts: [] };
+    await requestRemoteUnlock(SongUnlockServer.FISH, {
+      keyword: "晴天-周杰伦",
+      songName: "晴天",
+      artist: "周杰伦",
+    }, transportOf({ status: 404, body: "" }, fishCaptured));
+    assert.deepEqual(fishCaptured.timeouts, [20000]);
+
+    const jiexiangCaptured = { urls: [], timeouts: [] };
+    await requestRemoteUnlock(SongUnlockServer.JIEXIANG, {
+      keyword: "晴天-周杰伦",
+      songName: "晴天",
+      artist: "周杰伦",
+    }, transportOf({ status: 404, body: "" }, jiexiangCaptured));
+    assert.deepEqual(jiexiangCaptured.timeouts, [20000]);
   });
 
   it("业务 404 透传服务端失败原因，探活失败类别不劣化", async () => {
@@ -212,14 +230,18 @@ describe("本地与远程源分发回归 unblockDispatch", () => {
     globalThis.fetch = originalFetch;
   });
 
-  it("本地四源不参与远程回退，远程集合包含四源", () => {
+  it("本地四源不参与远程回退，远程集合包含六源", () => {
     assert.deepEqual([...REMOTE_UNLOCK_SERVERS], [
       SongUnlockServer.MIGU,
       SongUnlockServer.CHANGQING,
       SongUnlockServer.LXMUSIC,
       SongUnlockServer.XINGHAI,
+      SongUnlockServer.FISH,
+      SongUnlockServer.JIEXIANG,
     ]);
     assert.equal(isRemoteUnlockServer(SongUnlockServer.XINGHAI), true);
+    assert.equal(isRemoteUnlockServer(SongUnlockServer.FISH), true);
+    assert.equal(isRemoteUnlockServer(SongUnlockServer.JIEXIANG), true);
     for (const server of [
       SongUnlockServer.NETEASE,
       SongUnlockServer.KUWO,
@@ -228,6 +250,65 @@ describe("本地与远程源分发回归 unblockDispatch", () => {
     ]) {
       assert.equal(isRemoteUnlockServer(server), false);
     }
+  });
+
+  it("小鱼源经分发层请求远程服务并透传结果", async () => {
+    state.bodyText = JSON.stringify({
+      code: 200,
+      url: "https://cdn.example.com/fish.flac",
+      lengthVerified: true,
+    });
+
+    const result = await localUnlockSongUrl(
+      97773,
+      "晴天",
+      "周杰伦",
+      SongUnlockServer.FISH,
+      { platform: "qqmusic", platformId: "0039MnYb0qxYhV", duration: 269 },
+    );
+
+    assert.equal(result.code, 200);
+    assert.equal(result.url, "https://cdn.example.com/fish.flac");
+    assert.equal(result.lengthVerified, true);
+    assert.equal(state.requests.length, 1);
+    assert.ok(state.requests[0].includes(`${API_BASE_URL}/api/unblock/fish`));
+    const url = new URL(state.requests[0]);
+    assert.equal(url.searchParams.get("platform"), "qqmusic");
+    assert.equal(url.searchParams.get("platformId"), "0039MnYb0qxYhV");
+    assert.equal(url.searchParams.get("duration"), "269");
+  });
+
+  it("吉祥源经分发层请求远程服务并透传结果", async () => {
+    state.bodyText = JSON.stringify({
+      code: 200,
+      url: "https://cdn.example.com/jiexiang.flac",
+      lengthVerified: true,
+    });
+
+    const result = await localUnlockSongUrl(
+      12345,
+      "素颜",
+      "许嵩",
+      SongUnlockServer.JIEXIANG,
+      {
+        platform: "kugou",
+        platformId: "30C94AE2868E63B1058DA7685E0CDF3B",
+        duration: 238,
+      },
+    );
+
+    assert.equal(result.code, 200);
+    assert.equal(result.url, "https://cdn.example.com/jiexiang.flac");
+    assert.equal(result.lengthVerified, true);
+    assert.equal(state.requests.length, 1);
+    assert.ok(state.requests[0].includes(`${API_BASE_URL}/api/unblock/jiexiang`));
+    const url = new URL(state.requests[0]);
+    assert.equal(url.searchParams.get("platform"), "kugou");
+    assert.equal(
+      url.searchParams.get("platformId"),
+      "30C94AE2868E63B1058DA7685E0CDF3B",
+    );
+    assert.equal(url.searchParams.get("duration"), "238");
   });
 
   it("星海源经分发层请求远程服务并透传结果", async () => {

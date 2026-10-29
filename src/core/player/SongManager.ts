@@ -43,6 +43,8 @@ export { SongUnlockServer };
  */
 export const SONG_UNLOCK_PRIORITY: readonly SongUnlockServer[] = [
   SongUnlockServer.XINGHAI,
+  SongUnlockServer.FISH,
+  SongUnlockServer.JIEXIANG,
   SongUnlockServer.NETEASE,
   SongUnlockServer.BODIAN,
   SongUnlockServer.KUWO,
@@ -77,6 +79,8 @@ export const getUnlockSourceName = (server: SongUnlockServer): string => {
     [SongUnlockServer.CHANGQING]: "长青聚合",
     [SongUnlockServer.LXMUSIC]: "落雪音源",
     [SongUnlockServer.XINGHAI]: "星海音源",
+    [SongUnlockServer.FISH]: "小鱼音源",
+    [SongUnlockServer.JIEXIANG]: "吉祥音源",
   };
   return nameMap[server] || server;
 };
@@ -144,6 +148,8 @@ const PROBE_SOURCE_BY_SERVER: Partial<Record<SongUnlockServer, ProbeSource>> = {
   [SongUnlockServer.CHANGQING]: "changqing",
   [SongUnlockServer.LXMUSIC]: "lxmusic",
   [SongUnlockServer.XINGHAI]: "xinghai",
+  [SongUnlockServer.FISH]: "fish",
+  [SongUnlockServer.JIEXIANG]: "jiexiang",
   [SongUnlockServer.GEQUBAO]: "gequbao",
 };
 

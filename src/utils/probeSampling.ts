@@ -18,6 +18,8 @@ export type ProbeSource =
   | "changqing"
   | "lxmusic"
   | "xinghai"
+  | "fish"
+  | "jiexiang"
   | "gequbao";
 
 /** 失败类别（与服务端契约枚举一致） */

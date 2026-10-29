@@ -115,9 +115,13 @@ describe("音源可用性采样器 probeSampling", () => {
       const bodian = sampler.submit(makeSample("bodian", true), 1000);
       const netease = sampler.submit(makeSample("netease", true), 1000);
       const xinghai = sampler.submit(makeSample("xinghai", true), 1000);
+      const fish = sampler.submit(makeSample("fish", true), 1000);
+      const jiexiang = sampler.submit(makeSample("jiexiang", true), 1000);
       assert.equal(bodian.type, "send");
       assert.equal(netease.type, "send");
       assert.equal(xinghai.type, "send");
+      assert.equal(fish.type, "send");
+      assert.equal(jiexiang.type, "send");
     });
 
     it("一个源的失败不会影响另一个源的成功", () => {

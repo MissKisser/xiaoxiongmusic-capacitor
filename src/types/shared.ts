@@ -30,6 +30,10 @@ export enum SongUnlockServer {
   LXMUSIC = "lxmusic",
   /** 星海音源（lx 协议网易云通道） */
   XINGHAI = "xinghai",
+  /** 小鱼音源（社区公益源，QQ 曲库） */
+  FISH = "fish",
+  /** 吉祥音源（社区公益源，酷狗曲库） */
+  JIEXIANG = "jiexiang",
 }
 
 /**

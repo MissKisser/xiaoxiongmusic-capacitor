@@ -518,6 +518,8 @@ export const useSettingStore = defineStore("setting", {
     useSongUnlock: true,
     songUnlockServer: [
       { key: SongUnlockServer.XINGHAI, enabled: true },
+      { key: SongUnlockServer.FISH, enabled: true },
+      { key: SongUnlockServer.JIEXIANG, enabled: true },
       { key: SongUnlockServer.NETEASE, enabled: true },
       { key: SongUnlockServer.BODIAN, enabled: true },
       { key: SongUnlockServer.KUWO, enabled: false },
