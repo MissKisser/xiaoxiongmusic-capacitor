@@ -94,15 +94,32 @@ describe("播放决策树与换源优先级", () => {
       assert.equal(getPlatformLabel("netease"), "网易云");
     });
 
-    it("QQ 音乐与酷狗音乐歌曲绝对不包含 NETEASE 源（防范数字 ID 串台播错歌）", () => {
+    it("三个平台按实测可用性锁定的链位全序（与 PC 端同构）", () => {
+      const neteasePriority = getUnlockPriority("netease");
       const qqPriority = getUnlockPriority("qqmusic");
       const kgPriority = getUnlockPriority("kugou");
 
-      assert.equal(qqPriority.includes(SongUnlockServer.NETEASE), false);
-      assert.equal(kgPriority.includes(SongUnlockServer.NETEASE), false);
-
-      assert.equal(qqPriority[0], SongUnlockServer.BODIAN);
-      assert.equal(kgPriority[0], SongUnlockServer.BODIAN);
+      // 第三方平台歌曲对 NETEASE 源走关键词寻址（useKeywordLookup），不拿平台数字 ID 直查，
+      // 故 NETEASE 可入 QQ/酷狗链（A-05 禁的是数字 ID 直查，不是源入链）
+      assert.deepEqual(neteasePriority, [
+        SongUnlockServer.NETEASE,
+        SongUnlockServer.MIGU,
+        SongUnlockServer.CHANGQING,
+        SongUnlockServer.KUWO,
+        SongUnlockServer.BODIAN,
+      ]);
+      assert.deepEqual(qqPriority, [
+        SongUnlockServer.CHANGQING,
+        SongUnlockServer.MIGU,
+        SongUnlockServer.NETEASE,
+        SongUnlockServer.LXMUSIC,
+        SongUnlockServer.BODIAN,
+        SongUnlockServer.KUWO,
+      ]);
+      assert.deepEqual(kgPriority, qqPriority);
+      // 歌曲宝上游已失效，任何平台链位都不得再包含
+      assert.equal(neteasePriority.includes(SongUnlockServer.GEQUBAO), false);
+      assert.equal(qqPriority.includes(SongUnlockServer.GEQUBAO), false);
 
       assert.equal(getPlatformLabel("qqmusic"), "QQ 音乐");
       assert.equal(getPlatformLabel("kugou"), "酷狗音乐");
