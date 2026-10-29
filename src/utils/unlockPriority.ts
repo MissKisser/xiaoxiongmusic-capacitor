@@ -8,11 +8,12 @@
  *   长青 → 咪咕 → 网易云 → 落雪 → 波点 → 酷我
  *   （长青/咪咕/网易云为主力源前置；落雪上游为公益接口稳定性有限居中；
  *   波点与酷我对 VIP 曲目命中率近零，垫底兜底）；
- * - QQ 歌曲：同上，长青 → 咪咕 → 网易云 → 落雪 → 波点 → 酷我；
+ * - QQ 歌曲：同上，长青 → 咪咕 → 网易云 → 落雪 → 波点 → 酷我 → 歌曲宝；
  * - 网易云歌曲：星海后端网易云通道可用性最高，排在首位；原网易云网关作兜底，
  *   咪咕 / 长青 / 酷我 / 波点依次兜底。
+ * - 歌曲宝为社区公益源，各平台均置于链位末位，仅在其余源全部落空时兜底。
  *
- * 咪咕 / 长青 / 落雪 / 星海为远程回退源（服务端同源实现），网易云 / 波点 / 酷我为端侧本地实现。
+ * 咪咕 / 长青 / 落雪 / 星海为远程回退源（服务端同源实现），网易云 / 波点 / 酷我 / 歌曲宝为端侧本地实现。
  *
  * 铁律 A-05：第三方平台歌曲严禁拿平台数字 ID 直查网易云源。
  *
@@ -32,6 +33,7 @@ const UNLOCK_PRIORITY: Record<ApiPlatform, readonly SongUnlockServer[]> = {
         SongUnlockServer.CHANGQING,
         SongUnlockServer.KUWO,
         SongUnlockServer.BODIAN,
+        SongUnlockServer.GEQUBAO,
     ],
     qqmusic: [
         SongUnlockServer.CHANGQING,
@@ -40,6 +42,7 @@ const UNLOCK_PRIORITY: Record<ApiPlatform, readonly SongUnlockServer[]> = {
         SongUnlockServer.LXMUSIC,
         SongUnlockServer.BODIAN,
         SongUnlockServer.KUWO,
+        SongUnlockServer.GEQUBAO,
     ],
     kugou: [
         SongUnlockServer.CHANGQING,
@@ -48,6 +51,7 @@ const UNLOCK_PRIORITY: Record<ApiPlatform, readonly SongUnlockServer[]> = {
         SongUnlockServer.LXMUSIC,
         SongUnlockServer.BODIAN,
         SongUnlockServer.KUWO,
+        SongUnlockServer.GEQUBAO,
     ],
 };
 

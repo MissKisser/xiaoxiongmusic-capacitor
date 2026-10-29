@@ -273,12 +273,12 @@ class DownloadManager {
 
       if (!url && settingStore.useUnlockForDownload && canUseUnlock) {
         try {
-          // 解锁服务优先级顺序：网易云 -> 波点音乐 -> 歌曲宝 -> 酷我音乐
+          // 解锁服务优先级顺序：网易云 -> 波点音乐 -> 酷我音乐 -> 歌曲宝
           const priorityOrder = [
             SongUnlockServer.NETEASE,
             SongUnlockServer.BODIAN,
-            SongUnlockServer.GEQUBAO,
             SongUnlockServer.KUWO,
+            SongUnlockServer.GEQUBAO,
           ];
 
           const enabledServers = settingStore.songUnlockServer

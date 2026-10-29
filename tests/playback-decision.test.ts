@@ -117,6 +117,7 @@ describe("播放决策树与换源优先级", () => {
         SongUnlockServer.CHANGQING,
         SongUnlockServer.KUWO,
         SongUnlockServer.BODIAN,
+        SongUnlockServer.GEQUBAO,
       ]);
       assert.deepEqual(qqPriority, [
         SongUnlockServer.CHANGQING,
@@ -125,11 +126,12 @@ describe("播放决策树与换源优先级", () => {
         SongUnlockServer.LXMUSIC,
         SongUnlockServer.BODIAN,
         SongUnlockServer.KUWO,
+        SongUnlockServer.GEQUBAO,
       ]);
       assert.deepEqual(kgPriority, qqPriority);
-      // 歌曲宝上游已失效，任何平台链位都不得再包含
-      assert.equal(neteasePriority.includes(SongUnlockServer.GEQUBAO), false);
-      assert.equal(qqPriority.includes(SongUnlockServer.GEQUBAO), false);
+      // 歌曲宝是社区公益源，置于各平台链位末位，仅在其余源全部落空时兜底
+      assert.equal(neteasePriority.at(-1), SongUnlockServer.GEQUBAO);
+      assert.equal(qqPriority.at(-1), SongUnlockServer.GEQUBAO);
 
       assert.equal(getPlatformLabel("qqmusic"), "QQ 音乐");
       assert.equal(getPlatformLabel("kugou"), "酷狗音乐");

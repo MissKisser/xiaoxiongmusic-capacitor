@@ -45,8 +45,8 @@ export const SONG_UNLOCK_PRIORITY: readonly SongUnlockServer[] = [
   SongUnlockServer.XINGHAI,
   SongUnlockServer.NETEASE,
   SongUnlockServer.BODIAN,
-  SongUnlockServer.GEQUBAO,
   SongUnlockServer.KUWO,
+  SongUnlockServer.GEQUBAO,
 ];
 
 /**
@@ -144,6 +144,7 @@ const PROBE_SOURCE_BY_SERVER: Partial<Record<SongUnlockServer, ProbeSource>> = {
   [SongUnlockServer.CHANGQING]: "changqing",
   [SongUnlockServer.LXMUSIC]: "lxmusic",
   [SongUnlockServer.XINGHAI]: "xinghai",
+  [SongUnlockServer.GEQUBAO]: "gequbao",
 };
 
 /**

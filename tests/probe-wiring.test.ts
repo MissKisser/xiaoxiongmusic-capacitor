@@ -157,10 +157,13 @@ describe("换源探活上报接线 probeWiring", () => {
 
   it("未登记到上报接口的源：不上报", async () => {
     const settingStore = useSettingStore();
-    settingStore.songUnlockServer = [{ key: SongUnlockServer.GEQUBAO, enabled: true }];
+    // 已下线音源的历史标识：不在上报映射内，取链成功也不产生上报
+    settingStore.songUnlockServer = [
+      { key: "retired-source" as SongUnlockServer, enabled: true },
+    ];
     setCustomUnlockHandler(async () => ({
       code: 200,
-      url: "https://gequbao.example.com/audio.mp3",
+      url: "https://retired.example.com/audio.mp3",
     }));
 
     await songManager.getUnlockSongUrl(makeSong(90005));

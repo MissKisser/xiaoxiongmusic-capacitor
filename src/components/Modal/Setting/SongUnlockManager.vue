@@ -65,7 +65,7 @@ export const SOURCE_LABEL: Record<SongUnlockServer, string> = {
   [SongUnlockServer.XINGHAI]: "星海音源（社区公益源，网易云曲库）",
   [SongUnlockServer.NETEASE]: "网易云音乐（官方曲库）",
   [SongUnlockServer.BODIAN]: "波点音乐（第三方曲库）",
-  [SongUnlockServer.GEQUBAO]: "歌曲宝",
+  [SongUnlockServer.GEQUBAO]: "歌曲宝（社区公益源，稳定性无保障）",
   [SongUnlockServer.KUWO]: "酷我音乐（第三方曲库）",
   [SongUnlockServer.MIGU]: "咪咕音乐（免费曲库）",
   [SongUnlockServer.CHANGQING]: "长青聚合（社区公益源，稳定性无保障）",

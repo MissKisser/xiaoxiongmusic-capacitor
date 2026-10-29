@@ -17,7 +17,8 @@ export type ProbeSource =
   | "migu"
   | "changqing"
   | "lxmusic"
-  | "xinghai";
+  | "xinghai"
+  | "gequbao";
 
 /** 失败类别（与服务端契约枚举一致） */
 export type ProbeFailCategory =
