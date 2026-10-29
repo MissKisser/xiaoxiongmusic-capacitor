@@ -4,7 +4,7 @@
  * 在 Capacitor 端 + settingStore.useLocalApi 开启时,
  * src/utils/request.ts 会把请求路由到 localNcmRequest,
  * 由其在 WebView 内完成签名 + CapacitorHttp 直连 music.163.com,
- * 不经 music.viaxv.cn 服务器。失败时由 request.ts 回退服务器。
+ * 不经自有后端服务器。失败时由 request.ts 回退服务器。
  *
  * 作者:Hackerdallas
  */

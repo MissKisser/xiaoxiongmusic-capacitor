@@ -57,7 +57,7 @@ export const useAuthStore = defineStore('auth', {
             this.networkError = false;
 
             try {
-                // api 实例会自动处理 baseURL (Capacitor 下为 https://music.viaxv.cn)
+                // api 实例会自动处理 baseURL（取自 VITE_API_BASE_URL，见 src/utils/apiBase.ts）
                 const response = await api.get('/auth/check', {
                     params: { deviceId: this.deviceId, platform: 'android' },
                 });

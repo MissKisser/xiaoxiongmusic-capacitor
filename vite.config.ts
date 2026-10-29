@@ -6,11 +6,12 @@ import { NaiveUiResolver } from "unplugin-vue-components/resolvers";
 import Components from "unplugin-vue-components/vite";
 import viteCompression from "vite-plugin-compression";
 import wasm from "vite-plugin-wasm";
+import { DEFAULT_API_BASE_URL } from "./src/constants/backend";
 
 export default defineConfig(({ mode }) => {
-    // 后端服务基地址统一由 env 控制（.env.production / .env.development / .env.debug）
+    // 后端服务基地址统一由 env 控制（.env.development / .env.production / .env.debug）
     const env = loadEnv(mode, process.cwd(), '');
-    const apiBaseUrl = String(env.VITE_API_URL || '').replace(/\/+$/, '');
+    const apiBaseUrl = String(env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
     return {
     base: './', // 使用相对路径,确保 Capacitor 能正确加载资源
     plugins: [
@@ -53,7 +54,7 @@ export default defineConfig(({ mode }) => {
         // 代理配置：将所有 /api 请求转发到远程服务器
         proxy: {
             '/api': {
-                target: apiBaseUrl || 'https://music.viaxv.cn',
+                target: apiBaseUrl,
                 changeOrigin: true,
                 secure: false,
                 // Cookie 相关配置

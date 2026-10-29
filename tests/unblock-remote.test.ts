@@ -26,6 +26,7 @@ import {
   type UnlockTransport,
 } from "../src/utils/unblock/remote";
 import { classifyUnlockFailure } from "../src/utils/probeSampling";
+import { API_BASE_URL } from "../src/utils/apiBase";
 
 /** 构造一个固定响应的传输层桩件，并记录收到的请求地址 */
 const transportOf = (
@@ -100,7 +101,7 @@ describe("远程换源回退 unblockRemote", () => {
       platform: "qqmusic",
       platformId: "0039MnYb0qxYhV",
     });
-    assert.ok(url.startsWith("https://music.viaxv.cn/api/unblock/changqing?"));
+    assert.ok(url.startsWith(`${API_BASE_URL}/api/unblock/changqing?`));
     const params = new URL(url).searchParams;
     assert.equal(params.get("keyword"), "晴天-周杰伦");
     assert.equal(params.get("songName"), "晴天");
@@ -239,7 +240,7 @@ describe("本地与远程源分发回归 unblockDispatch", () => {
     assert.equal(result.url, "https://cdn.example.com/changqing.flac");
     assert.equal(result.lengthVerified, true);
     assert.equal(state.requests.length, 1);
-    assert.ok(state.requests[0].includes("https://music.viaxv.cn/api/unblock/changqing"));
+    assert.ok(state.requests[0].includes(`${API_BASE_URL}/api/unblock/changqing`));
   });
 
   it("网易云源仍走本地直连（GD 音乐台），不经远程服务", async () => {
@@ -251,7 +252,7 @@ describe("本地与远程源分发回归 unblockDispatch", () => {
     assert.equal(result.url, "https://example.com/gd.mp3");
     assert.equal(state.requests.length, 1);
     assert.ok(state.requests[0].includes("music-api.gdstudio.xyz"));
-    assert.ok(!state.requests[0].includes("music.viaxv.cn"));
+    assert.ok(!state.requests[0].includes(API_BASE_URL));
   });
 
   it("未知源保持原判死行为，不发起任何远程请求", async () => {

@@ -19,7 +19,7 @@ console.log("🔧 环境检测:", {
   isDev,
   isCapacitor,
   baseURL,
-  VITE_API_URL: import.meta.env?.["VITE_API_URL"]
+  VITE_API_BASE_URL: import.meta.env?.["VITE_API_BASE_URL"]
 });
 
 // 自定义适配器：在 Capacitor 环境下直接调用原生 HTTP 插件
@@ -234,7 +234,7 @@ server.interceptors.response.use(
 // 请求
 const request = async <T = any>(config: AxiosRequestConfig): Promise<T> => {
   try {
-    // Capacitor 端无条件走本地 API:纯 JS 签名直连网易云,不经 music.viaxv.cn。
+    // Capacitor 端无条件走本地 API:纯 JS 签名直连网易云,不经自有后端。
     // 失败自动回退到下方服务器链路(try-catch)。
     if (isCapacitor) {
       try {
