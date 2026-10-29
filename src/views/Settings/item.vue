@@ -189,13 +189,21 @@ const itemTitle = computed(() => titles[item.value] || "设置");
         padding: 16px;
       }
 
+      &.column {
+        .n-card-content {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 12px;
+        }
+      }
+
       .label {
         display: flex;
         flex-direction: row;
         flex-wrap: wrap;
         align-items: baseline;
         gap: 4px 8px;
-        flex: 1;
+        flex: 1 1 auto;
         min-width: 0;
 
         .name {

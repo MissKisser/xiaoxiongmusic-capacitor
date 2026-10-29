@@ -2,7 +2,7 @@
   <div class="setting-type">
     <div class="set-list">
       <n-h3 prefix="bar"> 本地 TTML 歌词库 </n-h3>
-      <n-card class="set-item" id="lyrics-local-ttml">
+      <n-card class="set-item column" id="lyrics-local-ttml">
         <div class="label">
           <n-text class="name">本地 TTML 歌词库</n-text>
           <n-text class="tip" :depth="3">
@@ -158,44 +158,32 @@ onMounted(refreshLocalTtml);
 </script>
 
 <style lang="scss" scoped>
-#lyrics-local-ttml {
-  :deep(.n-card-content) {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .label {
-    padding-right: 0;
-  }
-
-  .local-ttml-toolbar {
+.local-ttml-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.local-ttml-list {
+  .local-ttml-row {
     display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
   }
-  .local-ttml-list {
-    .local-ttml-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      width: 100%;
-    }
-    .local-ttml-info {
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-      flex: 1;
-    }
-    .local-ttml-name {
-      font-size: 14px;
-      font-weight: 500;
-      word-break: break-all;
-    }
-    .local-ttml-meta {
-      font-size: 12px;
-    }
+  .local-ttml-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+  }
+  .local-ttml-name {
+    font-size: 14px;
+    font-weight: 500;
+    word-break: break-all;
+  }
+  .local-ttml-meta {
+    font-size: 12px;
   }
 }
 </style>

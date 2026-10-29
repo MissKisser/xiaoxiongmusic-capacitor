@@ -311,7 +311,7 @@ watch(
   }
 
   .label {
-    flex: 1;
+    flex: 1 1 auto;
     min-width: 0;
     .title {
       font-size: 15px;
@@ -326,7 +326,7 @@ watch(
     }
   }
 
-  .control {
+  :deep(.control) {
     width: min(42vw, 168px);
     flex-shrink: 0;
   }

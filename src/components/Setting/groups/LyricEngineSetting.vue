@@ -2,7 +2,7 @@
   <div class="setting-type">
     <div class="set-list">
       <n-h3 prefix="bar"> 歌词引擎 </n-h3>
-      <n-card class="set-item engine-item">
+      <n-card class="set-item column engine-item">
         <div class="label">
           <n-text class="name">歌词渲染引擎</n-text>
           <n-text class="tip" :depth="3">
@@ -100,19 +100,7 @@ watch(
 </script>
 
 <style lang="scss" scoped>
-.engine-item {
-  :deep(.n-card-content) {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .label {
-    padding-right: 0;
-  }
-
-  .engine-group {
-    width: 100%;
-  }
+.engine-group {
+  width: 100%;
 }
 </style>

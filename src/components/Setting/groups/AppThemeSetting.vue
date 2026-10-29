@@ -4,7 +4,7 @@
       <n-h3 prefix="bar"> 主题与背景 </n-h3>
 
       <!-- 主题模式 -->
-      <n-card class="set-item theme-mode-item">
+      <n-card class="set-item column theme-mode-item">
         <div class="label">
           <n-text class="name">主题模式</n-text>
           <n-text class="tip" :depth="3"> 选择应用的主题模式 </n-text>
@@ -24,7 +24,7 @@
       </n-card>
 
       <!-- 主题色 -->
-      <n-card class="set-item theme-color-item">
+      <n-card class="set-item column theme-color-item">
         <div class="label">
           <n-text class="name">主题色</n-text>
           <n-text class="tip" :depth="3"> 选择应用配色的来源 </n-text>
@@ -79,7 +79,7 @@
       </n-card>
 
       <!-- 全局背景 -->
-      <n-card class="set-item background-item">
+      <n-card class="set-item column background-item">
         <div class="label">
           <n-text class="name">全局背景</n-text>
           <n-text class="tip" :depth="3"> 设置应用全局背景图片 </n-text>
@@ -119,7 +119,7 @@
       </n-card>
 
       <!-- 背景模糊度 -->
-      <n-card class="set-item slider-item">
+      <n-card class="set-item column slider-item">
         <div class="label">
           <n-text class="name">背景模糊度</n-text>
           <n-text class="tip" :depth="3">
@@ -139,7 +139,7 @@
       </n-card>
 
       <!-- 卡片透明度 -->
-      <n-card class="set-item slider-item">
+      <n-card class="set-item column slider-item">
         <div class="label">
           <n-text class="name">卡片透明度</n-text>
           <n-text class="tip" :depth="3">
@@ -288,18 +288,6 @@ const setBlurEffect = (enabled: boolean) => {
 
 <style lang="scss" scoped>
 .app-setting {
-  .theme-mode-item {
-    :deep(.n-card-content) {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 12px;
-    }
-
-    .label {
-      padding-right: 0;
-    }
-  }
-
   .theme-mode-group {
     display: flex;
     flex-wrap: wrap;
@@ -310,14 +298,6 @@ const setBlurEffect = (enabled: boolean) => {
       // 均分卡片宽度，但不压缩到内容宽度以下（按钮文字不换行，压缩会导致文字重叠）
       flex: 1 1 auto;
       min-width: fit-content;
-    }
-  }
-
-  .theme-color-item,
-  .background-item {
-    :deep(.n-card-content) {
-      flex-direction: column;
-      align-items: flex-start;
     }
   }
 
@@ -397,21 +377,8 @@ const setBlurEffect = (enabled: boolean) => {
     }
   }
 
-  .slider-item {
-    :deep(.n-card-content) {
-      flex-direction: column;
-      align-items: stretch;
-
-      .tuning-slider {
-        width: 100%;
-      }
-    }
-  }
-
-  @media (max-width: 768px) {
-    .tuning-slider {
-      width: 100%;
-    }
+  .tuning-slider {
+    width: 100%;
   }
 }
 </style>

@@ -49,7 +49,7 @@
 
         <!-- 首页比例 -->
         <n-h3 prefix="bar"> 首页比例 </n-h3>
-        <n-card class="set-item preview-card">
+        <n-card class="set-item column preview-card">
           <div class="label">
             <n-text class="name">大卡片比例</n-text>
             <n-text class="tip" :depth="3">
@@ -74,7 +74,7 @@
 
         <!-- 顶栏高度 -->
         <n-h3 prefix="bar"> 顶栏高度 </n-h3>
-        <n-card class="set-item nav-card">
+        <n-card class="set-item column nav-card">
           <div class="label">
             <n-text class="name">菜单栏高度</n-text>
             <n-text class="tip" :depth="3">
@@ -210,11 +210,6 @@ const handleNavHeightChange = (value: number) => {
   // 滑块卡片：描述在上、滑块在下从左到右满宽（窄屏不被挤压，宽度恒定避免拖动跳转）
   .preview-card,
   .nav-card {
-    :deep(.n-card-content) {
-      flex-direction: column !important;
-      align-items: stretch !important;
-      gap: 12px;
-    }
     .slider-row {
       display: flex;
       align-items: center;
