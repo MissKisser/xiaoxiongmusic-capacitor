@@ -115,7 +115,7 @@ jobs:
       - name: Push update to server
         if: ${{ inputs.do_push }}
         run: |
-          TOKEN=$(curl -s --max-time 15 -X POST https://music.viaxv.top/api/admin/login \
+          TOKEN=$(curl -s --max-time 15 -X POST https://music.viaxv.cn/api/admin/login \
             -H "Content-Type: application/json" \
             -d "{\"username\":\"${{ secrets.SERVER_API_USERNAME }}\",\"password\":\"${{ secrets.SERVER_API_PASSWORD }}\"}" \
             | python3 -c "import json,sys;print(json.load(sys.stdin)['data']['token'])")
@@ -125,7 +125,7 @@ jobs:
             -H "Authorization: Bearer $TOKEN" \
             -F "file=@$APK_PATH" \
             -F "version=${{ inputs.version }}" \
-            https://music.viaxv.top/api/admin/versions/upload)
+            https://music.viaxv.cn/api/admin/versions/upload)
           echo "Upload response: $UPLOAD_RESP"
           APK_URL=$(echo "$UPLOAD_RESP" | jq -r '.data.url // empty')
           test -n "$APK_URL" || { echo "::error::上传 APK 失败，未获取到下载直链: $UPLOAD_RESP"; exit 1; }
@@ -136,7 +136,7 @@ jobs:
                 --arg desc "$DESC" \
                 --argjson force "${{ inputs.is_force }}" \
                 '{version:$v, buildNumber:$bn, platform:"android", apkUrl:$url, description:$desc, isForce:$force}' > payload.json
-          HTTP=$(curl -s --max-time 20 -o push_resp.json -w "%{http_code}" -X POST https://music.viaxv.top/api/admin/versions \
+          HTTP=$(curl -s --max-time 20 -o push_resp.json -w "%{http_code}" -X POST https://music.viaxv.cn/api/admin/versions \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TOKEN" \
             -d @payload.json)

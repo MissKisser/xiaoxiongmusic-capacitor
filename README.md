@@ -14,7 +14,7 @@
 
 SPlayer Mobile（小熊音乐）是基于 Capacitor 8 框架构建的移动端独立音乐播放应用，采用 Vue 3 + TypeScript 技术栈开发。Android 端已发布；iOS 端扩展中（自用侧载分发，实施基准见 `docs/project/ios-expansion-plan.md`），通过 Capacitor 将前端代码封装为可在移动设备上独立运行的原生应用程序。
 
-应用通过连接远程服务器 API（`https://music.viaxv.top`）获取音乐数据，当前仅支持扫码登录（验证码登录已下线，仅保留二维码链路），为用户提供完整的移动端音乐播放体验。
+应用通过连接远程服务器 API（`https://music.viaxv.cn`）获取音乐数据，当前仅支持扫码登录（验证码登录已下线，仅保留二维码链路），为用户提供完整的移动端音乐播放体验。
 
 ## 技术架构
 
@@ -142,11 +142,13 @@ pnpm android:build
 
 ### API 地址配置
 
-在项目根目录的 `.env` 文件中配置远程 API 地址：
+自有后端服务地址由环境变量统一驱动，在项目根目录的 `.env.development` / `.env.production` 中配置：
 
 ```bash
-VITE_API_URL=https://your-music-api.example.com
+VITE_API_BASE_URL=https://music.viaxv.cn
 ```
+
+可用变量清单见 [`.env.example`](.env.example)。所有请求自有后端的模块（接口转发、远程换源解锁、探针上报、版本检查、鉴权校验）统一从该变量取值，换域名只需改 env 文件并重新构建。
 
 ### 构建配置
 
@@ -196,7 +198,7 @@ export default config;
 
 ## 注意事项
 
-- 后端服务独立部署于 `music.viaxv.top`（见 `server/` 与 `baota.nginx.conf`），`server/` 为 git submodule 指向 [xiaoxiongmusic-server](https://github.com/MissKisser/xiaoxiongmusic-server)，请勿直接在 `server/` 目录改代码；同步请执行 `git submodule update --remote server`
+- 后端服务独立部署于 `music.viaxv.cn`（后端位于 yn4 / `rdp.viaxv.cn` → `150.242.247.17`，Ubuntu 24.04 + 宝塔；见 `server/` 与 `baota.nginx.conf`），`server/` 为 git submodule 指向 [xiaoxiongmusic-server](https://github.com/MissKisser/xiaoxiongmusic-server)，请勿直接在 `server/` 目录改代码；同步请执行 `git submodule update --remote server`
 - 部分高级功能（如 Hi-Res 音质下载）需要网易云音乐会员账号
 - Android 版本需通过 Android Studio 或 Gradle 构建，产物位于 `android/app/build/outputs/apk/debug/app-debug.apk`
 - Android 已发布；iOS 端扩展中（自用侧载分发，实施基准见 `docs/project/ios-expansion-plan.md`），不涉及 Web/Windows 分发
