@@ -168,4 +168,50 @@ describe("换源探活上报接线 probeWiring", () => {
 
     assert.equal(captured.length, 0);
   });
+
+  it("星海音源换源成功：上报 source 为 xinghai，且网易云歌曲缺 platformId 时透传 String(song.id)", async () => {
+    const settingStore = useSettingStore();
+    settingStore.songUnlockServer = [{ key: SongUnlockServer.XINGHAI, enabled: true }];
+
+    let capturedContext: unknown;
+    setCustomUnlockHandler(async (id, songName, artist, server, context) => {
+      capturedContext = context;
+      return {
+        code: 200,
+        url: "https://xinghai.example.com/audio.mp3",
+      };
+    });
+
+    const neteaseSong: SongType = {
+      id: 654321,
+      name: "海阔天空",
+      artists: "Beyond",
+      album: "乐与怒",
+      cover: "",
+      duration: 326000,
+      free: 0,
+      mv: null,
+      type: "song",
+      platform: "netease",
+    };
+
+    const res = await songManager.getUnlockSongUrl(neteaseSong);
+    await flush();
+
+    assert.equal(res.id, 654321);
+    assert.equal(res.isUnlocked, true);
+    assert.equal(res.unlockSource, SongUnlockServer.XINGHAI);
+
+    assert.deepEqual(capturedContext, {
+      duration: 326,
+      platform: "netease",
+      platformId: "654321",
+    });
+
+    assert.equal(captured.length, 1);
+    const payload = JSON.parse(captured[0].body ?? "{}");
+    assert.equal(payload.source, "xinghai");
+    assert.equal(payload.success, true);
+    assert.equal(payload.failCategory, "none");
+  });
 });

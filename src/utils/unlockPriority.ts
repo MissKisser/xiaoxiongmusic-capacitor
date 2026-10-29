@@ -9,9 +9,10 @@
  *   （长青/咪咕/网易云为主力源前置；落雪上游为公益接口稳定性有限居中；
  *   波点与酷我对 VIP 曲目命中率近零，垫底兜底）；
  * - QQ 歌曲：同上，长青 → 咪咕 → 网易云 → 落雪 → 波点 → 酷我；
- * - 网易云歌曲：网易云按自身歌曲 id 直查，排在首位；咪咕 / 长青 / 酷我 / 波点依次兜底。
+ * - 网易云歌曲：星海后端网易云通道可用性最高，排在首位；原网易云网关作兜底，
+ *   咪咕 / 长青 / 酷我 / 波点依次兜底。
  *
- * 咪咕 / 长青 / 落雪为远程回退源（服务端同源实现），网易云 / 波点 / 酷我为端侧本地实现。
+ * 咪咕 / 长青 / 落雪 / 星海为远程回退源（服务端同源实现），网易云 / 波点 / 酷我为端侧本地实现。
  *
  * 铁律 A-05：第三方平台歌曲严禁拿平台数字 ID 直查网易云源。
  *
@@ -25,6 +26,7 @@ import { SongUnlockServer, type ApiPlatform } from "@/types/shared";
 /** 各平台的换源优先级（数组顺序即尝试顺序） */
 const UNLOCK_PRIORITY: Record<ApiPlatform, readonly SongUnlockServer[]> = {
     netease: [
+        SongUnlockServer.XINGHAI,
         SongUnlockServer.NETEASE,
         SongUnlockServer.MIGU,
         SongUnlockServer.CHANGQING,

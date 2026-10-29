@@ -122,11 +122,12 @@ describe("远程换源回退 unblockRemote", () => {
     assert.equal(minimalUrl.searchParams.get("platformId"), null);
   });
 
-  it("三源超时预算与 PC 端 UNLOCK_TIMEOUT 表一致", async () => {
+  it("四源超时预算与 PC 端 UNLOCK_TIMEOUT 表一致", async () => {
     assert.deepEqual(REMOTE_UNLOCK_TIMEOUT, {
       [SongUnlockServer.MIGU]: 30000,
       [SongUnlockServer.CHANGQING]: 40000,
       [SongUnlockServer.LXMUSIC]: 20000,
+      [SongUnlockServer.XINGHAI]: 20000,
     });
 
     const captured = { urls: [], timeouts: [] };
@@ -211,12 +212,14 @@ describe("本地与远程源分发回归 unblockDispatch", () => {
     globalThis.fetch = originalFetch;
   });
 
-  it("本地四源不参与远程回退，远程集合恰为三源", () => {
+  it("本地四源不参与远程回退，远程集合包含四源", () => {
     assert.deepEqual([...REMOTE_UNLOCK_SERVERS], [
       SongUnlockServer.MIGU,
       SongUnlockServer.CHANGQING,
       SongUnlockServer.LXMUSIC,
+      SongUnlockServer.XINGHAI,
     ]);
+    assert.equal(isRemoteUnlockServer(SongUnlockServer.XINGHAI), true);
     for (const server of [
       SongUnlockServer.NETEASE,
       SongUnlockServer.KUWO,
@@ -225,6 +228,32 @@ describe("本地与远程源分发回归 unblockDispatch", () => {
     ]) {
       assert.equal(isRemoteUnlockServer(server), false);
     }
+  });
+
+  it("星海源经分发层请求远程服务并透传结果", async () => {
+    state.bodyText = JSON.stringify({
+      code: 200,
+      url: "https://cdn.example.com/xinghai.flac",
+      lengthVerified: true,
+    });
+
+    const result = await localUnlockSongUrl(
+      123456,
+      "海阔天空",
+      "Beyond",
+      SongUnlockServer.XINGHAI,
+      { platform: "netease", platformId: "123456", duration: 326 },
+    );
+
+    assert.equal(result.code, 200);
+    assert.equal(result.url, "https://cdn.example.com/xinghai.flac");
+    assert.equal(result.lengthVerified, true);
+    assert.equal(state.requests.length, 1);
+    assert.ok(state.requests[0].includes(`${API_BASE_URL}/api/unblock/xinghai`));
+    const url = new URL(state.requests[0]);
+    assert.equal(url.searchParams.get("platform"), "netease");
+    assert.equal(url.searchParams.get("platformId"), "123456");
+    assert.equal(url.searchParams.get("duration"), "326");
   });
 
   it("长青源经分发层请求远程服务并透传结果", async () => {

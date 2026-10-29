@@ -16,14 +16,14 @@
         class="channel-item"
       >
         <div class="channel-info">
-          <n-text class="name">{{ getUnlockSourceName(item.key) }}</n-text>
+          <n-text class="name">{{ sourceLabel(item.key) }}</n-text>
           <n-text :depth="3" class="key-name">{{ item.key }}</n-text>
         </div>
         <n-switch v-model:value="item.enabled" :round="false" />
       </n-card>
     </div>
     <n-text :depth="3" class="hint">
-      解锁服务按固定优先级依次尝试（网易云 → 波点音乐 → 歌曲宝 → 酷我音乐），可在此单独启用或停用各渠道。
+      解锁服务按固定优先级依次尝试（星海音源 → 网易云 → 波点音乐 → 歌曲宝 → 酷我音乐），可在此单独启用或停用各渠道。
     </n-text>
     <n-card
       :content-style="{
@@ -55,6 +55,30 @@ import {
 } from "@/core/player/SongManager";
 
 const settingStore = useSettingStore();
+
+/**
+ * 各换源的用户可读名称与标签
+ *
+ * 只描述来源与可用性，不暴露内部实现细节。
+ */
+export const SOURCE_LABEL: Record<SongUnlockServer, string> = {
+  [SongUnlockServer.XINGHAI]: "星海音源（社区公益源，网易云曲库）",
+  [SongUnlockServer.NETEASE]: "网易云音乐（官方曲库）",
+  [SongUnlockServer.BODIAN]: "波点音乐（第三方曲库）",
+  [SongUnlockServer.GEQUBAO]: "歌曲宝",
+  [SongUnlockServer.KUWO]: "酷我音乐（第三方曲库）",
+  [SongUnlockServer.MIGU]: "咪咕音乐（免费曲库）",
+  [SongUnlockServer.CHANGQING]: "长青聚合（社区公益源，稳定性无保障）",
+  [SongUnlockServer.LXMUSIC]: "落雪音源（社区公益源，仅 QQ 曲库）",
+};
+
+/**
+ * 取换源的用户可读名称
+ * @param key 换源标识
+ * @returns 用户可读名称
+ */
+export const sourceLabel = (key: SongUnlockServer): string =>
+  SOURCE_LABEL[key] ?? getUnlockSourceName(key);
 
 /**
  * 按固定优先级展示解锁渠道列表

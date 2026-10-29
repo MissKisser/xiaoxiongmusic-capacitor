@@ -183,6 +183,50 @@ describe("SongManager 平台播放接线与判据 songManager-platform", () => {
       assert.equal(requestedServers[0], SongUnlockServer.BODIAN);
     });
 
+    it("网易云歌曲优先尝试 XINGHAI 源，且透传网易云歌曲 id 到 platformId", async () => {
+      const settingStore = useSettingStore();
+      settingStore.songUnlockServer = [
+        { key: SongUnlockServer.XINGHAI, enabled: true },
+        { key: SongUnlockServer.NETEASE, enabled: true },
+        { key: SongUnlockServer.BODIAN, enabled: true },
+      ];
+
+      const neteaseSong: SongType = {
+        id: 186016,
+        name: "晴天",
+        artists: "周杰伦",
+        album: "叶惠美",
+        cover: "",
+        duration: 269000,
+        free: 0,
+        mv: null,
+        type: "song",
+        platform: "netease",
+      };
+
+      const requestedServers: SongUnlockServer[] = [];
+      let capturedContext: unknown;
+      setCustomUnlockHandler(async (id, songName, artist, server, context) => {
+        requestedServers.push(server);
+        capturedContext = context;
+        if (server === SongUnlockServer.XINGHAI) {
+          return { code: 200, url: "https://xinghai.example.com/audio.flac" };
+        }
+        return { code: 404, url: null };
+      });
+
+      const res = await songManager.getUnlockSongUrl(neteaseSong);
+      assert.equal(res.id, 186016);
+      assert.equal(res.isUnlocked, true);
+      assert.equal(res.unlockSource, SongUnlockServer.XINGHAI);
+      assert.equal(requestedServers[0], SongUnlockServer.XINGHAI);
+      assert.deepEqual(capturedContext, {
+        duration: 269,
+        platform: "netease",
+        platformId: "186016",
+      });
+    });
+
     it("平台歌曲缺少歌手信息时拒绝换源，防范同名不同版本串播", async () => {
       const qqSongWithoutArtist: SongType = {
         id: 97773,

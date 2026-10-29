@@ -42,6 +42,7 @@ export { SongUnlockServer };
  * 歌曲解锁优先级常量（网易云基线尝试序）
  */
 export const SONG_UNLOCK_PRIORITY: readonly SongUnlockServer[] = [
+  SongUnlockServer.XINGHAI,
   SongUnlockServer.NETEASE,
   SongUnlockServer.BODIAN,
   SongUnlockServer.GEQUBAO,
@@ -75,6 +76,7 @@ export const getUnlockSourceName = (server: SongUnlockServer): string => {
     [SongUnlockServer.MIGU]: "咪咕音乐",
     [SongUnlockServer.CHANGQING]: "长青聚合",
     [SongUnlockServer.LXMUSIC]: "落雪音源",
+    [SongUnlockServer.XINGHAI]: "星海音源",
   };
   return nameMap[server] || server;
 };
@@ -140,6 +142,8 @@ const PROBE_SOURCE_BY_SERVER: Partial<Record<SongUnlockServer, ProbeSource>> = {
   [SongUnlockServer.KUWO]: "kuwo",
   [SongUnlockServer.MIGU]: "migu",
   [SongUnlockServer.CHANGQING]: "changqing",
+  [SongUnlockServer.LXMUSIC]: "lxmusic",
+  [SongUnlockServer.XINGHAI]: "xinghai",
 };
 
 /**
@@ -699,7 +703,17 @@ class SongManager {
       const startedAt = Date.now();
       try {
         console.log(`[UNLOCK] [${songId}] 正在尝试解锁服务: ${sourceName} (${server})...`);
-        const result = await unlockSongUrl(songId, songName, artist, server);
+        const platformId =
+          song.platformId || (isNeteaseSong ? String(songId) : undefined);
+        const duration =
+          typeof song.duration === "number" && song.duration > 0
+            ? Math.round(song.duration / 1000)
+            : undefined;
+        const result = await unlockSongUrl(songId, songName, artist, server, {
+          duration,
+          platform,
+          platformId,
+        });
         const durationMs = Date.now() - startedAt;
         console.log(`[UNLOCK] [${songId}] ${sourceName} 返回结果:`, result);
 

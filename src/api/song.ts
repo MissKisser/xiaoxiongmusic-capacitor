@@ -3,7 +3,7 @@ import { defaultAMLLDbServer, songLevelData } from "@/utils/meta";
 import { SongUnlockServer } from "@/core/player/SongManager";
 import { useSettingStore } from "@/stores";
 import request from "@/utils/request";
-import { localUnlockSongUrl } from "@/utils/unblock";
+import { localUnlockSongUrl, type UnlockRequestContext } from "@/utils/unblock";
 
 // 获取歌曲详情
 export const songDetail = (ids: number | number[]) => {
@@ -54,7 +54,8 @@ type UnlockSongUrlHandler = (
   songName: string,
   artist: string,
   server: SongUnlockServer,
-) => Promise<{ code: number; url: string | null }>;
+  context?: UnlockRequestContext,
+) => Promise<{ code: number; url: string | null; reason?: string; lengthVerified?: boolean }>;
 
 let customUnlockHandler: UnlockSongUrlHandler | null = null;
 
@@ -63,21 +64,31 @@ export const setCustomUnlockHandler = (handler: UnlockSongUrlHandler | null): vo
 };
 
 // 获取解锁歌曲 URL
-export const unlockSongUrl = (id: number, songName: string, artist: string, server: SongUnlockServer) => {
+export const unlockSongUrl = (
+  id: number,
+  songName: string,
+  artist: string,
+  server: SongUnlockServer,
+  context?: UnlockRequestContext,
+) => {
   if (customUnlockHandler) {
-    return customUnlockHandler(id, songName, artist, server);
+    return customUnlockHandler(id, songName, artist, server, context);
   }
 
   // Capacitor 环境：使用本地解锁（避免服务器 IP 被封禁）
   if (isCapacitor) {
     console.log(`🔓 [Capacitor] 使用本地解锁: server=${server}`);
-    return localUnlockSongUrl(id, songName, artist, server);
+    return localUnlockSongUrl(id, songName, artist, server, context);
   }
 
   // Web/Electron 环境：继续使用服务器 API
   // 构建 keyword 用于搜索
   const keyword = `${songName}-${artist}`;
-  const params = server === SongUnlockServer.NETEASE ? { id } : { keyword, songName };
+  const params: Record<string, unknown> =
+    server === SongUnlockServer.NETEASE ? { id } : { keyword, songName };
+  if (context?.duration) params.duration = context.duration;
+  if (context?.platform) params.platform = context.platform;
+  if (context?.platformId) params.platformId = context.platformId;
   // 使用 /api/unblock 作为 baseURL
   // Electron 端：直接访问 localhost:25884 的服务器
   // Web 端（开发环境）：通过 Vite 代理转发到 http://127.0.0.1:25884

@@ -10,7 +10,14 @@
  */
 
 /** 可上报的换源源（与服务端契约枚举一致） */
-export type ProbeSource = "kuwo" | "bodian" | "netease" | "migu" | "changqing" | "lxmusic";
+export type ProbeSource =
+  | "kuwo"
+  | "bodian"
+  | "netease"
+  | "migu"
+  | "changqing"
+  | "lxmusic"
+  | "xinghai";
 
 /** 失败类别（与服务端契约枚举一致） */
 export type ProbeFailCategory =

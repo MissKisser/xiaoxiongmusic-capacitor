@@ -12,10 +12,19 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createPinia, setActivePinia } from "pinia";
+import "./helpers/setup";
 import { planPlayback, type PlaybackDecisionInput } from "../src/core/player/playbackDecision";
 import { getUnlockPriority, getPlatformLabel } from "../src/utils/unlockPriority";
 import { UnlockUrlCache, UNLOCKED_URL_TTL_MS } from "../src/utils/unlockUrlCache";
 import { SongUnlockServer } from "../src/types/shared";
+import { getUnlockSourceName, SONG_UNLOCK_PRIORITY } from "../src/core/player/SongManager";
+import { useSettingStore } from "../src/stores/setting";
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("播放决策树与换源优先级", () => {
   describe("播放决策树 planPlayback", () => {
@@ -88,9 +97,9 @@ describe("播放决策树与换源优先级", () => {
   });
 
   describe("平台换源优先级分派 unlockPriority (A-05 铁律)", () => {
-    it("网易云歌曲以 NETEASE 为第一首选", () => {
+    it("网易云歌曲以 XINGHAI 为第一首选", () => {
       const priority = getUnlockPriority("netease");
-      assert.equal(priority[0], SongUnlockServer.NETEASE);
+      assert.equal(priority[0], SongUnlockServer.XINGHAI);
       assert.equal(getPlatformLabel("netease"), "网易云");
     });
 
@@ -102,6 +111,7 @@ describe("播放决策树与换源优先级", () => {
       // 第三方平台歌曲对 NETEASE 源走关键词寻址（useKeywordLookup），不拿平台数字 ID 直查，
       // 故 NETEASE 可入 QQ/酷狗链（A-05 禁的是数字 ID 直查，不是源入链）
       assert.deepEqual(neteasePriority, [
+        SongUnlockServer.XINGHAI,
         SongUnlockServer.NETEASE,
         SongUnlockServer.MIGU,
         SongUnlockServer.CHANGQING,
@@ -168,6 +178,38 @@ describe("播放决策树与换源优先级", () => {
       assert.equal(cache.get("key1", now + 2000), null);
       assert.notEqual(cache.get("key2", now + 2000), null);
       assert.notEqual(cache.get("key3", now + 2000), null);
+    });
+  });
+
+  describe("星海音源统一定义断言", () => {
+    it("星海音源源名映射与基线优先级", () => {
+      assert.equal(getUnlockSourceName(SongUnlockServer.XINGHAI), "星海音源");
+      assert.equal(SONG_UNLOCK_PRIORITY[0], SongUnlockServer.XINGHAI);
+    });
+
+    it("设置项默认包含星海音源且默认启用", () => {
+      setActivePinia(createPinia());
+      const settingStore = useSettingStore();
+      const xinghai = settingStore.songUnlockServer.find(
+        (s) => s.key === SongUnlockServer.XINGHAI,
+      );
+      assert.ok(xinghai, "默认换源清单应包含星海音源");
+      assert.equal(xinghai.enabled, true, "星海音源应默认启用");
+    });
+
+    it("设置页组件包含星海音源标签定义", () => {
+      const vueContent = readFileSync(
+        path.join(repoRoot, "src/components/Modal/Setting/SongUnlockManager.vue"),
+        "utf8",
+      );
+      assert.ok(
+        vueContent.includes("星海音源（社区公益源，网易云曲库）"),
+        "设置页组件应声明星海音源专属标签",
+      );
+      assert.ok(
+        vueContent.includes("SongUnlockServer.XINGHAI"),
+        "设置页组件应注册 XINGHAI 枚举项",
+      );
     });
   });
 });

@@ -28,6 +28,8 @@ export enum SongUnlockServer {
   CHANGQING = "changqing",
   /** 落雪音源（lx 协议自定义源） */
   LXMUSIC = "lxmusic",
+  /** 星海音源（lx 协议网易云通道） */
+  XINGHAI = "xinghai",
 }
 
 /**

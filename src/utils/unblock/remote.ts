@@ -1,9 +1,9 @@
 /**
- * 远程换源回退（MIGU / CHANGQING / LXMUSIC）
+ * 远程换源回退（MIGU / CHANGQING / LXMUSIC / XINGHAI）
  *
- * 这三个源在移动端没有本地实现：咪咕官方曲库检索、长青公益聚合站、落雪自定义源协议
+ * 这四个源在移动端没有本地实现：咪咕官方曲库检索、长青公益聚合站、落雪自定义源协议、星海网易云通道
  * 都依赖服务端同源实现（服务端持有取链凭据、候选检索与直链体积校验逻辑），
- * 端侧直连既拿不到凭据也无法复刻校验链路。故端侧不再把三者当成未知源直接判死链，
+ * 端侧直连既拿不到凭据也无法复刻校验链路。故端侧不再把这些源当成未知源直接判死链，
  * 而是在本地直连分发层内回退到远程解锁服务，由服务端完成检索、取链与校验，
  * 端侧只负责组装查询参数与归一化返回结果。
  *
@@ -30,12 +30,13 @@ export const REMOTE_UNLOCK_SERVERS: readonly SongUnlockServer[] = [
     SongUnlockServer.MIGU,
     SongUnlockServer.CHANGQING,
     SongUnlockServer.LXMUSIC,
+    SongUnlockServer.XINGHAI,
 ];
 
 /**
  * 各远程源的请求超时预算（毫秒）
  *
- * 与 PC 端解锁链的 UNLOCK_TIMEOUT 三源预算一致：服务端在一次请求内串行完成
+ * 与 PC 端解锁链的 UNLOCK_TIMEOUT 预算一致：服务端在一次请求内串行完成
  * 「检索 → 取链 → 体积校验」，咪咕需遍历音质档位、长青需探测真实音频时长，
  * 预算过短会把仍在处理中的慢源误判为失败。
  */
@@ -43,6 +44,7 @@ export const REMOTE_UNLOCK_TIMEOUT: Partial<Record<SongUnlockServer, number>> = 
     [SongUnlockServer.MIGU]: 30000,
     [SongUnlockServer.CHANGQING]: 40000,
     [SongUnlockServer.LXMUSIC]: 20000,
+    [SongUnlockServer.XINGHAI]: 20000,
 };
 
 /** 未单独配置预算的远程源所用的默认超时（毫秒） */
