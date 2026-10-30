@@ -5,7 +5,7 @@
  * 1. 搜索分类到平台模块参数的映射（QQ / 酷狗 search 模块的 type 口径与关键词透传）；
  * 2. 分页参数拼装（页码透传、QQ 单页 40 上限收敛、hasMore 翻页判定）；
  * 3. 平台返回结构差异的归一化（platform / platformId 在四类结果上透出）；
- * 4. 空响应降级（空搜索结果、酷狗无热搜、空热搜列表、空建议分组）。
+ * 4. 空响应降级（空搜索结果、酷狗热搜空列表、空热搜列表、空建议分组）。
  *
  * @author Hackerdallas
  */
@@ -263,39 +263,29 @@ describe("空响应降级", () => {
     }
   });
 
-  it("酷狗热搜由热歌榜曲名派生：取榜单清单与详情两次数据面调用", async () => {
-    installInterceptor((_platform, name) => {
-      if (name === "leaderboard_list") {
-        return {
-          groups: [
-            { groupId: 1, groupName: "官方榜", toplists: [{ rankId: 888, title: "热歌榜" }] },
-            { groupId: 2, groupName: "特色榜", toplists: [{ rankId: 3000, title: "飙升榜" }] },
-          ],
-        };
-      }
-      return {
-        title: "热歌榜",
-        total: 2,
-        songs: [
-          { hash: "KGHASH01", name: "晴天", singer: "周杰伦" },
-          { hash: "KGHASH02", name: "晴天", singer: "翻唱" },
-          { hash: "KGHASH03", name: "稻香", singer: "周杰伦" },
-        ],
-      };
-    });
+  it("酷狗热搜走原生热搜模块 hot_search，条目不带热度值", async () => {
+    installInterceptor(() => ({
+      total: 2,
+      list: [
+        { rank: 1, keyword: "说好再见却再也不见", description: "" },
+        { rank: 2, keyword: "我好像在哪见过你", description: "" },
+      ],
+    }));
     const hot = await dispatchHotSearch("kugou");
-    assert.equal(calls[0].name, "leaderboard_list");
-    assert.equal(calls[1].name, "leaderboard_detail");
-    assert.equal(calls[1].params.rankid, 888);
-    // 同名曲只保留一条，分值按名次递减
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].platform, "kugou");
+    assert.equal(calls[0].name, "hot_search");
+    assert.equal(calls[0].params.limit, 20);
     assert.deepEqual(hot, [
-      { searchWord: "晴天", score: 100, content: "" },
-      { searchWord: "稻香", score: 97, content: "" },
+      { searchWord: "说好再见却再也不见", content: "" },
+      { searchWord: "我好像在哪见过你", content: "" },
     ]);
+    // 上游不提供热度值，条目不含 score
+    assert.equal(hot[0].score, undefined);
   });
 
-  it("酷狗榜单清单为空时热搜降级为空数组", async () => {
-    installInterceptor(() => ({ groups: [] }));
+  it("酷狗热搜模块返回空列表时降级为空数组", async () => {
+    installInterceptor(() => ({ total: 0, list: [] }));
     const hot = await dispatchHotSearch("kugou");
     assert.deepEqual(hot, []);
   });

@@ -1329,34 +1329,54 @@ export const kgLeaderboardDetail = async (
   };
 };
 
+/** 主进程酷狗热搜模块的原生返回 */
+interface KgHotSearchRawResponse {
+  code?: number;
+  total?: number;
+  list?: Array<{
+    rank?: number;
+    keyword?: string;
+    description?: string;
+  }>;
+  message?: string;
+}
+
+/** 酷狗热搜条目 */
+export interface KgHotSearchEntry {
+  /** 热搜名次 */
+  rank: number;
+  /** 热搜词 */
+  keyword: string;
+  /** 热搜描述（上游未给出真实描述时为空） */
+  description: string;
+}
+
+/** 酷狗热搜结果 */
+export interface KgHotSearchResponse {
+  /** 热搜条目总数 */
+  total: number;
+  /** 热搜条目列表 */
+  list: KgHotSearchEntry[];
+}
+
 /**
  * 读取酷狗热搜词
  *
- * 酷狗无公开热搜词接口，用热歌榜（找不到时退到首个榜单）的顶部曲名
- * 作为热搜词来源，与站内搜索天然可衔接。
- * @returns 热搜词列表（按榜单名次降序给分）
+ * 走酷狗原生热搜榜接口（主进程 `hot_search` 模块），不再由榜单曲名派生。
+ * 上游不提供真实热度值，条目只有名次、词条与描述，不含热度分。
+ * @param limit 条数上限
+ * @returns 热搜词列表
  */
-export const kgHotSearch = async (): Promise<
-  { keyword: string; score: number }[]
-> => {
-  const groups = await kgLeaderboardList();
-  const boards = groups.flatMap((group) => group.toplists ?? []);
-  const target =
-    boards.find((board) => /热歌/.test(board.title)) ??
-    boards.find((board) => /飙升/.test(board.title)) ??
-    boards[0];
-  if (!target) return [];
-  const detail = await kgLeaderboardDetail(target.topId, 1, 30);
-  const seen = new Set<string>();
-  const items: { keyword: string; score: number }[] = [];
-  for (const song of detail.songs) {
-    const keyword = String(song?.name ?? "").trim();
-    if (!keyword || seen.has(keyword)) continue;
-    seen.add(keyword);
-    items.push({ keyword, score: Math.max(1, 100 - items.length * 3) });
-    if (items.length >= 20) break;
-  }
-  return items;
+export const kgHotSearch = async (limit = 20): Promise<KgHotSearchResponse> => {
+  const res = await platformRequest<KgHotSearchRawResponse>(KUGOU, "hot_search", { limit });
+  return {
+    total: Number(res?.total ?? 0),
+    list: (res?.list ?? []).map((item) => ({
+      rank: Number(item?.rank ?? 0),
+      keyword: String(item?.keyword ?? ""),
+      description: String(item?.description ?? ""),
+    })),
+  };
 };
 
 /** 酷狗歌手分类项 */

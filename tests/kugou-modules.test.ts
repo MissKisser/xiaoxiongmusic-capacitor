@@ -68,7 +68,7 @@ import {
 import { songfm } from "../src/utils/platform/kugou/modules/songfm";
 
 describe("酷狗模块注册表与调用入口", () => {
-  it("模块注册表包含全量 29 个接口入口", () => {
+  it("模块注册表包含全量 30 个接口入口", () => {
     const list = listKugouModules();
     const expected = [
       "login_qr_key",
@@ -93,6 +93,7 @@ describe("酷狗模块注册表与调用入口", () => {
       "audiobook/list",
       "audiobook/detail",
       "hot_artists",
+      "hot_search",
       "playlist",
       "playlist_square",
       "leaderboard_list",
@@ -110,7 +111,7 @@ describe("酷狗模块注册表与调用入口", () => {
 
   it("modules 对象导出与注册表键集严格一致", () => {
     const exportedKeys = Object.keys(modules);
-    assert.equal(exportedKeys.length, 29);
+    assert.equal(exportedKeys.length, 30);
   });
 });
 

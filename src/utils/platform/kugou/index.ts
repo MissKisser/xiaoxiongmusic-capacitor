@@ -60,7 +60,11 @@ export const clearKugouCache = (): void => {
 /** 默认缓存存活时间：2 分钟 */
 const DEFAULT_TTL = 2 * 60 * 1000;
 
-/** 不走缓存的实时或敏感接口 */
+/**
+ * 不走缓存的实时或敏感接口
+ *
+ * 热搜词实时性要求高（与 QQ 音乐热搜口径一致），不做内存缓存。
+ */
 const NON_CACHEABLE: ReadonlySet<string> = new Set([
   "login_qr_key",
   "login_qr_check",
@@ -72,6 +76,7 @@ const NON_CACHEABLE: ReadonlySet<string> = new Set([
   "leaderboard_list",
   "leaderboard_detail",
   "hot_artists",
+  "hot_search",
   "songfm",
   "home/album",
   "home/theme",

@@ -1,7 +1,7 @@
 /**
  * 酷狗音乐平台模块注册表
  *
- * 覆盖：登录、用户资料、歌单读写、搜索、播放直链、榜单、首页、歌手、专辑、评论、听书、每日推荐、刷歌FM、歌词。
+ * 覆盖：登录、用户资料、歌单读写、搜索、播放直链、榜单、热搜、首页、歌手、专辑、评论、听书、每日推荐、刷歌FM、歌词。
  *
  * @author Hackerdallas
  */
@@ -22,6 +22,7 @@ import { album } from "./album";
 import { artist } from "./artist";
 import { audiobookCategory, audiobookDetail, audiobookList } from "./audiobook";
 import { hot_artists } from "./hot_artists";
+import { hot_search } from "./hot_search";
 import { comment } from "./comment";
 import { homeAlbum } from "./home_album";
 import { homeTheme } from "./home_theme";
@@ -57,6 +58,7 @@ export const modules: Record<string, KGModule> = {
   "audiobook/list": audiobookList,
   "audiobook/detail": audiobookDetail,
   hot_artists,
+  hot_search,
   playlist,
   playlist_square,
   leaderboard_list,
@@ -84,6 +86,7 @@ export {
   audiobookDetail,
   audiobookList,
   hot_artists,
+  hot_search,
   comment,
   homeAlbum,
   homeTheme,

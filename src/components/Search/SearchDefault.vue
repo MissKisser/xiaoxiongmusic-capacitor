@@ -52,7 +52,7 @@
               </div>
               <n-text class="content" depth="3">{{ item.content }}</n-text>
             </div>
-            <div class="hot">
+            <div v-if="item.score !== undefined" class="hot">
               <SvgIcon name="Fire" />
               <n-text class="hot-num">{{ item.score }} </n-text>
             </div>
@@ -76,7 +76,8 @@ import {
 
 interface SearchHotItem {
   searchWord: string;
-  score: number;
+  /** 热度分，上游平台未提供时缺省 */
+  score?: number;
   content: string;
   iconUrl?: string;
   iconType?: number;
@@ -92,6 +93,8 @@ const settingStore = useSettingStore();
 const platformStore = usePlatformStore();
 
 const searchHotData = ref<SearchHotItem[]>([]);
+// 请求序号：平台切换后丢弃旧平台的在途响应
+const hotRequestId = ref<number>(0);
 
 // 是否展示
 const isShow = computed(() => {
@@ -108,17 +111,26 @@ const isShow = computed(() => {
 const getSearchHotData = async () => {
   if (!settingStore.useOnlineService || !settingStore.showHotSearch) return;
   const platform = platformStore.currentPlatform;
+  const currentId = ++hotRequestId.value;
   // 网易云沿用既有缓存键，其余平台按平台隔离缓存
   const cacheKey = platform === "netease" ? "searchHotData" : `searchHotData-${platform}`;
   try {
     const result = await getCacheData(() => dispatchHotSearch(platform), {
       key: cacheKey,
       time: 10,
+      // 空结果不写入缓存，避免上游失败被固化
+      skipEmpty: true,
     });
+    // 已被更新的请求取代时丢弃本次结果
+    if (currentId !== hotRequestId.value) return;
+    // 平台已切换时丢弃本次结果，避免串味
+    if (platformStore.currentPlatform !== platform) return;
     searchHotData.value = result ?? [];
   } catch (error) {
-    // 获取失败时保持空数组，隐藏热搜榜而非展示错误
+    if (currentId !== hotRequestId.value) return;
+    // 获取失败时清空并隐藏热搜榜，不保留上一个平台的数据
     console.error("获取热搜数据失败", error);
+    searchHotData.value = [];
   }
 };
 
@@ -141,6 +153,10 @@ onMounted(() => {
 
 // 平台切换后按新平台重新取热搜
 const stopPlatformWatch = onPlatformChange(() => {
+  // 作废在途响应，避免旧平台的热搜覆盖新平台
+  hotRequestId.value += 1;
+  // 清空旧平台的热搜，避免切换瞬间串味
+  searchHotData.value = [];
   getSearchHotData();
 });
 
