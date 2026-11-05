@@ -17,6 +17,7 @@ export interface VersionInfo {
     downloadUrl?: string;
     description: string;
     isForce: boolean;
+    assets?: { variant: string; url: string }[];
 }
 
 export interface CheckResult {
@@ -97,7 +98,8 @@ export async function checkForUpdates(): Promise<CheckResult> {
                     apkUrl: data.apkUrl || data.downloadUrl || '',
                     downloadUrl: data.downloadUrl || data.apkUrl || '',
                     description: data.description || '',
-                    isForce: !!data.isForce
+                    isForce: !!data.isForce,
+                    assets: data.assets
                 }
             };
         } else {

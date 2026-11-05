@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import api from '@/utils/api';
 import packageJson from '@/../package.json';
 import { isCapacitor, isIos } from '@/utils/env';
+import { pickDefaultAssetUrl } from '@/utils/updateAssets';
 
 /**
  * 版本信息描述
@@ -13,6 +14,7 @@ export interface VersionInfo {
     downloadUrl?: string;
     description: string;
     isForce: boolean;
+    assets?: { variant: string; url: string }[];
 }
 
 /**
@@ -99,7 +101,8 @@ export const useVersionStore = defineStore('version', {
          * @returns 是否成功拉起浏览器
          */
         downloadViaBrowser(url?: string): boolean {
-            const targetUrl = url || this.versionInfo?.apkUrl || this.versionInfo?.downloadUrl;
+            const defaultAssetUrl = pickDefaultAssetUrl(this.versionInfo?.assets);
+            const targetUrl = url || defaultAssetUrl || this.versionInfo?.apkUrl || this.versionInfo?.downloadUrl;
             if (!targetUrl) {
                 this.errorMessage = '下载链接无效';
                 return false;
@@ -120,7 +123,8 @@ export const useVersionStore = defineStore('version', {
          * @returns 是否成功启动下载或拉起安装器
          */
         async downloadUpdate(): Promise<boolean> {
-            const targetUrl = this.versionInfo?.apkUrl || this.versionInfo?.downloadUrl;
+            const defaultAssetUrl = pickDefaultAssetUrl(this.versionInfo?.assets);
+            const targetUrl = defaultAssetUrl || this.versionInfo?.apkUrl || this.versionInfo?.downloadUrl;
             if (!targetUrl) {
                 this.errorMessage = '下载链接无效';
                 this.downloadStatus = 'error';

@@ -102,7 +102,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { useVersionStore } from '@/stores/version';
-import { marked } from 'marked';
+import { renderMarkdown } from '@/utils/renderMarkdown';
 
 const versionStore = useVersionStore();
 
@@ -111,7 +111,7 @@ const showModal = ref(false);
 // 渲染 Markdown
 const renderedDescription = computed(() => {
   if (!versionStore.versionInfo?.description) return '';
-  return marked.parse(versionStore.versionInfo.description);
+  return renderMarkdown(versionStore.versionInfo.description);
 });
 
 // 操作按钮文案
@@ -169,6 +169,9 @@ const handleSkip = () => {
     font-size: 14px;
     line-height: 1.6;
     color: var(--n-text-color-2);
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
 
     &.empty {
       text-align: center;
