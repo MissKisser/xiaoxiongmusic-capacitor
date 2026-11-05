@@ -35,6 +35,7 @@ import {
 } from "@/utils/probeSampling";
 import { getPlatformLabel, getUnlockPriority } from "@/utils/unlockPriority";
 import { UnlockUrlCache } from "@/utils/unlockUrlCache";
+import { raceUnlockSources, type UnlockAttempt } from "@/utils/unlockRace";
 
 export { SongUnlockServer };
 
@@ -696,7 +697,9 @@ class SongManager {
       };
     }
 
-    console.log(`[UNLOCK] [${songId}] 开始按优先级尝试解锁服务（平台：${getPlatformLabel(platform)}）`);
+    console.log(
+      `[UNLOCK] [${songId}] 开始全量并行尝试解锁服务（平台：${getPlatformLabel(platform)}，并发源: ${sortedServers.map((s) => this.getUnlockSourceName(s)).join(", ")}）`,
+    );
     console.log(
       `[UNLOCK] [${songId}] 启用的服务: ${sortedServers.map((s) => this.getUnlockSourceName(s)).join(", ")}`,
     );
@@ -704,18 +707,20 @@ class SongManager {
       `[UNLOCK] [${songId}] 优先级顺序: ${sortedServers.map((s) => this.getUnlockSourceName(s)).join(" -> ")}`,
     );
 
-    const failures: string[] = [];
-    for (const server of sortedServers) {
+    const platformId =
+      song.platformId || (isNeteaseSong ? String(songId) : undefined);
+    const duration =
+      typeof song.duration === "number" && song.duration > 0
+        ? Math.round(song.duration / 1000)
+        : undefined;
+
+    const attempt = async (
+      server: SongUnlockServer,
+    ): Promise<UnlockAttempt<{ originalUrl: string; finalUrl: string }>> => {
       const sourceName = this.getUnlockSourceName(server);
       const startedAt = Date.now();
       try {
         console.log(`[UNLOCK] [${songId}] 正在尝试解锁服务: ${sourceName} (${server})...`);
-        const platformId =
-          song.platformId || (isNeteaseSong ? String(songId) : undefined);
-        const duration =
-          typeof song.duration === "number" && song.duration > 0
-            ? Math.round(song.duration / 1000)
-            : undefined;
         const result = await unlockSongUrl(songId, songName, artist, server, {
           duration,
           platform,
@@ -734,35 +739,24 @@ class SongManager {
 
           if (!finalUnlockUrl || finalUnlockUrl.trim() === "") {
             console.error(`[UNLOCK] [${songId}] ${sourceName} 处理后的 URL 无效，跳过此服务`);
-            continue;
+            return {
+              ok: false,
+              server,
+              durationMs,
+              reason: "URL 处理失败",
+            };
           }
-
-          let quality = QualityType.HQ;
-          if (originalUrl.includes(".flac") || originalUrl.includes(".wav")) {
-            quality = QualityType.SQ;
-          }
-
-          console.log(`[UNLOCK] [${songId}] 解锁成功！`);
-          console.log(`   📍 解锁源: ${sourceName} (${server})`);
-          console.log(`   🎵 音质: ${quality}`);
-
-          this.triggerCacheDownload(cacheKey, originalUrl);
-
-          unlockedUrlCache.set(String(cacheKey), {
-            url: originalUrl,
-            quality,
-            unlockSource: server,
-          });
 
           return {
-            id: songId,
-            url: finalUnlockUrl,
-            isUnlocked: true,
-            quality,
-            unlockSource: server,
+            ok: true,
+            server,
+            durationMs,
+            value: {
+              originalUrl,
+              finalUrl: finalUnlockUrl,
+            },
           };
         } else {
-          failures.push(`${sourceName}：未找到可用链接`);
           this.reportSourceProbe(
             server,
             false,
@@ -770,16 +764,63 @@ class SongManager {
             classifyUnlockFailure(result.reason),
           );
           console.warn(`[UNLOCK] [${songId}] ${sourceName} 返回失败，继续尝试下一个服务...`);
+          return {
+            ok: false,
+            server,
+            durationMs,
+            reason: "未找到可用链接",
+          };
         }
       } catch (error) {
         const durationMs = Date.now() - startedAt;
-        failures.push(`${sourceName}：请求失败`);
         this.reportSourceProbe(server, false, durationMs, classifyUnlockError(error));
         console.error(`[UNLOCK] [${songId}] ${sourceName} 请求失败:`, error);
+        return {
+          ok: false,
+          server,
+          durationMs,
+          reason: "请求失败",
+        };
       }
+    };
+
+    const { winner, failures } = await raceUnlockSources(sortedServers, attempt);
+
+    if (winner) {
+      const { server, value } = winner;
+      const { originalUrl, finalUrl } = value;
+      const sourceName = this.getUnlockSourceName(server);
+
+      let quality = QualityType.HQ;
+      if (originalUrl.includes(".flac") || originalUrl.includes(".wav")) {
+        quality = QualityType.SQ;
+      }
+
+      console.log(`[UNLOCK] [${songId}] 解锁成功！`);
+      console.log(`   📍 解锁源: ${sourceName} (${server})`);
+      console.log(`   🎵 音质: ${quality}`);
+
+      this.triggerCacheDownload(cacheKey, originalUrl);
+
+      unlockedUrlCache.set(String(cacheKey), {
+        url: originalUrl,
+        quality,
+        unlockSource: server,
+      });
+
+      return {
+        id: songId,
+        url: finalUrl,
+        isUnlocked: true,
+        quality,
+        unlockSource: server,
+      };
     }
 
-    console.warn(`[UNLOCK] [${songId}] 所有解锁服务均失败：${failures.join("；")}`);
+    const failureMessages = failures.map(
+      (f) => `${this.getUnlockSourceName(f.server)}：${f.reason}`,
+    );
+    console.warn(`[UNLOCK] [${songId}] 所有解锁服务均失败：${failureMessages.join("；")}`);
     return { id: songId, url: undefined, failureReason: PLAYBACK_FAILED_TEXT };
   };
 

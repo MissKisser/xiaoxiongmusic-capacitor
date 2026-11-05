@@ -5,6 +5,7 @@ import { saveAs } from "file-saver";
 import { cloneDeep } from "lodash-es";
 import { songDownloadUrl, songLyric, songLyricTTML, songUrl, unlockSongUrl } from "@/api/song";
 import { SongUnlockServer } from "@/core/player/SongManager";
+import { raceUnlockSources, type UnlockAttempt } from "@/utils/unlockRace";
 
 import { songLevelData } from "@/utils/meta";
 import { getPlayerInfoObj } from "@/utils/format";
@@ -290,33 +291,58 @@ class DownloadManager {
           
           const artist = (Array.isArray(song.artists) ? song.artists[0]?.name : song.artists) || "";
 
-          // 按顺序请求，一旦成功就使用
-          for (const server of sortedServers) {
-            try {
-              // 解锁接口签名：(id, songName, artist, server)，须传全 4 个参数
-              const result = await unlockSongUrl(song.id, song.name, artist, server);
-              if (result.code === 200 && result.url) {
-                url = result.url;
-                // 尝试推断类型
-                const extensionMatch = url.match(/\.([a-z0-9]+)(?:[?#]|$)/i);
-                const extension = extensionMatch ? extensionMatch[1].toLowerCase() : null;
-                switch (extension) {
-                  case "flac":
-                  case "ogg":
-                  case "wav":
-                  case "m4a":
-                    type = extension;
-                    break;
-                  default:
-                    type = "mp3";
+          // 并行竞速所有启用的解锁服务，首个成功立即采用
+          const { winner } = await raceUnlockSources(
+            sortedServers,
+            async (server): Promise<UnlockAttempt<string>> => {
+              const startedAt = Date.now();
+              try {
+                // 解锁接口签名：(id, songName, artist, server)，须传全 4 个参数
+                const result = await unlockSongUrl(song.id, song.name, artist, server);
+                const durationMs = Date.now() - startedAt;
+                if (result.code === 200 && result.url) {
+                  return {
+                    ok: true,
+                    server,
+                    durationMs,
+                    value: result.url,
+                  };
                 }
-                console.log(`🔓 [${song.id}] Unlock download URL found from ${server}:`, url);
-                break; // 找到可用链接，退出循环
+                return {
+                  ok: false,
+                  server,
+                  durationMs,
+                  reason: "未找到可用链接",
+                };
+              } catch (error) {
+                const durationMs = Date.now() - startedAt;
+                console.warn(`⚠️ [${song.id}] 解锁服务 ${server} 请求失败:`, error);
+                return {
+                  ok: false,
+                  server,
+                  durationMs,
+                  reason: "请求失败",
+                };
               }
-            } catch (error) {
-              console.warn(`⚠️ [${song.id}] 解锁服务 ${server} 请求失败:`, error);
-              // 继续尝试下一个服务
+            },
+          );
+
+          if (winner) {
+            url = winner.value;
+            // 尝试推断类型
+            const extensionMatch = url.match(/\.([a-z0-9]+)(?:[?#]|$)/i);
+            const extension = extensionMatch ? extensionMatch[1].toLowerCase() : null;
+            switch (extension) {
+              case "flac":
+              case "ogg":
+              case "wav":
+              case "m4a":
+                type = extension;
+                break;
+              default:
+                type = "mp3";
             }
+            console.log(`🔓 [${song.id}] Unlock download URL found from ${winner.server}:`, url);
           }
         } catch (e) {
           console.error("Error fetching unlock url for download:", e);
