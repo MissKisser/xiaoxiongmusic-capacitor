@@ -1,9 +1,9 @@
-import { isElectron, isCapacitor } from "@/utils/env";
+import { isElectron } from "@/utils/env";
 import { defaultAMLLDbServer, songLevelData } from "@/utils/meta";
 import { SongUnlockServer } from "@/core/player/SongManager";
 import { useSettingStore } from "@/stores";
 import request from "@/utils/request";
-import { localUnlockSongUrl, type UnlockRequestContext } from "@/utils/unblock";
+import { localUnlockSongUrl, type SongUrlResult, type UnlockRequestContext } from "@/utils/unblock";
 
 // 获取歌曲详情
 export const songDetail = (ids: number | number[]) => {
@@ -55,7 +55,7 @@ type UnlockSongUrlHandler = (
   artist: string,
   server: SongUnlockServer,
   context?: UnlockRequestContext,
-) => Promise<{ code: number; url: string | null; reason?: string; lengthVerified?: boolean }>;
+) => Promise<SongUrlResult>;
 
 let customUnlockHandler: UnlockSongUrlHandler | null = null;
 
@@ -63,41 +63,28 @@ export const setCustomUnlockHandler = (handler: UnlockSongUrlHandler | null): vo
   customUnlockHandler = handler;
 };
 
-// 获取解锁歌曲 URL
+/**
+ * 获取解锁歌曲 URL（全部音源端侧本地解锁）
+ * @param id 歌曲 ID（网易云使用）
+ * @param songName 歌曲名
+ * @param artist 歌手名
+ * @param server 解锁源
+ * @param context 换源寻址上下文（时长 / 平台 / 平台内 id）
+ * @returns 解锁结果，成功时携带 lengthVerified 直链体积校验标记
+ */
 export const unlockSongUrl = (
   id: number,
   songName: string,
   artist: string,
   server: SongUnlockServer,
   context?: UnlockRequestContext,
-) => {
+): Promise<SongUrlResult> => {
   if (customUnlockHandler) {
     return customUnlockHandler(id, songName, artist, server, context);
   }
 
-  // Capacitor 环境：使用本地解锁（避免服务器 IP 被封禁）
-  if (isCapacitor) {
-    console.log(`🔓 [Capacitor] 使用本地解锁: server=${server}`);
-    return localUnlockSongUrl(id, songName, artist, server, context);
-  }
-
-  // Web/Electron 环境：继续使用服务器 API
-  // 构建 keyword 用于搜索
-  const keyword = `${songName}-${artist}`;
-  const params: Record<string, unknown> =
-    server === SongUnlockServer.NETEASE ? { id } : { keyword, songName };
-  if (context?.duration) params.duration = context.duration;
-  if (context?.platform) params.platform = context.platform;
-  if (context?.platformId) params.platformId = context.platformId;
-  // 使用 /api/unblock 作为 baseURL
-  // Electron 端：直接访问 localhost:25884 的服务器
-  // Web 端（开发环境）：通过 Vite 代理转发到 http://127.0.0.1:25884
-  // Web 端（生产环境）：通过 nginx 代理转发到 http://localhost:25884
-  return request({
-    baseURL: "/api/unblock",
-    url: `/${server}`,
-    params: { ...params, noCookie: true },
-  });
+  console.log(`🔓 使用本地解锁: server=${server}`);
+  return localUnlockSongUrl(id, songName, artist, server, context);
 };
 
 // 获取歌曲歌词

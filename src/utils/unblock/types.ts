@@ -18,4 +18,11 @@ export interface SongUrlResult {
      * 为 false 时表示体积探测失败或缺少可比对的时长，直链未经体积校验。
      */
     lengthVerified?: boolean;
+    /**
+     * 胜出候选的元数据时长（秒）
+     *
+     * 供胜者终审比对同名异版：元数据时长与目标曲偏差超过终审容差时，
+     * 追加直链真实音频时长探测后决定放行或拒绝。
+     */
+    matchedDuration?: number;
 }
