@@ -4,7 +4,8 @@ import { isElectron } from "@/utils/env";
 import { saveAs } from "file-saver";
 import { cloneDeep } from "lodash-es";
 import { songDownloadUrl, songLyric, songLyricTTML, songUrl, unlockSongUrl } from "@/api/song";
-import { SongUnlockServer } from "@/core/player/SongManager";
+import { SongUnlockServer } from "@/types/shared";
+import { resolveSongPlatform } from "@/utils/songPlatform";
 import { raceUnlockSources, type UnlockAttempt } from "@/utils/unlockRace";
 
 import { songLevelData } from "@/utils/meta";
@@ -285,10 +286,16 @@ class DownloadManager {
           const enabledServers = settingStore.songUnlockServer
             .filter((s) => s.enabled)
             .map((s) => s.key);
-          
+
           // 按优先级顺序排序启用的服务器
-          const sortedServers = priorityOrder.filter((server) => enabledServers.includes(server));
-          
+          let sortedServers = priorityOrder.filter((server) => enabledServers.includes(server));
+
+          // A-05 铁律防御：非网易云歌曲绝不允许拿平台 ID 查网易云
+          const platform = resolveSongPlatform(song);
+          if (platform !== "netease") {
+            sortedServers = sortedServers.filter((server) => server !== SongUnlockServer.NETEASE);
+          }
+
           const artist = (Array.isArray(song.artists) ? song.artists[0]?.name : song.artists) || "";
 
           // 并行竞速所有启用的解锁服务，首个成功立即采用
@@ -297,8 +304,16 @@ class DownloadManager {
             async (server): Promise<UnlockAttempt<string>> => {
               const startedAt = Date.now();
               try {
-                // 解锁接口签名：(id, songName, artist, server)，须传全 4 个参数
-                const result = await unlockSongUrl(song.id, song.name, artist, server);
+                // 解锁接口签名：(id, songName, artist, server, context)，须带全换源寻址上下文
+                const result = await unlockSongUrl(song.id, song.name, artist, server, {
+                  duration:
+                    typeof song.duration === "number" && song.duration > 0
+                      ? Math.round(song.duration / 1000)
+                      : undefined,
+                  platform,
+                  platformId:
+                    song.platformId || (platform === "netease" ? String(song.id) : undefined),
+                });
                 const durationMs = Date.now() - startedAt;
                 if (result.code === 200 && result.url) {
                   return {
