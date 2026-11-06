@@ -316,7 +316,7 @@ const getGequbaoSongUrl = async (keyword: string, duration?: number | string): P
         continue
       }
       unblockLog.log('🔗 GequbaoSong URL:', sanitizeUrl(url))
-      return { code: 200, url }
+      return { code: 200, url, matchedDuration: detail.candidate.duration }
     }
     return { code: 404, url: null, reason: FETCH_FAILED_REASON }
   } catch (error) {

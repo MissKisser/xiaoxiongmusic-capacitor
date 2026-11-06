@@ -290,6 +290,7 @@ const getKuwoSongUrl = async (
         code: 200,
         url: outcome.url,
         lengthVerified: check.verified,
+        matchedDuration: detail.candidate.duration,
       }
     }
     if (upstreamFault) breaker.recordFailure()

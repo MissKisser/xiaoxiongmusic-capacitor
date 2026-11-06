@@ -334,6 +334,7 @@ const getBodianSongUrl = async (
         code: 200,
         url,
         lengthVerified: check.verified,
+        matchedDuration: detail.candidate.duration,
       }
     }
     if (upstreamFault) breaker.recordFailure()

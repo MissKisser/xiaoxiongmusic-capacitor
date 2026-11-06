@@ -35,11 +35,11 @@ import {
   MISSING_TITLE_REASON,
   NO_CANDIDATE_REASON,
   UPSTREAM_UNAVAILABLE_REASON,
-  durationTolerance,
   isPlausibleAudioLength,
   rankCandidates,
   type MatchTarget,
 } from './match'
+import { DURATION_GATE_TOLERANCE_S } from "./duration-gate"
 import { probeAudio, type AudioProbe } from './audio-probe'
 import { searchQqCandidates } from './qq-search'
 import { sanitizeUrl } from './sanitize'
@@ -386,7 +386,7 @@ const getChangqingSongUrl = async (
               continue
             }
             const delta = Math.abs(probe.durationSec - target.duration)
-            if (delta > durationTolerance(target.duration)) {
+            if (delta > DURATION_GATE_TOLERANCE_S) {
               unblockLog.warn(
                 `⚠️ 长青 candidate rejected (${candidate.title}): 时长 ${probe.durationSec.toFixed(
                   1,

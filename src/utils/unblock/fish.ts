@@ -37,11 +37,11 @@ import {
   MISSING_TITLE_REASON,
   NO_CANDIDATE_REASON,
   UPSTREAM_UNAVAILABLE_REASON,
-  durationTolerance,
   isPlausibleAudioLength,
   rankCandidates,
   type MatchTarget,
 } from './match'
+import { DURATION_GATE_TOLERANCE_S } from "./duration-gate"
 import { probeAudio } from './audio-probe'
 import { probeContentLength } from './audio-length'
 import { searchQqCandidates } from './qq-search'
@@ -438,7 +438,7 @@ const getFishSongUrl = async (
     // 上游声明的时长与请求声明的时长必须一致，否则是另一版本
     if (upstreamDuration && target.duration) {
       const delta = Math.abs(upstreamDuration - target.duration)
-      if (delta > durationTolerance(target.duration)) {
+      if (delta > DURATION_GATE_TOLERANCE_S) {
         unblockLog.warn(
           `⚠️ fish candidate rejected: 上游时长 ${upstreamDuration}s 偏离目标 ${target.duration}s`,
         )
@@ -471,7 +471,7 @@ const getFishSongUrl = async (
       }
       if (expectedDuration) {
         const delta = Math.abs(probe.durationSec - expectedDuration)
-        if (delta > durationTolerance(expectedDuration)) {
+        if (delta > DURATION_GATE_TOLERANCE_S) {
           unblockLog.warn(
             `⚠️ fish candidate rejected: 时长 ${probe.durationSec.toFixed(1)}s 偏离目标 ${expectedDuration}s`,
           )

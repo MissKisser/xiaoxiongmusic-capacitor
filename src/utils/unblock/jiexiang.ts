@@ -32,10 +32,10 @@ import {
   MISSING_TITLE_REASON,
   NO_CANDIDATE_REASON,
   UPSTREAM_UNAVAILABLE_REASON,
-  durationTolerance,
   isPlausibleAudioLength,
   type MatchTarget,
 } from './match'
+import { DURATION_GATE_TOLERANCE_S } from "./duration-gate"
 import { probeAudio } from './audio-probe'
 import { sanitizeUrl } from './sanitize'
 import {
@@ -302,7 +302,7 @@ const getJiexiangSongUrl = async (
       // 时长闸门：真实音频时长必须与请求声明的时长在容差内
       if (expectedDuration) {
         const delta = Math.abs(probe.durationSec - expectedDuration)
-        if (delta > durationTolerance(expectedDuration)) {
+        if (delta > DURATION_GATE_TOLERANCE_S) {
           unblockLog.warn(
             `⚠️ jiexiang candidate rejected: 时长 ${probe.durationSec.toFixed(1)}s 偏离目标 ${expectedDuration}s`,
           )

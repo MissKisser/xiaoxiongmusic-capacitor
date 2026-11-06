@@ -44,11 +44,11 @@ import {
   MISSING_TITLE_REASON,
   NO_CANDIDATE_REASON,
   UPSTREAM_UNAVAILABLE_REASON,
-  durationTolerance,
   isPlausibleAudioLength,
   rankCandidates,
   type MatchTarget,
 } from './match'
+import { DURATION_GATE_TOLERANCE_S } from "./duration-gate"
 import { probeContentLength } from './audio-length'
 import { sanitizeUrl } from './sanitize'
 import { CircuitBreaker, TTLCache, isUpstreamFault, sleep } from './resilience'
@@ -593,7 +593,7 @@ const getMiguSongUrl = async (
       const realDuration = source.duration ?? candidate.duration
       if (realDuration && target.duration) {
         const delta = Math.abs(realDuration - target.duration)
-        if (delta > durationTolerance(target.duration)) {
+        if (delta > DURATION_GATE_TOLERANCE_S) {
           unblockLog.warn(
             `⚠️ Migu candidate rejected (${candidate.title}): 时长 ${realDuration}s 偏离请求 ${target.duration}s`,
           )
@@ -615,6 +615,7 @@ const getMiguSongUrl = async (
         code: 200,
         url: source.url,
         lengthVerified: check.verified,
+        matchedDuration: realDuration,
       }
     }
     if (upstreamFault) breaker.recordFailure()

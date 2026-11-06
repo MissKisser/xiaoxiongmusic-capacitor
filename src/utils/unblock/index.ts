@@ -10,6 +10,7 @@
  * 目标信息构造与关键词拼回的口径与 xiaoxiongmusic-server/unblock 的路由层保持一致。
  */
 import { SongUnlockServer } from "@/types/shared";
+import { gateSearchResult } from "./duration-gate";
 import type { SongUrlResult } from "./types";
 import getKuwoSongUrl from "./kuwo";
 import getBodianSongUrl from "./bodian";
@@ -97,6 +98,19 @@ export const formatKeyword = (target: MatchTarget): string => {
 export const NETEASE_ID_SPACE_REASON = "第三方平台歌曲不支持按 ID 直查网易云";
 
 /**
+ * 需要胜者终审的检索类源及其日志名
+ *
+ * 这些源的校验只比对候选元数据时长；长青/落雪源内已有真实音频时长闸门，
+ * 直查类源按平台 ID 寻址天然同曲，均不需要终审。
+ */
+const DURATION_GATE_SOURCES: Partial<Record<SongUnlockServer, string>> = {
+    [SongUnlockServer.KUWO]: "酷我",
+    [SongUnlockServer.BODIAN]: "波点",
+    [SongUnlockServer.GEQUBAO]: "歌曲宝",
+    [SongUnlockServer.MIGU]: "咪咕",
+};
+
+/**
  * 本地解锁歌曲 URL
  * @param id 歌曲 ID（网易云使用）
  * @param songName 歌曲名（用于匹配验证）
@@ -167,6 +181,13 @@ export async function localUnlockSongUrl(
             default:
                 unblockLog.warn(`⚠️ 未知的解锁服务器类型: ${server}`);
                 result = { code: 404, url: null };
+        }
+
+        // 检索类源胜者终审：候选元数据时长进入灰区时读直链真实音频时长复核，
+        // 疑似同名异版则改判失败，交由竞速编排让位次胜者
+        // （长青/落雪源内已有真实音频时长闸门，不重复终审）。
+        if (DURATION_GATE_SOURCES[server]) {
+            result = await gateSearchResult(result, target.duration, DURATION_GATE_SOURCES[server]);
         }
 
         // 详细日志输出
